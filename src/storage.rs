@@ -11,10 +11,7 @@ pub fn set_journal_path(path: PathBuf) {
 }
 
 pub fn get_active_journal_path() -> PathBuf {
-    JOURNAL_PATH
-        .get()
-        .cloned()
-        .unwrap_or_else(get_journal_path)
+    JOURNAL_PATH.get().cloned().unwrap_or_else(get_journal_path)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,20 +31,6 @@ impl Entry {
     pub fn new_task(content: &str) -> Self {
         Self {
             entry_type: EntryType::Task { completed: false },
-            content: content.to_string(),
-        }
-    }
-
-    pub fn new_note(content: &str) -> Self {
-        Self {
-            entry_type: EntryType::Note,
-            content: content.to_string(),
-        }
-    }
-
-    pub fn new_event(content: &str) -> Self {
-        Self {
-            entry_type: EntryType::Event,
             content: content.to_string(),
         }
     }
@@ -142,12 +125,7 @@ pub fn save_day_lines(date: NaiveDate, lines: &[Line]) -> io::Result<()> {
 }
 
 pub fn get_journal_path() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".config")
-        .join("caliber")
-        .join("journals")
-        .join("journal.md")
+    crate::config::get_default_journal_path()
 }
 
 fn day_header(date: NaiveDate) -> String {
@@ -280,7 +258,8 @@ fn remove_day(before: &str, after: &str) -> String {
 fn replace_day(before: &str, header: &str, content: &str, after: &str) -> String {
     format!("{}{}\n{}\n\n{}", before, header, content.trim_end(), after)
         .trim_end()
-        .to_string() + "\n"
+        .to_string()
+        + "\n"
 }
 
 fn insert_new_day(journal: &str, date: NaiveDate, header: &str, content: &str) -> String {
@@ -288,27 +267,33 @@ fn insert_new_day(journal: &str, date: NaiveDate, header: &str, content: &str) -
 
     let insert_pos = find_insertion_point(journal, date);
 
-    match insert_pos {
-        Some(pos) => {
-            let before = journal[..pos].trim_end();
-            let after = &journal[pos..];
-            if before.is_empty() {
-                format!("{}\n{}", new_day.trim_end(), after.trim_start())
-                    .trim_end().to_string() + "\n"
-            } else {
-                format!("{}\n\n{}\n{}", before, new_day.trim_end(), after.trim_start())
-                    .trim_end().to_string() + "\n"
-            }
+    if let Some(pos) = insert_pos {
+        let before = journal[..pos].trim_end();
+        let after = &journal[pos..];
+        if before.is_empty() {
+            format!("{}\n{}", new_day.trim_end(), after.trim_start())
+                .trim_end()
+                .to_string()
+                + "\n"
+        } else {
+            format!(
+                "{}\n\n{}\n{}",
+                before,
+                new_day.trim_end(),
+                after.trim_start()
+            )
+            .trim_end()
+            .to_string()
+                + "\n"
         }
-        None => {
-            let mut result = journal.trim_end().to_string();
-            if !result.is_empty() {
-                result.push_str("\n\n");
-            }
-            result.push_str(new_day.trim_end());
-            result.push('\n');
-            result
+    } else {
+        let mut result = journal.trim_end().to_string();
+        if !result.is_empty() {
+            result.push_str("\n\n");
         }
+        result.push_str(new_day.trim_end());
+        result.push('\n');
+        result
     }
 }
 
@@ -335,18 +320,18 @@ pub fn save_day(date: NaiveDate, content: &str) -> io::Result<()> {
 }
 
 #[derive(Debug, Clone)]
-pub struct TodoItem {
+pub struct TaskItem {
     pub date: NaiveDate,
     pub content: String,
     // Index within the day's parsed lines - used for reliable task matching
-    // when toggling from todos view (avoids ambiguity with duplicate content).
+    // when toggling from tasks view (avoids ambiguity with duplicate content).
     pub line_index: usize,
     pub completed: bool,
 }
 
-pub fn collect_all_todos() -> io::Result<Vec<TodoItem>> {
+pub fn collect_incomplete_tasks() -> io::Result<Vec<TaskItem>> {
     let journal = load_journal()?;
-    let mut todos = Vec::new();
+    let mut tasks = Vec::new();
     let mut current_date: Option<NaiveDate> = None;
     let mut line_index_in_day: usize = 0;
 
@@ -359,7 +344,7 @@ pub fn collect_all_todos() -> io::Result<Vec<TodoItem>> {
 
         if let Some(date) = current_date {
             if let Some(content) = line.trim_start().strip_prefix("- [ ] ") {
-                todos.push(TodoItem {
+                tasks.push(TaskItem {
                     date,
                     content: content.to_string(),
                     line_index: line_index_in_day,
@@ -370,8 +355,8 @@ pub fn collect_all_todos() -> io::Result<Vec<TodoItem>> {
         }
     }
 
-    todos.sort_by_key(|t| t.date);
-    Ok(todos)
+    tasks.sort_by_key(|t| t.date);
+    Ok(tasks)
 }
 
 #[cfg(test)]
@@ -436,7 +421,7 @@ mod tests {
     #[test]
     fn test_parse_empty_line() {
         let line = parse_line("");
-        assert_eq!(line, Line::Raw("".to_string()));
+        assert_eq!(line, Line::Raw(String::new()));
     }
 
     #[test]
@@ -458,13 +443,22 @@ mod tests {
     #[test]
     fn test_entry_toggle() {
         let mut entry = Entry::new_task("Test");
-        assert!(matches!(entry.entry_type, EntryType::Task { completed: false }));
+        assert!(matches!(
+            entry.entry_type,
+            EntryType::Task { completed: false }
+        ));
 
         entry.toggle_complete();
-        assert!(matches!(entry.entry_type, EntryType::Task { completed: true }));
+        assert!(matches!(
+            entry.entry_type,
+            EntryType::Task { completed: true }
+        ));
 
         entry.toggle_complete();
-        assert!(matches!(entry.entry_type, EntryType::Task { completed: false }));
+        assert!(matches!(
+            entry.entry_type,
+            EntryType::Task { completed: false }
+        ));
     }
 
     #[test]
@@ -524,7 +518,8 @@ mod tests {
 
     #[test]
     fn test_update_day_content_preserves_other_days() {
-        let journal = "# 2024/01/14\n- Day 14\n\n# 2024/01/15\n- Old task\n\n# 2024/01/16\n- Day 16\n";
+        let journal =
+            "# 2024/01/14\n- Day 14\n\n# 2024/01/15\n- Old task\n\n# 2024/01/16\n- Day 16\n";
         let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
         let updated = update_day_content(journal, date, "- Updated task");
 

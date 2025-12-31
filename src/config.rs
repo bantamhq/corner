@@ -65,6 +65,6 @@ pub fn get_config_path() -> PathBuf {
     get_config_dir().join("config.toml")
 }
 
-fn get_default_journal_path() -> PathBuf {
+pub fn get_default_journal_path() -> PathBuf {
     get_config_dir().join("journals").join("journal.md")
 }

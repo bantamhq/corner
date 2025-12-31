@@ -24,37 +24,36 @@ caliber init         # Create config file
 
 | Key | Action |
 |-----|--------|
-| `n` | New task |
-| `o` | New note |
-| `e` | New event |
+| `Enter` | New entry at end |
+| `i` | Insert entry below current |
+| `e` | Edit selected entry |
 | `j/k` | Navigate down/up |
-| `Enter` | Edit entry |
 | `x` | Toggle task complete |
 | `d` | Delete entry |
 | `h/l` or `[/]` | Previous/next day |
 | `t` | Go to today |
-| `Tab` | Switch to Todos view |
+| `Tab` | Switch to Tasks view |
 | `:goto` or `:gt` | Go to date (YYYY/MM/DD or MM/DD) |
 | `:q` | Quit |
 
-### Editing
+### Edit Mode
 
 | Key | Action |
 |-----|--------|
-| `Enter` | Save |
-| `Tab` | Save and create another |
-| `Esc` | Cancel |
+| `Enter` | Save and add new entry below |
+| `Tab` | Toggle entry type (task/note/event) |
+| `Esc` | Save and return to Daily |
 
-### Todos View
+### Tasks View
 
 Shows incomplete tasks across all days.
 
 | Key | Action |
 |-----|--------|
-| `j/k` | Navigate down/up |
-| `x` | Toggle complete |
-| `Enter` | Jump to day |
-| `Tab/Esc` | Back to Daily view |
+| `j/k` | Move down/up |
+| `x` | Toggle task |
+| `Enter` | Go to selected day |
+| `Tab` | Return to Daily |
 
 ## Journal Format
 
