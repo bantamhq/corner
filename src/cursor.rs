@@ -70,25 +70,6 @@ impl CursorBuffer {
         }
     }
 
-    pub fn char_at_cursor(&self) -> Option<char> {
-        self.content.chars().nth(self.cursor_char_pos)
-    }
-
-    pub fn text_before_cursor(&self) -> &str {
-        let byte_pos = self.cursor_byte_pos();
-        &self.content[..byte_pos]
-    }
-
-    pub fn text_after_cursor(&self) -> &str {
-        let byte_pos = self.cursor_byte_pos();
-        if byte_pos < self.content.len() {
-            let char_len = self.char_at_cursor().map_or(0, char::len_utf8);
-            &self.content[byte_pos + char_len..]
-        } else {
-            ""
-        }
-    }
-
     pub fn is_empty(&self) -> bool {
         self.content.is_empty()
     }
@@ -187,34 +168,6 @@ mod tests {
         assert_eq!(buf.cursor_char_pos(), 2); // Should not exceed length
     }
 
-    #[test]
-    fn test_char_at_cursor() {
-        let mut buf = CursorBuffer::new("abc".to_string());
-        assert_eq!(buf.char_at_cursor(), None); // Cursor at end
-
-        buf.move_left();
-        assert_eq!(buf.char_at_cursor(), Some('c'));
-
-        buf.move_left();
-        assert_eq!(buf.char_at_cursor(), Some('b'));
-    }
-
-    #[test]
-    fn test_text_before_after_cursor() {
-        let mut buf = CursorBuffer::new("hello".to_string());
-        buf.move_left();
-        buf.move_left(); // Cursor before 'l' (second one)
-
-        assert_eq!(buf.text_before_cursor(), "hel");
-        assert_eq!(buf.text_after_cursor(), "o");
-    }
-
-    #[test]
-    fn test_text_after_cursor_at_end() {
-        let buf = CursorBuffer::new("hello".to_string());
-        assert_eq!(buf.text_after_cursor(), "");
-    }
-
     // UTF-8 multi-byte character tests
 
     #[test]
@@ -224,13 +177,13 @@ mod tests {
         assert_eq!(buf.cursor_char_pos(), 3);
 
         buf.move_left(); // Before 'b'
-        assert_eq!(buf.char_at_cursor(), Some('b'));
+        assert_eq!(buf.cursor_char_pos(), 2);
 
         buf.move_left(); // Before '🎉'
-        assert_eq!(buf.char_at_cursor(), Some('🎉'));
+        assert_eq!(buf.cursor_char_pos(), 1);
 
         buf.move_left(); // Before 'a'
-        assert_eq!(buf.char_at_cursor(), Some('a'));
+        assert_eq!(buf.cursor_char_pos(), 0);
     }
 
     #[test]
@@ -269,7 +222,7 @@ mod tests {
         assert_eq!(buf.cursor_char_pos(), 3);
 
         buf.move_left();
-        assert_eq!(buf.char_at_cursor(), Some('語'));
+        assert_eq!(buf.cursor_char_pos(), 2);
 
         buf.insert_char('!');
         assert_eq!(buf.content(), "日本!語");

@@ -1,6 +1,6 @@
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Color, Style},
     text::{Line as RatatuiLine, Span},
 };
 
@@ -108,35 +108,6 @@ pub fn render_daily_view(app: &App) -> Vec<RatatuiLine<'static>> {
     }
 
     lines
-}
-
-pub fn render_editing_cursor(app: &App, lines: &mut [RatatuiLine<'static>]) {
-    if app.mode != Mode::Edit {
-        return;
-    }
-
-    let Some(ref buffer) = app.edit_buffer else {
-        return;
-    };
-    let Some(entry) = app.get_selected_entry() else {
-        return;
-    };
-
-    let line_idx = app.selected + 1; // +1 for date header
-    if line_idx < lines.len() {
-        let before = buffer.text_before_cursor();
-        let cursor_char = buffer.char_at_cursor().unwrap_or(' ');
-        let after = buffer.text_after_cursor();
-
-        lines[line_idx] = RatatuiLine::from(vec![
-            Span::raw(format!("{}{}", entry.prefix(), before)),
-            Span::styled(
-                cursor_char.to_string(),
-                Style::default().add_modifier(Modifier::REVERSED),
-            ),
-            Span::raw(after.to_string()),
-        ]);
-    }
 }
 
 pub fn render_footer(app: &App) -> RatatuiLine<'static> {

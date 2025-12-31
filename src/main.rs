@@ -18,7 +18,7 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 
 use app::{App, Mode};
@@ -119,15 +119,13 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>) -> io::Resu
 
             f.render_widget(main_block, chunks[0]);
 
-            let mut lines = if is_tasks_mode {
+            let lines = if is_tasks_mode {
                 ui::render_tasks_view(&app)
             } else {
                 ui::render_daily_view(&app)
             };
 
             if !is_tasks_mode {
-                ui::render_editing_cursor(&app, &mut lines);
-
                 if app.mode == Mode::Edit
                     && let Some(ref buffer) = app.edit_buffer
                     && let Some(entry) = app.get_selected_entry()
@@ -147,7 +145,7 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>) -> io::Resu
                 }
             }
 
-            let content = Paragraph::new(lines);
+            let content = Paragraph::new(lines).wrap(Wrap { trim: true });
             f.render_widget(content, content_area);
 
             let footer = Paragraph::new(ui::render_footer(&app));
