@@ -692,8 +692,25 @@ impl App {
 
 fn main() -> Result<(), io::Error> {
     let args: Vec<String> = std::env::args().collect();
-    let cli_file = args.get(1).map(PathBuf::from);
 
+    if args.get(1).map(|s| s.as_str()) == Some("init") {
+        return match Config::init() {
+            Ok(true) => {
+                println!("Created config file at: {}", config::get_config_path().display());
+                Ok(())
+            }
+            Ok(false) => {
+                println!("Config file already exists at: {}", config::get_config_path().display());
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("Failed to create config file: {}", e);
+                Err(e)
+            }
+        };
+    }
+
+    let cli_file = args.get(1).map(PathBuf::from);
     let config = Config::load().unwrap_or_default();
 
     let journal_path = if let Some(path) = cli_file {

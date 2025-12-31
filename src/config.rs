@@ -20,6 +20,26 @@ impl Config {
         }
     }
 
+    pub fn init() -> io::Result<bool> {
+        let path = get_config_path();
+        if path.exists() {
+            return Ok(false);
+        }
+
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let default_config = r#"# Caliber configuration
+
+# Set a custom default journal file path (optional)
+# default_file = "/path/to/journal.md"
+"#;
+
+        fs::write(&path, default_config)?;
+        Ok(true)
+    }
+
     pub fn get_journal_path(&self) -> PathBuf {
         if let Some(ref file) = self.default_file {
             let path = PathBuf::from(file);
@@ -35,8 +55,9 @@ impl Config {
 }
 
 pub fn get_config_dir() -> PathBuf {
-    dirs::config_dir()
+    dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
+        .join(".config")
         .join("caliber")
 }
 
