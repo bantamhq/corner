@@ -1,15 +1,47 @@
-use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+
+const VALID_SORT_TYPES: &[&str] = &["completed", "uncompleted", "notes", "events"];
+
+fn default_sort_order() -> Vec<String> {
+    vec![
+        "completed".to_string(),
+        "events".to_string(),
+        "notes".to_string(),
+        "uncompleted".to_string(),
+    ]
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     #[serde(default)]
     pub default_file: Option<String>,
+    #[serde(default = "default_sort_order")]
+    pub sort_order: Vec<String>,
 }
 
 impl Config {
+    #[must_use]
+    pub fn validated_sort_order(&self) -> Vec<String> {
+        let mut seen = HashSet::new();
+        let result: Vec<String> = self
+            .sort_order
+            .iter()
+            .filter(|s| VALID_SORT_TYPES.contains(&s.as_str()) && seen.insert(s.as_str()))
+            .cloned()
+            .collect();
+
+        if result.is_empty() {
+            default_sort_order()
+        } else {
+            result
+        }
+    }
+
     pub fn load() -> io::Result<Self> {
         let path = get_config_path();
         if path.exists() {
@@ -30,13 +62,7 @@ impl Config {
             fs::create_dir_all(parent)?;
         }
 
-        let default_config = r#"# Caliber configuration
-
-# Set a custom default journal file path (optional)
-# default_file = "/path/to/journal.md"
-"#;
-
-        fs::write(&path, default_config)?;
+        fs::write(&path, include_str!("config_template.toml"))?;
         Ok(true)
     }
 

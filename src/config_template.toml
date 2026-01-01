@@ -1,0 +1,11 @@
+# Caliber configuration
+
+# Set a custom default journal file path
+# Default: ~/.config/caliber/journals/journal.md
+# default_file = "/path/to/journal.md"
+
+# Sort order for entries (press 's' to sort)
+# Valid values: completed, uncompleted, notes, events
+# Omit a type to leave it unsorted
+# Default: ["completed", "events", "notes", "uncompleted"]
+# sort_order = ["completed", "events", "notes", "uncompleted"]

@@ -110,10 +110,13 @@ pub struct App {
 
     // Undo
     pub last_deleted: Option<(NaiveDate, usize, Entry)>,
+
+    // Config
+    pub sort_order: Vec<String>,
 }
 
 impl App {
-    pub fn new() -> io::Result<Self> {
+    pub fn new(sort_order: Vec<String>) -> io::Result<Self> {
         let current_date = Local::now().date_naive();
         let lines = storage::load_day_lines(current_date)?;
         let entry_indices = Self::compute_entry_indices(&lines);
@@ -133,6 +136,7 @@ impl App {
             help_scroll: 0,
             help_visible_height: 0,
             last_deleted: None,
+            sort_order,
         })
     }
 
@@ -786,25 +790,42 @@ impl App {
     }
 
     pub fn sort_entries(&mut self) {
-        let completed: Vec<Line> = self
+        let entry_positions: Vec<usize> = self
             .lines
             .iter()
-            .filter(|line| {
-                matches!(line, Line::Entry(e) if matches!(e.entry_type, EntryType::Task { completed: true }))
-            })
-            .cloned()
+            .enumerate()
+            .filter_map(|(i, l)| matches!(l, Line::Entry(_)).then_some(i))
             .collect();
 
-        if completed.is_empty() {
+        if entry_positions.is_empty() {
             return;
         }
 
-        self.lines.retain(|line| {
-            !matches!(line, Line::Entry(e) if matches!(e.entry_type, EntryType::Task { completed: true }))
-        });
+        let get_priority = |line: &Line| -> usize {
+            let Line::Entry(entry) = line else {
+                return self.sort_order.len();
+            };
+            for (i, type_name) in self.sort_order.iter().enumerate() {
+                match (type_name.as_str(), &entry.entry_type) {
+                    ("completed", EntryType::Task { completed: true }) => return i,
+                    ("uncompleted", EntryType::Task { completed: false }) => return i,
+                    ("notes", EntryType::Note) => return i,
+                    ("events", EntryType::Event) => return i,
+                    _ => {}
+                }
+            }
+            self.sort_order.len()
+        };
 
-        for (i, line) in completed.into_iter().enumerate() {
-            self.lines.insert(i, line);
+        let mut entries: Vec<Line> = entry_positions
+            .iter()
+            .map(|&i| self.lines[i].clone())
+            .collect();
+
+        entries.sort_by_key(|line| get_priority(line));
+
+        for (pos, entry) in entry_positions.iter().zip(entries.into_iter()) {
+            self.lines[*pos] = entry;
         }
 
         self.entry_indices = Self::compute_entry_indices(&self.lines);
