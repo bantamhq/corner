@@ -46,11 +46,11 @@ pub fn handle_command_key(app: &mut App, key: KeyCode) -> io::Result<()> {
     Ok(())
 }
 
-pub fn handle_normal_key(app: &mut App, key: KeyCode) -> io::Result<()> {
+pub fn handle_daily_key(app: &mut App, key: KeyCode) -> io::Result<()> {
     match key {
         KeyCode::Char('?') => app.show_help = true,
         KeyCode::Char(':') => app.mode = Mode::Command,
-        KeyCode::Tab => app.enter_tasks_mode()?,
+        KeyCode::Char('/') => app.enter_filter_input(),
         KeyCode::Enter => app.new_task(true),
         KeyCode::Char('o') => app.new_task(false),
         KeyCode::Char('e') => app.edit_selected(),
@@ -109,16 +109,39 @@ pub fn handle_editing_key(app: &mut App, key: KeyCode) {
     }
 }
 
-pub fn handle_tasks_key(app: &mut App, key: KeyCode) -> io::Result<()> {
+pub fn handle_filter_key(app: &mut App, key: KeyCode) -> io::Result<()> {
     match key {
         KeyCode::Char('?') => app.show_help = true,
-        KeyCode::Tab => app.exit_tasks_mode(),
-        KeyCode::Up | KeyCode::Char('k') => app.task_move_up(),
-        KeyCode::Down | KeyCode::Char('j') => app.task_move_down(),
-        KeyCode::Enter => app.task_jump_to_day()?,
-        KeyCode::Char('x') => app.task_toggle()?,
-        KeyCode::Char('r') => app.refresh_tasks()?,
+        KeyCode::Char('/') => app.enter_filter_input(),
+        KeyCode::Esc => app.exit_filter(),
+        KeyCode::Up | KeyCode::Char('k') => app.filter_move_up(),
+        KeyCode::Down | KeyCode::Char('j') => app.filter_move_down(),
+        KeyCode::Char('g') => {
+            app.filter_selected = 0;
+        }
+        KeyCode::Char('G') => {
+            if !app.filter_items.is_empty() {
+                app.filter_selected = app.filter_items.len() - 1;
+            }
+        }
+        KeyCode::Enter => app.filter_jump_to_day()?,
+        KeyCode::Char('e') => app.filter_edit(),
+        KeyCode::Char('x') => app.filter_toggle()?,
+        KeyCode::Char('r') => app.refresh_filter()?,
         KeyCode::Char(':') => app.mode = Mode::Command,
+        _ => {}
+    }
+    Ok(())
+}
+
+pub fn handle_filter_input_key(app: &mut App, key: KeyCode) -> io::Result<()> {
+    match key {
+        KeyCode::Enter => app.execute_filter()?,
+        KeyCode::Esc => app.cancel_filter_input(),
+        KeyCode::Backspace => {
+            app.filter_buffer.pop();
+        }
+        KeyCode::Char(c) => app.filter_buffer.push(c),
         _ => {}
     }
     Ok(())

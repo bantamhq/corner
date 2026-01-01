@@ -51,8 +51,6 @@ impl Entry {
     }
 }
 
-// Line::Raw preserves non-entry content (blank lines, headers, arbitrary text)
-// so the journal file can be manually edited without data loss on save.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Line {
     Entry(Entry),
@@ -62,8 +60,6 @@ pub enum Line {
 fn parse_line(line: &str) -> Line {
     let trimmed = line.trim_start();
 
-    // Order matters: task patterns must be checked before note pattern
-    // since "- " is a prefix of "- [ ] " and "- [x] ".
     if let Some(content) = trimmed.strip_prefix("- [ ] ") {
         return Line::Entry(Entry {
             entry_type: EntryType::Task { completed: false },
@@ -319,19 +315,77 @@ pub fn save_day(date: NaiveDate, content: &str) -> io::Result<()> {
     save_journal(&updated)
 }
 
+use once_cell::sync::Lazy;
+use regex::Regex;
+
 #[derive(Debug, Clone)]
-pub struct TaskItem {
-    pub date: NaiveDate,
+pub struct FilterItem {
+    pub source_date: NaiveDate,
     pub content: String,
-    // Index within the day's parsed lines - used for reliable task matching
-    // when toggling from tasks view (avoids ambiguity with duplicate content).
     pub line_index: usize,
+    pub entry_type: EntryType,
     pub completed: bool,
 }
 
-pub fn collect_incomplete_tasks() -> io::Result<Vec<TaskItem>> {
+#[derive(Debug, Clone, PartialEq)]
+pub enum FilterType {
+    Task,
+    Note,
+    Event,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Filter {
+    pub entry_type: Option<FilterType>,
+    pub completed: Option<bool>,
+    pub tags: Vec<String>,
+}
+
+static TAG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"#([a-zA-Z][a-zA-Z0-9_-]*)").unwrap());
+
+pub fn extract_tags(content: &str) -> Vec<String> {
+    TAG_REGEX
+        .captures_iter(content)
+        .map(|cap| cap[1].to_string())
+        .collect()
+}
+
+pub fn parse_filter_query(query: &str) -> Filter {
+    let mut filter = Filter::default();
+
+    for token in query.split_whitespace() {
+        if let Some(type_str) = token.strip_prefix('!') {
+            // Type filter: !tasks, !tasks/done, !notes, !events
+            let (base_type, modifier) = if let Some(idx) = type_str.find('/') {
+                (&type_str[..idx], Some(&type_str[idx + 1..]))
+            } else {
+                (type_str, None)
+            };
+
+            match base_type {
+                "tasks" | "task" => {
+                    filter.entry_type = Some(FilterType::Task);
+                    filter.completed = match modifier {
+                        Some("done") | Some("completed") => Some(true),
+                        Some("all") => None,
+                        _ => Some(false),
+                    };
+                }
+                "notes" | "note" => filter.entry_type = Some(FilterType::Note),
+                "events" | "event" => filter.entry_type = Some(FilterType::Event),
+                _ => {}
+            }
+        } else if let Some(tag) = token.strip_prefix('#') {
+            filter.tags.push(tag.to_string());
+        }
+    }
+
+    filter
+}
+
+pub fn collect_filtered_entries(filter: &Filter) -> io::Result<Vec<FilterItem>> {
     let journal = load_journal()?;
-    let mut tasks = Vec::new();
+    let mut items = Vec::new();
     let mut current_date: Option<NaiveDate> = None;
     let mut line_index_in_day: usize = 0;
 
@@ -343,20 +397,57 @@ pub fn collect_incomplete_tasks() -> io::Result<Vec<TaskItem>> {
         }
 
         if let Some(date) = current_date {
-            if let Some(content) = line.trim_start().strip_prefix("- [ ] ") {
-                tasks.push(TaskItem {
-                    date,
-                    content: content.to_string(),
-                    line_index: line_index_in_day,
-                    completed: false,
-                });
+            let parsed = parse_line(line);
+            if let Line::Entry(entry) = parsed {
+                let matches = entry_matches_filter(&entry, filter);
+                if matches {
+                    let completed = matches!(entry.entry_type, EntryType::Task { completed: true });
+                    items.push(FilterItem {
+                        source_date: date,
+                        content: entry.content,
+                        line_index: line_index_in_day,
+                        entry_type: entry.entry_type,
+                        completed,
+                    });
+                }
             }
             line_index_in_day += 1;
         }
     }
 
-    tasks.sort_by_key(|t| t.date);
-    Ok(tasks)
+    items.sort_by_key(|item| item.source_date);
+    Ok(items)
+}
+
+fn entry_matches_filter(entry: &Entry, filter: &Filter) -> bool {
+    if let Some(ref filter_type) = filter.entry_type {
+        let entry_matches_type = match filter_type {
+            FilterType::Task => matches!(entry.entry_type, EntryType::Task { .. }),
+            FilterType::Note => matches!(entry.entry_type, EntryType::Note),
+            FilterType::Event => matches!(entry.entry_type, EntryType::Event),
+        };
+        if !entry_matches_type {
+            return false;
+        }
+    }
+
+    if let Some(want_completed) = filter.completed
+        && let EntryType::Task { completed } = entry.entry_type
+        && completed != want_completed
+    {
+        return false;
+    }
+
+    if !filter.tags.is_empty() {
+        let entry_tags = extract_tags(&entry.content);
+        for required_tag in &filter.tags {
+            if !entry_tags.iter().any(|t| t.eq_ignore_ascii_case(required_tag)) {
+                return false;
+            }
+        }
+    }
+
+    true
 }
 
 #[cfg(test)]

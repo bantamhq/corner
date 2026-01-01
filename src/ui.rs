@@ -1,53 +1,149 @@
+use once_cell::sync::Lazy;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line as RatatuiLine, Span},
 };
+use regex::Regex;
 
 use crate::app::{App, Mode};
 use crate::storage::{EntryType, Line};
 
-pub fn render_tasks_view(app: &App) -> Vec<RatatuiLine<'static>> {
-    use chrono::NaiveDate;
+static TAG_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"#([a-zA-Z][a-zA-Z0-9_-]*)").unwrap());
+static LATER_DATE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"@(\d{1,2}/\d{1,2})").unwrap());
+
+fn style_content(text: &str, base_style: Style) -> Vec<Span<'static>> {
+    let mut spans = Vec::new();
+    let mut last_end = 0;
+
+    let mut matches: Vec<(usize, usize, Color)> = Vec::new();
+
+    for cap in TAG_REGEX.captures_iter(text) {
+        if let Some(m) = cap.get(0) {
+            matches.push((m.start(), m.end(), Color::Yellow));
+        }
+    }
+
+    for cap in LATER_DATE_REGEX.captures_iter(text) {
+        if let Some(m) = cap.get(0) {
+            matches.push((m.start(), m.end(), Color::Red));
+        }
+    }
+
+    matches.sort_by_key(|(start, _, _)| *start);
+
+    for (start, end, color) in matches {
+        if start > last_end {
+            spans.push(Span::styled(text[last_end..start].to_string(), base_style));
+        }
+        spans.push(Span::styled(
+            text[start..end].to_string(),
+            Style::default().fg(color),
+        ));
+        last_end = end;
+    }
+
+    if last_end < text.len() {
+        spans.push(Span::styled(text[last_end..].to_string(), base_style));
+    }
+
+    if spans.is_empty() {
+        spans.push(Span::styled(text.to_string(), base_style));
+    }
+
+    spans
+}
+
+pub fn render_filter_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> {
+    use unicode_width::UnicodeWidthStr;
 
     let mut lines = Vec::new();
-    let mut last_date: Option<NaiveDate> = None;
 
-    for (idx, item) in app.task_items.iter().enumerate() {
-        if last_date != Some(item.date) {
-            let date_str = item.date.format("%m/%d/%y").to_string();
-            lines.push(RatatuiLine::from(Span::styled(
-                date_str,
-                Style::default().fg(Color::Cyan),
-            )));
-            last_date = Some(item.date);
-        }
+    let header = format!("Filter: {}", app.filter_query);
+    lines.push(RatatuiLine::from(Span::styled(
+        header,
+        Style::default().fg(Color::Cyan),
+    )));
 
-        let is_selected = idx == app.task_selected;
+    let is_editing = app.mode == Mode::Edit;
+
+    for (idx, item) in app.filter_items.iter().enumerate() {
+        let is_selected = idx == app.filter_selected;
+        let is_editing_this = is_selected && is_editing;
+
         let content_style = if item.completed {
             Style::default().fg(Color::DarkGray)
         } else {
             Style::default()
         };
 
-        if is_selected {
-            let checkbox = if item.completed { " [x] " } else { " [ ] " };
-            lines.push(RatatuiLine::from(vec![
-                Span::styled("→", Style::default().fg(Color::Cyan)),
-                Span::styled(format!("{}{}", checkbox, item.content), content_style),
-            ]));
+        let text = if is_editing_this {
+            if let Some(ref buffer) = app.edit_buffer {
+                buffer.content().to_string()
+            } else {
+                item.content.clone()
+            }
         } else {
-            let checkbox = if item.completed { "- [x] " } else { "- [ ] " };
-            lines.push(RatatuiLine::from(Span::styled(
-                format!("{}{}", checkbox, item.content),
-                content_style,
-            )));
+            item.content.clone()
+        };
+
+        let prefix = match &item.entry_type {
+            EntryType::Task { completed: false } => "- [ ] ",
+            EntryType::Task { completed: true } => "- [x] ",
+            EntryType::Note => "- ",
+            EntryType::Event => "* ",
+        };
+        let prefix_width = prefix.width();
+
+        let date_suffix = format!(" ({})", item.source_date.format("%m/%d"));
+        let date_suffix_width = date_suffix.width();
+
+        if is_selected {
+            if is_editing_this {
+                let available = width.saturating_sub(prefix_width + date_suffix_width);
+                let wrapped = wrap_text(&text, available);
+                for (i, line_text) in wrapped.iter().enumerate() {
+                    if i == 0 {
+                        let mut spans = vec![Span::styled(prefix.to_string(), content_style)];
+                        spans.push(Span::styled(line_text.clone(), content_style));
+                        spans.push(Span::styled(date_suffix.clone(), Style::default().fg(Color::DarkGray)));
+                        lines.push(RatatuiLine::from(spans));
+                    } else {
+                        let indent = " ".repeat(prefix_width);
+                        lines.push(RatatuiLine::from(Span::styled(
+                            format!("{indent}{line_text}"),
+                            content_style,
+                        )));
+                    }
+                }
+            } else {
+                let sel_prefix = match &item.entry_type {
+                    EntryType::Task { completed: false } => " [ ] ",
+                    EntryType::Task { completed: true } => " [x] ",
+                    EntryType::Note => " ",
+                    EntryType::Event => " ",
+                };
+                let available = width.saturating_sub(prefix_width + date_suffix_width);
+                let display_text = truncate_text(&text, available);
+                let mut spans = vec![Span::styled("→", Style::default().fg(Color::Cyan))];
+                spans.push(Span::styled(sel_prefix.to_string(), content_style));
+                spans.extend(style_content(&display_text, content_style));
+                spans.push(Span::styled(date_suffix, Style::default().fg(Color::DarkGray)));
+                lines.push(RatatuiLine::from(spans));
+            }
+        } else {
+            let available = width.saturating_sub(prefix_width + date_suffix_width);
+            let display_text = truncate_text(&text, available);
+            let mut spans = vec![Span::styled(prefix.to_string(), content_style)];
+            spans.extend(style_content(&display_text, content_style));
+            spans.push(Span::styled(date_suffix, Style::default().fg(Color::DarkGray)));
+            lines.push(RatatuiLine::from(spans));
         }
     }
 
-    if lines.is_empty() {
+    if app.filter_items.is_empty() {
         lines.push(RatatuiLine::from(Span::styled(
-            "(no incomplete tasks)",
+            "(no matches)",
             Style::default().fg(Color::DarkGray),
         )));
     }
@@ -109,7 +205,6 @@ pub fn render_daily_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> {
                     }
                 }
             } else if is_selected {
-                // Selected but not editing: show with indicator, truncate if needed
                 let rest_of_prefix = prefix.chars().skip(1).collect::<String>();
                 let indicator = if app.mode == Mode::Order {
                     Span::styled("↕", Style::default().fg(Color::Yellow))
@@ -118,18 +213,15 @@ pub fn render_daily_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> {
                 };
                 let available = width.saturating_sub(prefix_width);
                 let display_text = truncate_text(&text, available);
-                lines.push(RatatuiLine::from(vec![
-                    indicator,
-                    Span::styled(format!("{rest_of_prefix}{display_text}"), content_style),
-                ]));
+                let mut spans = vec![indicator, Span::styled(rest_of_prefix, content_style)];
+                spans.extend(style_content(&display_text, content_style));
+                lines.push(RatatuiLine::from(spans));
             } else {
-                // Normal entry: truncate if needed
                 let available = width.saturating_sub(prefix_width);
                 let display_text = truncate_text(&text, available);
-                lines.push(RatatuiLine::from(Span::styled(
-                    format!("{prefix}{display_text}"),
-                    content_style,
-                )));
+                let mut spans = vec![Span::styled(prefix.to_string(), content_style)];
+                spans.extend(style_content(&display_text, content_style));
+                lines.push(RatatuiLine::from(spans));
             }
         }
     }
@@ -180,15 +272,30 @@ fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     let mut current_line = String::new();
     let mut current_width = 0;
 
-    for ch in text.chars() {
-        let ch_width = ch.to_string().width();
-        if current_width + ch_width > max_width && !current_line.is_empty() {
+    for word in text.split_inclusive(' ') {
+        let word_width = word.width();
+
+        if current_width + word_width <= max_width {
+            current_line.push_str(word);
+            current_width += word_width;
+        } else if current_line.is_empty() {
+            // Word is longer than max_width, must break it by character
+            for ch in word.chars() {
+                let ch_width = ch.to_string().width();
+                if current_width + ch_width > max_width && !current_line.is_empty() {
+                    lines.push(current_line);
+                    current_line = String::new();
+                    current_width = 0;
+                }
+                current_line.push(ch);
+                current_width += ch_width;
+            }
+        } else {
+            // Start new line with this word
             lines.push(current_line);
-            current_line = String::new();
-            current_width = 0;
+            current_line = word.to_string();
+            current_width = word_width;
         }
-        current_line.push(ch);
-        current_width += ch_width;
     }
 
     if !current_line.is_empty() || lines.is_empty() {
@@ -203,6 +310,11 @@ pub fn render_footer(app: &App) -> RatatuiLine<'static> {
         Mode::Command => RatatuiLine::from(vec![
             Span::styled(":", Style::default().fg(Color::Yellow)),
             Span::raw(app.command_buffer.clone()),
+            Span::styled("█", Style::default().fg(Color::White)),
+        ]),
+        Mode::FilterInput => RatatuiLine::from(vec![
+            Span::styled("/", Style::default().fg(Color::Yellow)),
+            Span::raw(app.filter_buffer.clone()),
             Span::styled("█", Style::default().fg(Color::White)),
         ]),
         Mode::Edit => RatatuiLine::from(vec![
@@ -224,22 +336,24 @@ pub fn render_footer(app: &App) -> RatatuiLine<'static> {
             Span::styled(" Edit entry  ", Style::default().fg(Color::DarkGray)),
             Span::styled("x", Style::default().fg(Color::Gray)),
             Span::styled(" Toggle task  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("d", Style::default().fg(Color::Gray)),
-            Span::styled(" Delete entry  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("/", Style::default().fg(Color::Gray)),
+            Span::styled(" Filter  ", Style::default().fg(Color::DarkGray)),
             Span::styled("?", Style::default().fg(Color::Gray)),
             Span::styled(" Help", Style::default().fg(Color::DarkGray)),
         ]),
-        Mode::Tasks => RatatuiLine::from(vec![
+        Mode::Filter => RatatuiLine::from(vec![
             Span::styled(
-                " TASKS ",
+                " FILTER ",
                 Style::default().fg(Color::Black).bg(Color::Magenta),
             ),
             Span::styled("  x", Style::default().fg(Color::Gray)),
-            Span::styled(" Toggle task  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Toggle  ", Style::default().fg(Color::DarkGray)),
             Span::styled("r", Style::default().fg(Color::Gray)),
             Span::styled(" Refresh  ", Style::default().fg(Color::DarkGray)),
             Span::styled("Enter", Style::default().fg(Color::Gray)),
             Span::styled(" Go to day  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Esc", Style::default().fg(Color::Gray)),
+            Span::styled(" Exit  ", Style::default().fg(Color::DarkGray)),
             Span::styled("?", Style::default().fg(Color::Gray)),
             Span::styled(" Help", Style::default().fg(Color::DarkGray)),
         ]),
@@ -327,7 +441,7 @@ pub fn get_help_lines() -> Vec<RatatuiLine<'static>> {
         desc_style,
     ));
     lines.push(help_line("m", "Move mode", key_style, desc_style));
-    lines.push(help_line("Tab", "Tasks view", key_style, desc_style));
+    lines.push(help_line("/", "Filter mode", key_style, desc_style));
     lines.push(help_line(":", "Command mode", key_style, desc_style));
     lines.push(RatatuiLine::from(""));
 
@@ -359,9 +473,9 @@ pub fn get_help_lines() -> Vec<RatatuiLine<'static>> {
     lines.push(help_line("Esc", "Cancel", key_style, desc_style));
     lines.push(RatatuiLine::from(""));
 
-    // Tasks mode
+    // Filter mode
     lines.push(
-        RatatuiLine::from(Span::styled("[Tasks]", header_style)).alignment(Alignment::Center),
+        RatatuiLine::from(Span::styled("[Filter]", header_style)).alignment(Alignment::Center),
     );
     lines.push(help_line(
         "j/k|↕",
@@ -369,10 +483,30 @@ pub fn get_help_lines() -> Vec<RatatuiLine<'static>> {
         key_style,
         desc_style,
     ));
+    lines.push(help_line("g/G", "Jump first/last", key_style, desc_style));
+    lines.push(help_line("e", "Edit entry", key_style, desc_style));
     lines.push(help_line("x", "Toggle task", key_style, desc_style));
-    lines.push(help_line("r", "Refresh list", key_style, desc_style));
+    lines.push(help_line("r", "Refresh results", key_style, desc_style));
     lines.push(help_line("Enter", "Go to day", key_style, desc_style));
-    lines.push(help_line("Tab", "Daily view", key_style, desc_style));
+    lines.push(help_line("/", "Edit filter", key_style, desc_style));
+    lines.push(help_line("Esc", "Exit to daily", key_style, desc_style));
+    lines.push(RatatuiLine::from(""));
+
+    // Filter syntax
+    lines.push(
+        RatatuiLine::from(Span::styled("[Filter Syntax]", header_style))
+            .alignment(Alignment::Center),
+    );
+    lines.push(help_line("!tasks", "Incomplete tasks", key_style, desc_style));
+    lines.push(help_line(
+        "!tasks/done",
+        "Completed tasks",
+        key_style,
+        desc_style,
+    ));
+    lines.push(help_line("!notes", "Notes only", key_style, desc_style));
+    lines.push(help_line("!events", "Events only", key_style, desc_style));
+    lines.push(help_line("#tag", "Filter by tag", key_style, desc_style));
     lines.push(RatatuiLine::from(""));
 
     // Commands
