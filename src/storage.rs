@@ -562,13 +562,15 @@ pub fn parse_natural_date(input: &str, today: NaiveDate) -> Option<NaiveDate> {
     if let Some(days_str) = input_lower.strip_suffix('d') {
         if let Some(neg_days_str) = days_str.strip_prefix('-') {
             if let Ok(days) = neg_days_str.parse::<u64>()
-                && days > 0 {
-                    return today.checked_sub_days(Days::new(days));
-                }
-        } else if let Ok(days) = days_str.parse::<u64>()
-            && days > 0 {
-                return today.checked_add_days(Days::new(days));
+                && days > 0
+            {
+                return today.checked_sub_days(Days::new(days));
             }
+        } else if let Ok(days) = days_str.parse::<u64>()
+            && days > 0
+        {
+            return today.checked_add_days(Days::new(days));
+        }
     }
 
     if let Some(weekday_str) = input_lower.strip_prefix("next-")
@@ -619,8 +621,8 @@ pub fn extract_target_date(content: &str, today: NaiveDate) -> Option<NaiveDate>
 fn parse_date_prefer_past(date_str: &str, today: NaiveDate) -> Option<NaiveDate> {
     use chrono::Datelike;
 
-    // For formats with explicit year, parse normally
-    if date_str.matches('/').count() == 2 || date_str.starts_with(|c: char| c.is_ascii_digit() && date_str.len() >= 4 && date_str[0..4] == date_str[0..4].chars().filter(|c| c.is_ascii_digit()).collect::<String>()) {
+    // For formats with explicit year (MM/DD/YY, MM/DD/YYYY, or YYYY/MM/DD), parse normally
+    if date_str.matches('/').count() == 2 {
         return parse_later_date(date_str, today);
     }
 

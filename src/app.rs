@@ -120,13 +120,13 @@ impl App {
         let current_date = Local::now().date_naive();
         let lines = storage::load_day_lines(current_date)?;
         let entry_indices = Self::compute_entry_indices(&lines);
-        let later_entrys = storage::collect_later_entries_for_date(current_date)?;
+        let later_entries = storage::collect_later_entries_for_date(current_date)?;
 
         Ok(Self {
             current_date,
             lines,
             entry_indices: entry_indices.clone(),
-            view: ViewMode::Daily(DailyState::new(entry_indices.len(), later_entrys)),
+            view: ViewMode::Daily(DailyState::new(entry_indices.len(), later_entries)),
             input_mode: InputMode::Normal,
             edit_buffer: None,
             command_buffer: String::new(),
@@ -965,9 +965,9 @@ impl App {
         self.current_date = date;
         self.lines = storage::load_day_lines(date)?;
         self.entry_indices = Self::compute_entry_indices(&self.lines);
-        let later_entrys = storage::collect_later_entries_for_date(date)?;
+        let later_entries = storage::collect_later_entries_for_date(date)?;
         self.edit_buffer = None;
-        self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entrys));
+        self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
         self.input_mode = InputMode::Normal;
 
         Ok(())
@@ -1058,7 +1058,10 @@ impl App {
         let filter = storage::parse_filter_query(&query);
 
         if !filter.invalid_tokens.is_empty() {
-            self.status_message = Some(format!("Unknown filter: {}", filter.invalid_tokens.join(", ")));
+            self.status_message = Some(format!(
+                "Unknown filter: {}",
+                filter.invalid_tokens.join(", ")
+            ));
         }
 
         let entries = storage::collect_filtered_entries(&filter)?;
@@ -1119,7 +1122,10 @@ impl App {
         let filter = storage::parse_filter_query(&state.query);
 
         if !filter.invalid_tokens.is_empty() {
-            self.status_message = Some(format!("Unknown filter: {}", filter.invalid_tokens.join(", ")));
+            self.status_message = Some(format!(
+                "Unknown filter: {}",
+                filter.invalid_tokens.join(", ")
+            ));
         }
 
         state.entries = storage::collect_filtered_entries(&filter)?;
