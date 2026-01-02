@@ -92,15 +92,21 @@ impl Config {
 
     pub fn get_journal_path(&self) -> PathBuf {
         if let Some(ref file) = self.default_file {
-            let path = PathBuf::from(file);
-            if path.is_absolute() {
-                path
-            } else {
-                std::env::current_dir().unwrap_or_default().join(path)
-            }
+            resolve_path(file)
         } else {
             get_default_journal_path()
         }
+    }
+}
+
+/// Resolve a path to absolute, joining with cwd if relative.
+#[must_use]
+pub fn resolve_path(path: &str) -> PathBuf {
+    let path = PathBuf::from(path);
+    if path.is_absolute() {
+        path
+    } else {
+        std::env::current_dir().unwrap_or_default().join(path)
     }
 }
 

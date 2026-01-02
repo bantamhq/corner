@@ -2,7 +2,7 @@ use std::io;
 
 use chrono::{Datelike, Days, Local, NaiveDate};
 
-use crate::config::Config;
+use crate::config::{resolve_path, Config};
 use crate::cursor::CursorBuffer;
 use crate::storage::{self, Entry, EntryType, FilterEntry, LaterEntry, Line};
 
@@ -959,16 +959,21 @@ impl App {
 
     // === Day Navigation (Daily only) ===
 
+    /// Load a day's data into self, returning later entries for view construction.
+    fn load_day(&mut self, date: NaiveDate) -> io::Result<Vec<LaterEntry>> {
+        self.current_date = date;
+        self.lines = storage::load_day_lines(date)?;
+        self.entry_indices = Self::compute_entry_indices(&self.lines);
+        storage::collect_later_entries_for_date(date)
+    }
+
     pub fn goto_day(&mut self, date: NaiveDate) -> io::Result<()> {
         if date == self.current_date {
             return Ok(());
         }
 
         self.save();
-        self.current_date = date;
-        self.lines = storage::load_day_lines(date)?;
-        self.entry_indices = Self::compute_entry_indices(&self.lines);
-        let later_entries = storage::collect_later_entries_for_date(date)?;
+        let later_entries = self.load_day(date)?;
         self.edit_buffer = None;
         self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
         self.input_mode = InputMode::Normal;
@@ -996,18 +1001,67 @@ impl App {
 
     #[must_use]
     pub fn parse_goto_date(input: &str) -> Option<NaiveDate> {
-        if let Ok(date) = NaiveDate::parse_from_str(input, "%Y/%m/%d") {
+        // YYYY/MM/DD (only if first part is exactly 4 digits)
+        if let Some(first_slash) = input.find('/')
+            && first_slash == 4
+            && input[..4].chars().all(|c| c.is_ascii_digit())
+            && let Ok(date) = NaiveDate::parse_from_str(input, "%Y/%m/%d")
+        {
             return Some(date);
         }
-        let current_year = Local::now().year();
-        NaiveDate::parse_from_str(&format!("{current_year}/{input}"), "%Y/%m/%d").ok()
+
+        let parts: Vec<&str> = input.split('/').collect();
+
+        // MM/DD/YYYY or MM/DD/YY
+        if parts.len() == 3
+            && let (Ok(month), Ok(day), Ok(year)) = (
+                parts[0].parse::<u32>(),
+                parts[1].parse::<u32>(),
+                parts[2].parse::<i32>(),
+            )
+        {
+            let full_year = if year < 100 { 2000 + year } else { year };
+            return NaiveDate::from_ymd_opt(full_year, month, day);
+        }
+
+        // MM/DD (always future - if date passed this year, use next year)
+        if parts.len() == 2
+            && let (Ok(month), Ok(day)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>())
+        {
+            let today = Local::now().date_naive();
+            if let Some(date) = NaiveDate::from_ymd_opt(today.year(), month, day) {
+                if date >= today {
+                    return Some(date);
+                }
+                return NaiveDate::from_ymd_opt(today.year() + 1, month, day);
+            }
+        }
+
+        None
+    }
+
+    pub fn open_journal(&mut self, path: &str) -> io::Result<()> {
+        self.save();
+
+        let path = resolve_path(path);
+        storage::set_journal_path(path.clone());
+        let later_entries = self.load_day(Local::now().date_naive())?;
+        self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
+        self.status_message = Some(format!("Opened: {}", path.display()));
+        Ok(())
+    }
+
+    pub fn reload_config(&mut self) -> io::Result<()> {
+        self.config = Config::load()?;
+        self.status_message = Some("Config reloaded".to_string());
+        Ok(())
     }
 
     // === Command Mode ===
 
     pub fn execute_command(&mut self) -> io::Result<()> {
-        let cmd = self.command_buffer.trim();
-        let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
+        let cmd = std::mem::take(&mut self.command_buffer);
+        let parts: Vec<&str> = cmd.trim().splitn(2, ' ').collect();
         let command = parts.first().copied().unwrap_or("");
         let arg = parts.get(1).copied().unwrap_or("").trim();
 
@@ -1026,9 +1080,18 @@ impl App {
                     self.status_message = Some(format!("Invalid date: {arg}"));
                 }
             }
+            "o" | "open" => {
+                if arg.is_empty() {
+                    self.status_message = Some("Usage: :open /path/to/file.md".to_string());
+                } else {
+                    self.open_journal(arg)?;
+                }
+            }
+            "config-reload" => {
+                self.reload_config()?;
+            }
             _ => {}
         }
-        self.command_buffer.clear();
         self.input_mode = InputMode::Normal;
         Ok(())
     }
@@ -1153,12 +1216,9 @@ impl App {
     fn goto_entry_source(&mut self, date: NaiveDate, line_index: usize) -> io::Result<()> {
         if date != self.current_date {
             self.save();
-            self.current_date = date;
-            self.lines = storage::load_day_lines(date)?;
-            self.entry_indices = Self::compute_entry_indices(&self.lines);
         }
 
-        let later_entries = storage::collect_later_entries_for_date(date)?;
+        let later_entries = self.load_day(date)?;
         let later_count = later_entries.len();
 
         // Find entry position and add later_count offset
@@ -1245,40 +1305,42 @@ mod tests {
 
     #[test]
     fn test_parse_goto_date() {
+        // YYYY/MM/DD
         let result = App::parse_goto_date("2025/12/30");
-        assert!(result.is_some(), "2025/12/30 should parse");
-        assert_eq!(
-            result.unwrap(),
-            NaiveDate::from_ymd_opt(2025, 12, 30).unwrap()
-        );
+        assert_eq!(result, NaiveDate::from_ymd_opt(2025, 12, 30));
 
+        // MM/DD (assumes current year)
         let result = App::parse_goto_date("12/30");
         assert!(result.is_some(), "12/30 should parse");
 
-        assert!(App::parse_goto_date("12/30/2025").is_none());
-        assert!(App::parse_goto_date("12/30/25").is_none());
+        // MM/DD/YYYY
+        let result = App::parse_goto_date("12/30/2025");
+        assert_eq!(result, NaiveDate::from_ymd_opt(2025, 12, 30));
+
+        // MM/DD/YY (assumes 2000s)
+        let result = App::parse_goto_date("12/30/25");
+        assert_eq!(result, NaiveDate::from_ymd_opt(2025, 12, 30));
+
+        let result = App::parse_goto_date("1/1/26");
+        assert_eq!(result, NaiveDate::from_ymd_opt(2026, 1, 1));
+
+        // Reject ambiguous short "year" that would parse as year 1
+        assert!(
+            App::parse_goto_date("1/1/26").unwrap().year() >= 2000,
+            "1/1/26 should not parse as year 1"
+        );
     }
 
     #[test]
     fn test_command_parsing() {
-        let cmd = "gt 12/30";
+        let cmd = "goto 12/30";
         let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
-        let command = parts.first().copied().unwrap_or("");
-        let arg = parts.get(1).copied().unwrap_or("").trim();
+        assert_eq!(parts[0], "goto");
+        assert_eq!(parts[1], "12/30");
 
-        assert_eq!(command, "gt");
-        assert_eq!(arg, "12/30");
-
-        let cmd = "gt 12/30/2025";
+        let cmd = "g 12/30/2025";
         let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
-        let command = parts.first().copied().unwrap_or("");
-        let arg = parts.get(1).copied().unwrap_or("").trim();
-
-        assert_eq!(command, "gt");
-        assert_eq!(arg, "12/30/2025");
-        assert!(
-            App::parse_goto_date(arg).is_none(),
-            "12/30/2025 should NOT parse"
-        );
+        assert_eq!(parts[0], "g");
+        assert_eq!(parts[1], "12/30/2025");
     }
 }

@@ -123,8 +123,10 @@ The entry will appear in the "Later" section when you view that date.
 | `0-9` | Filter by favorite tag |
 | `/` | Open filter mode |
 | `?` | Show help |
-| `:goto` or `:g` | Go to date (YYYY/MM/DD or MM/DD) |
-| `:q` | Quit |
+| `:[g]oto` | Go to date (MM/DD, MM/DD/YY, MM/DD/YYYY, YYYY/MM/DD) |
+| `:[o]pen` | Open journal file |
+| `:config-reload` | Reload config file |
+| `:[q]uit` | Quit |
 
 ### Move Mode
 

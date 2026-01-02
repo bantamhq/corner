@@ -23,7 +23,7 @@ use ratatui::{
 use unicode_width::UnicodeWidthStr;
 
 use app::{App, EditContext, InputMode, ViewMode};
-use config::Config;
+use config::{resolve_path, Config};
 use cursor::cursor_position_in_wrap;
 use storage::Line;
 
@@ -75,11 +75,7 @@ fn main() -> Result<(), io::Error> {
     let config = Config::load().unwrap_or_default();
 
     let journal_path = if let Some(path) = cli_file {
-        if path.is_absolute() {
-            path
-        } else {
-            std::env::current_dir()?.join(path)
-        }
+        resolve_path(&path.to_string_lossy())
     } else {
         config.get_journal_path()
     };

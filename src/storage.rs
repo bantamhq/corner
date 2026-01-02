@@ -5,16 +5,22 @@ use regex::Regex;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
-use std::sync::{LazyLock, OnceLock};
+use std::sync::{LazyLock, RwLock};
 
-static JOURNAL_PATH: OnceLock<PathBuf> = OnceLock::new();
+static JOURNAL_PATH: RwLock<Option<PathBuf>> = RwLock::new(None);
 
 pub fn set_journal_path(path: PathBuf) {
-    let _ = JOURNAL_PATH.set(path);
+    if let Ok(mut guard) = JOURNAL_PATH.write() {
+        *guard = Some(path);
+    }
 }
 
 pub fn get_active_journal_path() -> PathBuf {
-    JOURNAL_PATH.get().cloned().unwrap_or_else(get_journal_path)
+    JOURNAL_PATH
+        .read()
+        .ok()
+        .and_then(|guard| guard.clone())
+        .unwrap_or_else(get_journal_path)
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -725,12 +725,24 @@ fn build_help_lines() -> Vec<RatatuiLine<'static>> {
         RatatuiLine::from(Span::styled("[Commands]", header_style)).alignment(Alignment::Center),
     );
     lines.push(help_line(
-        ":goto|:g",
-        "Go to date (YYYY/MM/DD or MM/DD)",
+        ":[g]oto",
+        "Go to date (MM/DD, MM/DD/YY, etc.)",
         key_style,
         desc_style,
     ));
-    lines.push(help_line(":q", "Quit", key_style, desc_style));
+    lines.push(help_line(
+        ":[o]pen",
+        "Open journal file",
+        key_style,
+        desc_style,
+    ));
+    lines.push(help_line(
+        ":config-reload",
+        "Reload config file",
+        key_style,
+        desc_style,
+    ));
+    lines.push(help_line(":[q]uit", "Quit", key_style, desc_style));
 
     lines
 }
