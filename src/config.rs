@@ -24,6 +24,10 @@ fn default_favorite_tags() -> HashMap<String, String> {
     m
 }
 
+fn default_default_filter() -> String {
+    "!tasks".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     #[serde(default)]
@@ -34,6 +38,8 @@ pub struct Config {
     pub favorite_tags: HashMap<String, String>,
     #[serde(default)]
     pub filters: HashMap<String, String>,
+    #[serde(default = "default_default_filter")]
+    pub default_filter: String,
 }
 
 impl Config {

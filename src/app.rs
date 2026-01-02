@@ -119,6 +119,9 @@ pub struct App {
     // Undo
     pub last_deleted: Option<(NaiveDate, usize, Entry)>,
 
+    // Filter history
+    pub last_filter_query: Option<String>,
+
     // Config
     pub config: Config,
 }
@@ -144,6 +147,7 @@ impl App {
             help_scroll: 0,
             help_visible_height: 0,
             last_deleted: None,
+            last_filter_query: None,
             config,
         })
     }
@@ -1197,10 +1201,21 @@ impl App {
     }
 
     pub fn exit_filter(&mut self) {
+        if let ViewMode::Filter(state) = &self.view {
+            self.last_filter_query = Some(state.query.clone());
+        }
         let later_entries =
             storage::collect_later_entries_for_date(self.current_date).unwrap_or_default();
         self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
         self.input_mode = InputMode::Normal;
+    }
+
+    pub fn return_to_filter(&mut self) -> io::Result<()> {
+        let query = self
+            .last_filter_query
+            .clone()
+            .unwrap_or_else(|| self.config.default_filter.clone());
+        self.quick_filter(&query)
     }
 
     pub fn refresh_filter(&mut self) -> io::Result<()> {
@@ -1225,6 +1240,9 @@ impl App {
 
     /// Navigate to a specific day and select the entry at the given line index
     fn goto_entry_source(&mut self, date: NaiveDate, line_index: usize) -> io::Result<()> {
+        if let ViewMode::Filter(state) = &self.view {
+            self.last_filter_query = Some(state.query.clone());
+        }
         if date != self.current_date {
             self.save();
         }

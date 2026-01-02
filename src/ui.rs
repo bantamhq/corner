@@ -611,6 +611,7 @@ fn build_help_lines() -> Vec<RatatuiLine<'static>> {
     lines.push(help_line("s", "Sort entries", key_style, desc_style));
     lines.push(help_line("m", "Move mode", key_style, desc_style));
     lines.push(help_line("/", "Filter mode", key_style, desc_style));
+    lines.push(help_line("Tab", "Return to filter", key_style, desc_style));
     lines.push(help_line(
         "0-9",
         "Filter favorite tag",
@@ -672,7 +673,7 @@ fn build_help_lines() -> Vec<RatatuiLine<'static>> {
     lines.push(help_line("r", "Refresh results", key_style, desc_style));
     lines.push(help_line("v", "View day", key_style, desc_style));
     lines.push(help_line("/", "Edit filter", key_style, desc_style));
-    lines.push(help_line("Esc", "Exit to daily", key_style, desc_style));
+    lines.push(help_line("Tab/Esc", "Exit to daily", key_style, desc_style));
     lines.push(RatatuiLine::from(""));
 
     // Filter syntax

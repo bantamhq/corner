@@ -122,6 +122,7 @@ The entry will appear in the "Later" section when you view that date.
 | `m` | Move mode (reorder entries) |
 | `0-9` | Filter by favorite tag |
 | `/` | Open filter mode |
+| `Tab` | Return to last filter |
 | `?` | Show help |
 | `:[g]oto` | Go to date (MM/DD, MM/DD/YY, MM/DD/YYYY, YYYY/MM/DD) |
 | `:[o]pen` | Open journal file |
@@ -162,7 +163,7 @@ Reorder entries within a day.
 | `v` | Jump to entry's source day |
 | `Enter` | Quick add entry to today |
 | `/` | Edit filter query |
-| `Esc` | Exit filter mode |
+| `Tab/Esc` | Exit filter mode |
 | `?` | Show help |
 
 ### Filter Syntax

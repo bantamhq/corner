@@ -121,10 +121,11 @@ pub fn handle_normal_key(app: &mut App, key: KeyCode) -> io::Result<()> {
             KeyCode::Char('t') => app.goto_today()?,
             KeyCode::Char('s') => app.sort_entries(),
             KeyCode::Char('m') => app.enter_order_mode(),
+            KeyCode::Tab => app.return_to_filter()?,
             _ => {}
         },
         ViewMode::Filter(_) => match key {
-            KeyCode::Esc => app.exit_filter(),
+            KeyCode::Esc | KeyCode::Tab => app.exit_filter(),
             KeyCode::Char('r') => app.refresh_filter()?,
             KeyCode::Enter => app.filter_quick_add(),
             _ => {}
