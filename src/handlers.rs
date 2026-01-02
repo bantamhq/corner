@@ -110,6 +110,9 @@ pub fn handle_normal_key(app: &mut App, key: KeyCode) -> io::Result<()> {
             KeyCode::Char('t') => app.goto_today()?,
             KeyCode::Char('s') => app.sort_entries(),
             KeyCode::Char('m') => app.enter_order_mode(),
+            KeyCode::Char('T') => app.quick_filter("!tasks")?,
+            KeyCode::Char('N') => app.quick_filter("!notes")?,
+            KeyCode::Char('E') => app.quick_filter("!events")?,
             _ => {}
         },
         ViewMode::Filter(_) => match key {

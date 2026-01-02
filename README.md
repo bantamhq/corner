@@ -34,8 +34,9 @@ caliber init         # Create config file
 | `u` | Undo delete |
 | `h/l` or `[]` | Previous/next day |
 | `t` | Go to today |
-| `s` | Sort completed tasks to top |
+| `s` | Sort entries |
 | `m` | Move mode (rearrange entries) |
+| `T/N/E` | Quick filter tasks/notes/events |
 | `/` | Filter mode |
 | `?` | Show help |
 | `:goto` or `:gt` | Go to date (YYYY/MM/DD or MM/DD) |
@@ -80,14 +81,18 @@ Search and filter entries across all days. Press `/` to enter a filter query.
 
 #### Filter Syntax
 
-| Query | Matches |
-|-------|---------|
-| `!tasks` | Incomplete tasks |
+| Pattern | Matches |
+|---------|---------|
+| `!tasks` or `!t` | Incomplete tasks |
 | `!tasks/done` | Completed tasks |
 | `!tasks/all` | All tasks |
-| `!notes` | Notes only |
-| `!events` | Events only |
+| `!notes` or `!n` | Notes only |
+| `!events` or `!e` | Events only |
 | `#tag` | Entries with tag |
+| `word` | Entries containing text |
+| `not:#tag` | Entries without tag |
+| `not:!tasks` | Exclude tasks |
+| `not:word` | Entries not containing text |
 
 Combine filters: `!tasks #work` finds incomplete tasks tagged #work.
 

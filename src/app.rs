@@ -1030,6 +1030,23 @@ impl App {
         Ok(())
     }
 
+    pub fn quick_filter(&mut self, query: &str) -> io::Result<()> {
+        self.save();
+        let filter = storage::parse_filter_query(query);
+        let items = storage::collect_filtered_entries(&filter)?;
+        let selected = items.len().saturating_sub(1);
+
+        self.view = ViewMode::Filter(FilterState {
+            query: query.to_string(),
+            query_buffer: String::new(),
+            items,
+            selected,
+            scroll_offset: 0,
+        });
+        self.input_mode = InputMode::Normal;
+        Ok(())
+    }
+
     pub fn cancel_filter_input(&mut self) {
         match &mut self.view {
             ViewMode::Filter(state) => {

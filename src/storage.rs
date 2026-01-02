@@ -412,6 +412,10 @@ pub struct Filter {
     pub entry_type: Option<FilterType>,
     pub completed: Option<bool>,
     pub tags: Vec<String>,
+    pub exclude_tags: Vec<String>,
+    pub search_terms: Vec<String>,
+    pub exclude_terms: Vec<String>,
+    pub exclude_types: Vec<FilterType>,
 }
 
 pub static TAG_REGEX: LazyLock<Regex> =
@@ -538,13 +542,31 @@ pub fn collect_later_entries_for_date(target_date: NaiveDate) -> io::Result<Vec<
     Ok(items)
 }
 
+fn parse_type_keyword(s: &str) -> Option<FilterType> {
+    match s {
+        "tasks" | "task" | "t" => Some(FilterType::Task),
+        "notes" | "note" | "n" => Some(FilterType::Note),
+        "events" | "event" | "e" => Some(FilterType::Event),
+        _ => None,
+    }
+}
+
 #[must_use]
 pub fn parse_filter_query(query: &str) -> Filter {
     let mut filter = Filter::default();
 
     for token in query.split_whitespace() {
-        if let Some(type_str) = token.strip_prefix('!') {
-            // Type filter: !tasks, !tasks/done, !notes, !events
+        if let Some(negated) = token.strip_prefix("not:") {
+            if let Some(tag) = negated.strip_prefix('#') {
+                filter.exclude_tags.push(tag.to_string());
+            } else if let Some(type_str) = negated.strip_prefix('!') {
+                if let Some(filter_type) = parse_type_keyword(type_str) {
+                    filter.exclude_types.push(filter_type);
+                }
+            } else if !negated.is_empty() {
+                filter.exclude_terms.push(negated.to_string());
+            }
+        } else if let Some(type_str) = token.strip_prefix('!') {
             let (base_type, modifier) = if let Some(idx) = type_str.find('/') {
                 (&type_str[..idx], Some(&type_str[idx + 1..]))
             } else {
@@ -552,20 +574,22 @@ pub fn parse_filter_query(query: &str) -> Filter {
             };
 
             match base_type {
-                "tasks" | "task" => {
+                "tasks" | "task" | "t" => {
                     filter.entry_type = Some(FilterType::Task);
                     filter.completed = match modifier {
-                        Some("done") | Some("completed") => Some(true),
+                        Some("done" | "completed") => Some(true),
                         Some("all") => None,
                         _ => Some(false),
                     };
                 }
-                "notes" | "note" => filter.entry_type = Some(FilterType::Note),
-                "events" | "event" => filter.entry_type = Some(FilterType::Event),
+                "notes" | "note" | "n" => filter.entry_type = Some(FilterType::Note),
+                "events" | "event" | "e" => filter.entry_type = Some(FilterType::Event),
                 _ => {}
             }
         } else if let Some(tag) = token.strip_prefix('#') {
             filter.tags.push(tag.to_string());
+        } else if !token.is_empty() {
+            filter.search_terms.push(token.to_string());
         }
     }
 
@@ -608,14 +632,25 @@ pub fn collect_filtered_entries(filter: &Filter) -> io::Result<Vec<FilterItem>> 
     Ok(items)
 }
 
+fn entry_type_to_filter_type(entry_type: &EntryType) -> FilterType {
+    match entry_type {
+        EntryType::Task { .. } => FilterType::Task,
+        EntryType::Note => FilterType::Note,
+        EntryType::Event => FilterType::Event,
+    }
+}
+
 fn entry_matches_filter(entry: &Entry, filter: &Filter) -> bool {
-    if let Some(ref filter_type) = filter.entry_type {
-        let entry_matches_type = match filter_type {
-            FilterType::Task => matches!(entry.entry_type, EntryType::Task { .. }),
-            FilterType::Note => matches!(entry.entry_type, EntryType::Note),
-            FilterType::Event => matches!(entry.entry_type, EntryType::Event),
-        };
-        if !entry_matches_type {
+    let entry_filter_type = entry_type_to_filter_type(&entry.entry_type);
+
+    if let Some(ref filter_type) = filter.entry_type
+        && &entry_filter_type != filter_type
+    {
+        return false;
+    }
+
+    for excluded_type in &filter.exclude_types {
+        if &entry_filter_type == excluded_type {
             return false;
         }
     }
@@ -627,15 +662,37 @@ fn entry_matches_filter(entry: &Entry, filter: &Filter) -> bool {
         return false;
     }
 
-    if !filter.tags.is_empty() {
-        let entry_tags = extract_tags(&entry.content);
-        for required_tag in &filter.tags {
-            if !entry_tags
-                .iter()
-                .any(|t| t.eq_ignore_ascii_case(required_tag))
-            {
-                return false;
-            }
+    let entry_tags = extract_tags(&entry.content);
+
+    for required_tag in &filter.tags {
+        if !entry_tags
+            .iter()
+            .any(|t| t.eq_ignore_ascii_case(required_tag))
+        {
+            return false;
+        }
+    }
+
+    for excluded_tag in &filter.exclude_tags {
+        if entry_tags
+            .iter()
+            .any(|t| t.eq_ignore_ascii_case(excluded_tag))
+        {
+            return false;
+        }
+    }
+
+    let content_lower = entry.content.to_lowercase();
+
+    for term in &filter.search_terms {
+        if !content_lower.contains(&term.to_lowercase()) {
+            return false;
+        }
+    }
+
+    for term in &filter.exclude_terms {
+        if content_lower.contains(&term.to_lowercase()) {
+            return false;
         }
     }
 
