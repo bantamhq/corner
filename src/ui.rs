@@ -507,6 +507,16 @@ pub fn render_footer(app: &App) -> RatatuiLine<'static> {
             Span::styled("Esc", Style::default().fg(Color::Gray)),
             Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
         ]),
+        (_, InputMode::Confirm(_)) => RatatuiLine::from(vec![
+            Span::styled(
+                " CONFIRM ",
+                Style::default().fg(Color::Black).bg(Color::Blue),
+            ),
+            Span::styled("  y", Style::default().fg(Color::Gray)),
+            Span::styled(" Yes  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("n/Esc", Style::default().fg(Color::Gray)),
+            Span::styled(" No", Style::default().fg(Color::DarkGray)),
+        ]),
         (ViewMode::Daily(_), InputMode::Normal) => RatatuiLine::from(vec![
             Span::styled(" DAILY ", Style::default().fg(Color::Black).bg(Color::Cyan)),
             Span::styled("  Enter", Style::default().fg(Color::Gray)),
@@ -592,6 +602,7 @@ fn build_help_lines() -> Vec<RatatuiLine<'static>> {
                 ("/", "Filter mode"),
                 ("Tab", "Return to filter"),
                 ("0-9", "Filter favorite tag"),
+                ("`", "Toggle Global/Project journal"),
                 (":", "Command mode"),
             ],
         ),
@@ -665,6 +676,9 @@ fn build_help_lines() -> Vec<RatatuiLine<'static>> {
             &[
                 (":[g]oto", "Go to date (MM/DD, MM/DD/YY, etc.)"),
                 (":[o]pen", "Open journal file"),
+                (":global", "Switch to Global journal"),
+                (":project", "Switch to Project journal"),
+                (":init-project", "Create .caliber/journal.md"),
                 (":config-reload", "Reload config file"),
                 (":[q]uit", "Quit"),
             ],

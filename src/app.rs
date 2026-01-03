@@ -4,7 +4,7 @@ use chrono::{Datelike, Days, Local, NaiveDate};
 
 use crate::config::{Config, resolve_path};
 use crate::cursor::CursorBuffer;
-use crate::storage::{self, Entry, EntryType, FilterEntry, LaterEntry, Line};
+use crate::storage::{self, Entry, EntryType, FilterEntry, JournalSlot, LaterEntry, Line};
 
 pub const DAILY_HEADER_LINES: usize = 1;
 pub const FILTER_HEADER_LINES: usize = 1;
@@ -99,6 +99,13 @@ pub enum EditContext {
     },
 }
 
+/// Context for confirmation dialogs
+#[derive(Clone, PartialEq)]
+pub enum ConfirmContext {
+    CreateProjectJournal,
+    AddToGitignore,
+}
+
 /// What keyboard handler to use
 #[derive(Clone, PartialEq)]
 pub enum InputMode {
@@ -107,6 +114,7 @@ pub enum InputMode {
     Command,
     Reorder,
     QueryInput,
+    Confirm(ConfirmContext),
 }
 
 /// Where to insert a new entry
@@ -132,6 +140,8 @@ pub struct App {
     pub last_deleted: Option<(NaiveDate, usize, Entry)>,
     pub last_filter_query: Option<String>,
     pub config: Config,
+    pub active_journal: JournalSlot,
+    pub in_git_repo: bool,
 }
 
 impl App {
@@ -140,6 +150,8 @@ impl App {
         let lines = storage::load_day_lines(current_date)?;
         let entry_indices = Self::compute_entry_indices(&lines);
         let later_entries = storage::collect_later_entries_for_date(current_date)?;
+        let active_journal = storage::get_active_slot();
+        let in_git_repo = storage::find_git_root().is_some();
 
         Ok(Self {
             current_date,
@@ -157,6 +169,8 @@ impl App {
             last_deleted: None,
             last_filter_query: None,
             config,
+            active_journal,
+            in_git_repo,
         })
     }
 
@@ -206,7 +220,7 @@ impl App {
         state.total_entries(&self.entry_indices)
     }
 
-    fn set_status(&mut self, msg: impl Into<String>) {
+    pub fn set_status(&mut self, msg: impl Into<String>) {
         self.status_message = Some(msg.into());
     }
 
@@ -1053,10 +1067,56 @@ impl App {
         self.save();
 
         let path = resolve_path(path);
-        storage::set_journal_path(path.clone());
+        storage::set_project_path(path.clone());
+        storage::set_active_slot(storage::JournalSlot::Project);
+        self.active_journal = JournalSlot::Project;
         let later_entries = self.load_day(Local::now().date_naive())?;
         self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
         self.set_status(format!("Opened: {}", path.display()));
+        Ok(())
+    }
+
+    fn switch_to_journal(&mut self, slot: JournalSlot) -> io::Result<()> {
+        if self.active_journal == slot {
+            return Ok(());
+        }
+        self.save();
+        storage::set_active_slot(slot);
+        self.active_journal = slot;
+        let later_entries = self.load_day(Local::now().date_naive())?;
+        self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
+        self.set_status(match slot {
+            JournalSlot::Global => "Switched to Global journal",
+            JournalSlot::Project => "Switched to Project journal",
+        });
+        Ok(())
+    }
+
+    pub fn switch_to_global(&mut self) -> io::Result<()> {
+        self.switch_to_journal(JournalSlot::Global)
+    }
+
+    pub fn switch_to_project(&mut self) -> io::Result<()> {
+        self.switch_to_journal(JournalSlot::Project)
+    }
+
+    pub fn toggle_journal(&mut self) -> io::Result<()> {
+        match self.active_journal {
+            JournalSlot::Global => {
+                // Check if project journal exists
+                if storage::get_project_path().is_some() {
+                    self.switch_to_project()?;
+                } else if self.in_git_repo {
+                    // Prompt to create project journal
+                    self.input_mode = InputMode::Confirm(ConfirmContext::CreateProjectJournal);
+                } else {
+                    self.set_status("Not in a git repository - no project journal available");
+                }
+            }
+            JournalSlot::Project => {
+                self.switch_to_global()?;
+            }
+        }
         Ok(())
     }
 
@@ -1098,6 +1158,46 @@ impl App {
             }
             "config-reload" => {
                 self.reload_config()?;
+            }
+            "global" => {
+                self.switch_to_global()?;
+            }
+            "project" => {
+                if arg.is_empty() {
+                    // Switch to project journal (prompt to create if needed)
+                    if storage::get_project_path().is_some() {
+                        self.switch_to_project()?;
+                    } else if self.in_git_repo {
+                        self.input_mode = InputMode::Confirm(ConfirmContext::CreateProjectJournal);
+                        return Ok(());
+                    } else {
+                        self.set_status("Not in a git repository - no project journal available");
+                    }
+                } else {
+                    // :project /path/to.md - set and switch to that path
+                    self.open_journal(arg)?;
+                }
+            }
+            "init-project" => {
+                if storage::get_project_path().is_some() {
+                    self.set_status("Project journal already exists");
+                } else if self.in_git_repo {
+                    // In git repo: use the confirm flow (creates at git root, asks about .gitignore)
+                    self.input_mode = InputMode::Confirm(ConfirmContext::CreateProjectJournal);
+                    return Ok(());
+                } else {
+                    // Not in git repo: create in cwd, no .gitignore prompt
+                    let cwd = std::env::current_dir()?;
+                    let caliber_dir = cwd.join(".caliber");
+                    std::fs::create_dir_all(&caliber_dir)?;
+                    let journal_path = caliber_dir.join("journal.md");
+                    if !journal_path.exists() {
+                        std::fs::write(&journal_path, "")?;
+                    }
+                    storage::set_project_path(journal_path);
+                    self.switch_to_project()?;
+                    self.set_status("Project journal created");
+                }
             }
             _ => {}
         }

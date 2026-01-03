@@ -43,6 +43,15 @@ caliber init         # Create config file at ~/.config/caliber/config.toml
 
 ## Features
 
+### Global and Project Journals
+
+Caliber supports two journal contexts:
+
+- **Global journal** - Your default journal stored in `~/.config/caliber/global_journal.md`
+- **Project journal** - A project-specific journal at `.caliber/journal.md` in your project root
+
+When you launch Caliber in a git repository, it automatically detects or offers to create a project journal. Toggle between journals with `` ` `` (backtick). The title bar shows `G` (blue) or `P` (green) to indicate which journal is active.
+
 ### Daily View
 
 Your home base. View and manage entries for a single day with vim-style navigation.
@@ -123,9 +132,13 @@ The entry will appear in the "Later" section when you view that date.
 | `0-9` | Filter by favorite tag |
 | `/` | Open filter mode |
 | `Tab` | Return to last filter |
+| `` ` `` | Toggle Global/Project journal |
 | `?` | Show help |
 | `:[g]oto` | Go to date (MM/DD, MM/DD/YY, MM/DD/YYYY, YYYY/MM/DD) |
 | `:[o]pen` | Open journal file |
+| `:global` | Switch to Global journal |
+| `:project` | Switch to Project journal |
+| `:init-project` | Create .caliber/journal.md |
 | `:config-reload` | Reload config file |
 | `:[q]uit` | Quit |
 
@@ -232,8 +245,8 @@ Caliber uses a markdown-compatible format:
 Config file: `~/.config/caliber/config.toml`
 
 ```toml
-# Custom journal path (default: ~/.config/caliber/journals/journal.md)
-default_file = "/path/to/journal.md"
+# Custom global journal path (default: ~/.config/caliber/global_journal.md)
+global_file = "/path/to/journal.md"
 
 # Custom sort order for 's' command
 sort_order = ["uncompleted", "notes", "events", "completed"]

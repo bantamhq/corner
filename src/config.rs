@@ -31,7 +31,7 @@ fn default_default_filter() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     #[serde(default)]
-    pub default_file: Option<String>,
+    pub global_file: Option<String>,
     #[serde(default = "default_sort_order")]
     pub sort_order: Vec<String>,
     #[serde(default = "default_favorite_tags")]
@@ -96,8 +96,8 @@ impl Config {
         Ok(true)
     }
 
-    pub fn get_journal_path(&self) -> PathBuf {
-        if let Some(ref file) = self.default_file {
+    pub fn get_global_journal_path(&self) -> PathBuf {
+        if let Some(ref file) = self.global_file {
             resolve_path(file)
         } else {
             get_default_journal_path()
@@ -128,7 +128,7 @@ pub fn get_config_path() -> PathBuf {
 }
 
 pub fn get_default_journal_path() -> PathBuf {
-    get_config_dir().join("journals").join("journal.md")
+    get_config_dir().join("global_journal.md")
 }
 
 #[cfg(test)]

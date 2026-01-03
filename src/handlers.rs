@@ -2,8 +2,9 @@ use std::io;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::app::{App, InputMode, InsertPosition, ViewMode};
+use crate::app::{App, ConfirmContext, InputMode, InsertPosition, ViewMode};
 use crate::cursor::CursorBuffer;
+use crate::storage;
 use crate::ui;
 
 pub fn handle_help_key(app: &mut App, key: KeyCode) {
@@ -89,6 +90,10 @@ pub fn handle_normal_key(app: &mut App, key: KeyCode) -> io::Result<()> {
         }
         KeyCode::Char('u') => {
             app.undo();
+            return Ok(());
+        }
+        KeyCode::Char('`') => {
+            app.toggle_journal()?;
             return Ok(());
         }
         KeyCode::Char('v') => {
@@ -270,4 +275,54 @@ fn handle_text_input(buffer: &mut CursorBuffer, key: KeyEvent) -> bool {
         _ => return false,
     }
     true
+}
+
+pub fn handle_confirm_key(app: &mut App, key: KeyCode) -> io::Result<()> {
+    let context = match &app.input_mode {
+        InputMode::Confirm(ctx) => ctx.clone(),
+        _ => return Ok(()),
+    };
+
+    match key {
+        KeyCode::Char('y') | KeyCode::Char('Y') => match context {
+            ConfirmContext::CreateProjectJournal => {
+                match storage::create_project_journal() {
+                    Ok(path) => {
+                        storage::set_project_path(path);
+                        // Ask about .gitignore next
+                        app.input_mode = InputMode::Confirm(ConfirmContext::AddToGitignore);
+                    }
+                    Err(e) => {
+                        app.set_status(format!("Failed to create project journal: {e}"));
+                        app.input_mode = InputMode::Normal;
+                    }
+                }
+            }
+            ConfirmContext::AddToGitignore => {
+                if let Err(e) = storage::add_caliber_to_gitignore() {
+                    app.set_status(format!("Failed to update .gitignore: {e}"));
+                } else {
+                    app.set_status("Project journal created and added to .gitignore");
+                }
+                // Switch to project journal
+                app.switch_to_project()?;
+                app.input_mode = InputMode::Normal;
+            }
+        },
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => match context {
+            ConfirmContext::CreateProjectJournal => {
+                app.set_status("Staying on Global journal");
+                app.input_mode = InputMode::Normal;
+            }
+            ConfirmContext::AddToGitignore => {
+                app.set_status("Project journal created (not added to .gitignore)");
+                // Still switch to project journal
+                app.switch_to_project()?;
+                app.input_mode = InputMode::Normal;
+            }
+        },
+        _ => {}
+    }
+
+    Ok(())
 }

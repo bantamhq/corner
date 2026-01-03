@@ -18,13 +18,14 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Style},
+    text::Span,
     widgets::{Block, Borders, Clear, Paragraph},
 };
 use unicode_width::UnicodeWidthStr;
 
 use app::{
-    App, DAILY_HEADER_LINES, DATE_SUFFIX_WIDTH, EditContext, FILTER_HEADER_LINES, InputMode,
-    ViewMode,
+    App, ConfirmContext, DAILY_HEADER_LINES, DATE_SUFFIX_WIDTH, EditContext, FILTER_HEADER_LINES,
+    InputMode, ViewMode,
 };
 use config::{Config, resolve_path};
 use cursor::cursor_position_in_wrap;
@@ -77,13 +78,22 @@ fn main() -> Result<(), io::Error> {
     let cli_file = args.get(1).map(PathBuf::from);
     let config = Config::load().unwrap_or_default();
 
-    let journal_path = if let Some(path) = cli_file {
-        resolve_path(&path.to_string_lossy())
+    let global_path = config.get_global_journal_path();
+    let (project_path, active_slot) = if let Some(path) = cli_file {
+        // CLI path overrides project slot
+        (
+            Some(resolve_path(&path.to_string_lossy())),
+            storage::JournalSlot::Project,
+        )
+    } else if let Some(path) = storage::detect_project_journal() {
+        // Existing project journal detected
+        (Some(path), storage::JournalSlot::Project)
     } else {
-        config.get_journal_path()
+        // No project journal, start in Global
+        (None, storage::JournalSlot::Global)
     };
 
-    storage::set_journal_path(journal_path);
+    storage::set_journal_context(global_path, project_path.clone(), active_slot);
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -114,6 +124,11 @@ fn run_app<B: ratatui::backend::Backend>(
 ) -> io::Result<()> {
     let mut app = App::new(config)?;
 
+    // If in git repo without project journal, prompt to create one
+    if app.in_git_repo && storage::get_project_path().is_none() {
+        app.input_mode = InputMode::Confirm(ConfirmContext::CreateProjectJournal);
+    }
+
     loop {
         let is_filter_context = matches!(app.view, ViewMode::Filter(_))
             || matches!(
@@ -136,9 +151,18 @@ fn run_app<B: ratatui::backend::Backend>(
                     .borders(Borders::ALL)
                     .border_style(Style::default().fg(Color::Magenta))
             } else {
-                let date_title = app.current_date.format(" %m/%d/%y ").to_string();
+                let date_text = Span::raw(app.current_date.format(" %m/%d/%y ").to_string());
+                let slot_indicator = match app.active_journal {
+                    storage::JournalSlot::Global => {
+                        Span::styled(" G ", Style::default().bg(Color::Blue).fg(Color::White))
+                    }
+                    storage::JournalSlot::Project => {
+                        Span::styled(" P ", Style::default().bg(Color::Green).fg(Color::Black))
+                    }
+                };
+                let title = ratatui::text::Line::from(vec![date_text, slot_indicator]);
                 Block::default()
-                    .title_top(ratatui::text::Line::from(date_title).alignment(Alignment::Right))
+                    .title_top(title.alignment(Alignment::Right))
                     .borders(Borders::ALL)
                     .border_style(Style::default().fg(Color::White))
             };
@@ -466,6 +490,45 @@ fn run_app<B: ratatui::backend::Backend>(
                     Paragraph::new(footer_line).alignment(ratatui::layout::Alignment::Right);
                 f.render_widget(footer, footer_area);
             }
+
+            // Render confirm dialog if active
+            if let InputMode::Confirm(context) = &app.input_mode {
+                let (title, messages): (&str, &[&str]) = match context {
+                    ConfirmContext::CreateProjectJournal => (
+                        " Create Project Journal ",
+                        &["No project journal found.", "Create .caliber/journal.md?"],
+                    ),
+                    ConfirmContext::AddToGitignore => {
+                        (" Add to .gitignore ", &["Add .caliber/ to .gitignore?"])
+                    }
+                };
+
+                let popup_area = ui::centered_rect(50, 30, size);
+                f.render_widget(Clear, popup_area);
+
+                let confirm_block = Block::default()
+                    .title(title)
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Blue));
+
+                let inner_area = confirm_block.inner(popup_area);
+                f.render_widget(confirm_block, popup_area);
+
+                let mut lines = vec![ratatui::text::Line::raw("")];
+                for msg in messages {
+                    lines.push(ratatui::text::Line::raw(*msg));
+                }
+                lines.push(ratatui::text::Line::raw(""));
+                lines.push(ratatui::text::Line::from(vec![
+                    Span::styled("[Y]", Style::default().fg(Color::Green)),
+                    Span::raw(" Yes    "),
+                    Span::styled("[N]", Style::default().fg(Color::Red)),
+                    Span::raw(" No"),
+                ]));
+                let content = ratatui::text::Text::from(lines);
+                let paragraph = Paragraph::new(content).alignment(Alignment::Center);
+                f.render_widget(paragraph, inner_area);
+            }
         })?;
 
         if event::poll(std::time::Duration::from_millis(16))?
@@ -482,6 +545,7 @@ fn run_app<B: ratatui::backend::Backend>(
                     InputMode::Edit(_) => handlers::handle_edit_key(&mut app, key),
                     InputMode::QueryInput => handlers::handle_query_input_key(&mut app, key)?,
                     InputMode::Reorder => handlers::handle_reorder_key(&mut app, key.code),
+                    InputMode::Confirm(_) => handlers::handle_confirm_key(&mut app, key.code)?,
                 }
             }
         }
