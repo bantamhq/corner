@@ -14,14 +14,14 @@ fn style_content(text: &str, base_style: Style, muted: bool) -> Vec<Span<'static
     let mut last_end = 0;
 
     let tag_color = if muted {
-        Color::Rgb(140, 140, 100)
-    } else {
         Color::Yellow
+    } else {
+        Color::LightYellow
     };
     let date_color = if muted {
-        Color::Rgb(140, 100, 100)
-    } else {
         Color::Red
+    } else {
+        Color::LightRed
     };
 
     let mut matches: Vec<(usize, usize, Color)> = Vec::new();
