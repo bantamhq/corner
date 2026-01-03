@@ -135,7 +135,6 @@ fn run_app<B: ratatui::backend::Backend>(
                 app.input_mode,
                 InputMode::Edit(EditContext::FilterEdit { .. })
                     | InputMode::Edit(EditContext::FilterQuickAdd { .. })
-                    | InputMode::QueryInput
             );
 
         terminal.draw(|f| {
