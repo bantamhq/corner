@@ -404,7 +404,7 @@ fn run_app<B: ratatui::backend::Backend>(
             }
 
             if app.show_help {
-                let popup_area = ui::centered_rect(50, 70, size);
+                let popup_area = ui::centered_rect(75, 70, size);
                 app.help_visible_height = popup_area.height.saturating_sub(3) as usize;
 
                 f.render_widget(Clear, popup_area);

@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line as RatatuiLine, Span},
 };
@@ -561,259 +561,137 @@ pub fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
         .split(vertical[1])[1]
 }
 
+const HELP_KEY_WIDTH: usize = 14; // Longest key: ":config-reload"
+const HELP_GUTTER_WIDTH: usize = 2;
+
 static HELP_LINES: LazyLock<Vec<RatatuiLine<'static>>> = LazyLock::new(build_help_lines);
 
-#[allow(clippy::vec_init_then_push)]
 fn build_help_lines() -> Vec<RatatuiLine<'static>> {
     let header_style = Style::default().fg(Color::Cyan);
     let key_style = Style::default().fg(Color::Yellow);
     let desc_style = Style::default().fg(Color::White);
+    let header_indent = " ".repeat(HELP_KEY_WIDTH + HELP_GUTTER_WIDTH);
+
+    let sections: &[(&str, &[(&str, &str)])] = &[
+        (
+            "[Daily]",
+            &[
+                ("Enter", "New entry at end"),
+                ("o/O", "New entry below/above"),
+                ("e", "Edit selected"),
+                ("x", "Toggle task complete"),
+                ("d", "Delete entry"),
+                ("y", "Yank to clipboard"),
+                ("u", "Undo delete"),
+                ("j/k", "Navigate down/up"),
+                ("g/G", "Jump to first/last"),
+                ("h/l|[]", "Previous/next day"),
+                ("t", "Go to today"),
+                ("s", "Sort entries"),
+                ("m", "Move mode"),
+                ("/", "Filter mode"),
+                ("Tab", "Return to filter"),
+                ("0-9", "Filter favorite tag"),
+                (":", "Command mode"),
+            ],
+        ),
+        (
+            "[Move]",
+            &[
+                ("j/k|↕", "Move entry down/up"),
+                ("m/Enter", "Save"),
+                ("Esc", "Cancel"),
+            ],
+        ),
+        (
+            "[Edit]",
+            &[
+                ("Enter", "Save and exit"),
+                ("Tab", "Save and new"),
+                ("Shift+Tab", "Toggle entry type"),
+                ("Esc", "Cancel"),
+            ],
+        ),
+        (
+            "[Text Editing]",
+            &[
+                ("←/→", "Move cursor left/right"),
+                ("Alt+B/F", "Move cursor one word left/right"),
+                ("Home/Ctrl+A", "Move cursor to start"),
+                ("End/Ctrl+E", "Move cursor to end"),
+                ("Ctrl+W", "Delete word before cursor"),
+                ("Alt+D", "Delete from cursor to end of word"),
+                ("Ctrl+U", "Delete from cursor to start"),
+                ("Ctrl+K", "Delete from cursor to end"),
+                ("Delete", "Delete char after cursor"),
+            ],
+        ),
+        (
+            "[Filter]",
+            &[
+                ("j/k|↕", "Navigate down/up"),
+                ("g/G", "Jump first/last"),
+                ("Enter", "Quick add to today"),
+                ("e", "Edit entry"),
+                ("x", "Toggle task"),
+                ("d", "Delete entry"),
+                ("y", "Yank to clipboard"),
+                ("r", "Refresh results"),
+                ("v", "View day"),
+                ("/", "Edit filter"),
+                ("Tab/Esc", "Exit to daily"),
+            ],
+        ),
+        (
+            "[Filter Syntax]",
+            &[
+                ("!tasks", "Incomplete tasks"),
+                ("!tasks/done", "Completed tasks"),
+                ("!notes", "Notes only"),
+                ("!events", "Events only"),
+                ("#tag", "Filter by tag"),
+                ("$name", "Saved filter"),
+                ("@before:DATE", "Before date"),
+                ("@after:DATE", "After date"),
+                ("@overdue", "Has past @date"),
+                ("DATE:", "MM/DD, tomorrow, yesterday, next-mon, last-fri, 3d, -3d"),
+            ],
+        ),
+        (
+            "[Commands]",
+            &[
+                (":[g]oto", "Go to date (MM/DD, MM/DD/YY, etc.)"),
+                (":[o]pen", "Open journal file"),
+                (":config-reload", "Reload config file"),
+                (":[q]uit", "Quit"),
+            ],
+        ),
+    ];
 
     let mut lines = Vec::new();
 
-    // Daily mode
-    lines.push(
-        RatatuiLine::from(Span::styled("[Daily]", header_style)).alignment(Alignment::Center),
-    );
-    lines.push(help_line(
-        "Enter",
-        "New entry at end",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        "o/O",
-        "New entry below/above",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line("e", "Edit selected", key_style, desc_style));
-    lines.push(help_line(
-        "x",
-        "Toggle task complete",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line("d", "Delete entry", key_style, desc_style));
-    lines.push(help_line("y", "Yank to clipboard", key_style, desc_style));
-    lines.push(help_line("u", "Undo delete", key_style, desc_style));
-    lines.push(help_line("j/k", "Navigate down/up", key_style, desc_style));
-    lines.push(help_line(
-        "g/G",
-        "Jump to first/last",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        "h/l|[]",
-        "Previous/next day",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line("t", "Go to today", key_style, desc_style));
-    lines.push(help_line("s", "Sort entries", key_style, desc_style));
-    lines.push(help_line("m", "Move mode", key_style, desc_style));
-    lines.push(help_line("/", "Filter mode", key_style, desc_style));
-    lines.push(help_line("Tab", "Return to filter", key_style, desc_style));
-    lines.push(help_line(
-        "0-9",
-        "Filter favorite tag",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(":", "Command mode", key_style, desc_style));
-    lines.push(RatatuiLine::from(""));
-
-    // Move mode
-    lines
-        .push(RatatuiLine::from(Span::styled("[Move]", header_style)).alignment(Alignment::Center));
-    lines.push(help_line(
-        "j/k|↕",
-        "Move entry down/up",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line("m/Enter", "Save", key_style, desc_style));
-    lines.push(help_line("Esc", "Cancel", key_style, desc_style));
-    lines.push(RatatuiLine::from(""));
-
-    // Edit mode
-    lines
-        .push(RatatuiLine::from(Span::styled("[Edit]", header_style)).alignment(Alignment::Center));
-    lines.push(help_line("Enter", "Save and exit", key_style, desc_style));
-    lines.push(help_line("Tab", "Save and new", key_style, desc_style));
-    lines.push(help_line(
-        "Shift+Tab",
-        "Toggle entry type",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line("Esc", "Cancel", key_style, desc_style));
-    lines.push(RatatuiLine::from(""));
-
-    // Text editing (shared)
-    lines.push(
-        RatatuiLine::from(Span::styled("[Text Editing]", header_style))
-            .alignment(Alignment::Center),
-    );
-    lines.push(help_line(
-        "←/→",
-        "Move cursor left/right",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        "Alt+B/F",
-        "Move cursor one word left/right",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        "Home/Ctrl+A",
-        "Move cursor to start",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        "End/Ctrl+E",
-        "Move cursor to end",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        "Ctrl+W",
-        "Delete word before cursor",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        "Alt+D",
-        "Delete from cursor to end of word",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        "Ctrl+U",
-        "Delete from cursor to start",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        "Ctrl+K",
-        "Delete from cursor to end",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        "Delete",
-        "Delete char after cursor",
-        key_style,
-        desc_style,
-    ));
-    lines.push(RatatuiLine::from(""));
-
-    // Filter mode
-    lines.push(
-        RatatuiLine::from(Span::styled("[Filter]", header_style)).alignment(Alignment::Center),
-    );
-    lines.push(help_line(
-        "j/k|↕",
-        "Navigate down/up",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line("g/G", "Jump first/last", key_style, desc_style));
-    lines.push(help_line(
-        "Enter",
-        "Quick add to today",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line("e", "Edit entry", key_style, desc_style));
-    lines.push(help_line("x", "Toggle task", key_style, desc_style));
-    lines.push(help_line("d", "Delete entry", key_style, desc_style));
-    lines.push(help_line("y", "Yank to clipboard", key_style, desc_style));
-    lines.push(help_line("r", "Refresh results", key_style, desc_style));
-    lines.push(help_line("v", "View day", key_style, desc_style));
-    lines.push(help_line("/", "Edit filter", key_style, desc_style));
-    lines.push(help_line("Tab/Esc", "Exit to daily", key_style, desc_style));
-    lines.push(RatatuiLine::from(""));
-
-    // Filter syntax
-    lines.push(
-        RatatuiLine::from(Span::styled("[Filter Syntax]", header_style))
-            .alignment(Alignment::Center),
-    );
-    lines.push(help_line(
-        "!tasks",
-        "Incomplete tasks",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        "!tasks/done",
-        "Completed tasks",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line("!notes", "Notes only", key_style, desc_style));
-    lines.push(help_line("!events", "Events only", key_style, desc_style));
-    lines.push(help_line("#tag", "Filter by tag", key_style, desc_style));
-    lines.push(help_line("$name", "Saved filter", key_style, desc_style));
-    lines.push(help_line(
-        "@before:DATE",
-        "Before date",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        "@after:DATE",
-        "After date",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        "@overdue",
-        "Has past @date",
-        key_style,
-        desc_style,
-    ));
-    lines.push(RatatuiLine::from(Span::styled(
-        "  DATE: MM/DD, tomorrow, yesterday, next-mon, last-fri, 3d, -3d",
-        desc_style,
-    )));
-    lines.push(RatatuiLine::from(""));
-
-    // Commands
-    lines.push(
-        RatatuiLine::from(Span::styled("[Commands]", header_style)).alignment(Alignment::Center),
-    );
-    lines.push(help_line(
-        ":[g]oto",
-        "Go to date (MM/DD, MM/DD/YY, etc.)",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        ":[o]pen",
-        "Open journal file",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(
-        ":config-reload",
-        "Reload config file",
-        key_style,
-        desc_style,
-    ));
-    lines.push(help_line(":[q]uit", "Quit", key_style, desc_style));
+    for (i, (title, keys)) in sections.iter().enumerate() {
+        lines.push(RatatuiLine::from(Span::styled(
+            format!("{header_indent}{title}"),
+            header_style,
+        )));
+        for (key, desc) in *keys {
+            lines.push(help_line(key, desc, key_style, desc_style));
+        }
+        if i < sections.len() - 1 {
+            lines.push(RatatuiLine::from(""));
+        }
+    }
 
     lines
 }
 
 fn help_line(key: &str, desc: &str, key_style: Style, desc_style: Style) -> RatatuiLine<'static> {
     RatatuiLine::from(vec![
-        Span::styled(format!("{key:>8}  "), key_style),
+        Span::styled(
+            format!("{:>width$}{}", key, " ".repeat(HELP_GUTTER_WIDTH), width = HELP_KEY_WIDTH),
+            key_style,
+        ),
         Span::styled(desc.to_string(), desc_style),
     ])
 }
