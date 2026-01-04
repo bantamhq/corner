@@ -1,0 +1,45 @@
+# Command definitions (: commands)
+# Each entry defines a command with its aliases and help text variants
+
+[[commands]]
+name = "date"
+aliases = ["d"]
+args = "DATE"
+key = ":date DATE"
+short_text = "Go to date"
+short_description = "Go to date (MM/DD)"
+long_description = "Navigate to a specific date. Supports MM/DD, YYYY/MM/DD, or natural dates like 'tomorrow', 'next-mon', '3d'"
+
+[[commands]]
+name = "global"
+aliases = ["g"]
+key = ":global"
+short_text = "Global"
+short_description = "Switch to Global journal"
+long_description = "Switch to the global journal at ~/.config/caliber/global_journal.md"
+
+[[commands]]
+name = "project"
+aliases = ["p"]
+args = "[init|default|path]"
+key = ":project"
+short_text = "Project"
+short_description = "Project [init|default|path]"
+long_description = "Manage project journal. Use 'init' to create, 'default' to reset, or provide a path"
+
+[[commands]]
+name = "config"
+aliases = ["c"]
+args = "[reload]"
+key = ":config"
+short_text = "Config"
+short_description = "Config [reload]"
+long_description = "Configuration management. Use 'reload' to refresh settings from config file"
+
+[[commands]]
+name = "quit"
+aliases = ["q"]
+key = ":quit"
+short_text = "Quit"
+short_description = "Quit application"
+long_description = "Save and exit the application"

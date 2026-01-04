@@ -1,0 +1,453 @@
+# Keybinding definitions
+# Each entry defines a single action with its key codes and help text variants
+
+# =============================================================================
+# Shared Normal Mode (works in both Daily and Filter views)
+# =============================================================================
+
+[[keys]]
+id = "show_help"
+key = "?"
+modes = ["shared_normal"]
+short_text = "Help"
+short_description = "Show help"
+long_description = "Display the help overlay with all keybindings"
+
+[[keys]]
+id = "enter_command_mode"
+key = ":"
+modes = ["shared_normal"]
+short_text = "Commands"
+short_description = "Command mode"
+long_description = "Enter command mode for :date, :quit, etc."
+
+[[keys]]
+id = "enter_filter_mode"
+key = "/"
+modes = ["shared_normal"]
+short_text = "Filter"
+short_description = "Filter mode"
+long_description = "Enter filter mode to search entries"
+
+[[keys]]
+id = "edit_entry"
+key = "i"
+modes = ["shared_normal"]
+short_text = "Edit"
+short_description = "Edit selected"
+long_description = "Edit the currently selected entry"
+
+[[keys]]
+id = "toggle_entry"
+key = "c"
+modes = ["shared_normal"]
+short_text = "Toggle"
+short_description = "Toggle task complete"
+long_description = "Toggle task completion status"
+
+[[keys]]
+id = "delete_entry"
+key = "x"
+modes = ["shared_normal"]
+short_text = "Delete"
+short_description = "Delete entry"
+long_description = "Delete the selected entry"
+
+[[keys]]
+id = "move_down"
+key = "j"
+alt_key = "↓"
+modes = ["shared_normal"]
+short_text = "Down"
+short_description = "Navigate down"
+long_description = "Move selection to the next entry"
+
+[[keys]]
+id = "move_up"
+key = "k"
+alt_key = "↑"
+modes = ["shared_normal"]
+short_text = "Up"
+short_description = "Navigate up"
+long_description = "Move selection to the previous entry"
+
+[[keys]]
+id = "jump_to_first"
+key = "g"
+modes = ["shared_normal"]
+short_text = "First"
+short_description = "Jump to first"
+long_description = "Jump to the first entry"
+
+[[keys]]
+id = "jump_to_last"
+key = "G"
+modes = ["shared_normal"]
+short_text = "Last"
+short_description = "Jump to last"
+long_description = "Jump to the last entry"
+
+[[keys]]
+id = "undo"
+key = "u"
+modes = ["shared_normal"]
+short_text = "Undo"
+short_description = "Undo delete"
+long_description = "Undo the last delete operation"
+
+[[keys]]
+id = "toggle_journal"
+key = "`"
+modes = ["shared_normal"]
+short_text = "Journal"
+short_description = "Toggle Global/Project journal"
+long_description = "Switch between Global and Project journal"
+
+[[keys]]
+id = "view_entry_source"
+key = "v"
+modes = ["shared_normal"]
+short_text = "View"
+short_description = "View entry source"
+long_description = "Jump to the source day of a filtered entry"
+
+[[keys]]
+id = "yank_entry"
+key = "y"
+modes = ["shared_normal"]
+short_text = "Yank"
+short_description = "Yank to clipboard"
+long_description = "Copy the selected entry to clipboard"
+
+[[keys]]
+id = "quick_filter_tag"
+key = "0-9"
+modes = ["shared_normal"]
+short_text = "Tag filter"
+short_description = "Filter favorite tag"
+long_description = "Quick filter by favorite tag (configured in config.toml)"
+
+# =============================================================================
+# Daily Normal Mode
+# =============================================================================
+
+[[keys]]
+id = "new_entry_bottom"
+key = "Enter"
+modes = ["daily_normal"]
+short_text = "New entry"
+short_description = "New entry at end"
+long_description = "Create a new entry at the bottom of the list"
+
+[[keys]]
+id = "new_entry_below"
+key = "o"
+modes = ["daily_normal"]
+short_text = "New below"
+short_description = "New entry below"
+long_description = "Create a new entry below the selected one"
+
+[[keys]]
+id = "new_entry_above"
+key = "O"
+modes = ["daily_normal"]
+short_text = "New above"
+short_description = "New entry above"
+long_description = "Create a new entry above the selected one"
+
+[[keys]]
+id = "prev_day"
+key = "h"
+alt_key = "["
+modes = ["daily_normal"]
+short_text = "Prev day"
+short_description = "Previous day"
+long_description = "Navigate to the previous day"
+
+[[keys]]
+id = "next_day"
+key = "l"
+alt_key = "]"
+modes = ["daily_normal"]
+short_text = "Next day"
+short_description = "Next day"
+long_description = "Navigate to the next day"
+
+[[keys]]
+id = "goto_today"
+key = "t"
+modes = ["daily_normal"]
+short_text = "Today"
+short_description = "Go to today"
+long_description = "Navigate to today's entries"
+
+[[keys]]
+id = "sort_entries"
+key = "s"
+modes = ["daily_normal"]
+short_text = "Sort"
+short_description = "Sort entries"
+long_description = "Sort entries by type and completion status"
+
+[[keys]]
+id = "enter_reorder_mode"
+key = "r"
+modes = ["daily_normal"]
+short_text = "Reorder"
+short_description = "Reorder mode"
+long_description = "Enter reorder mode to manually arrange entries"
+
+[[keys]]
+id = "toggle_hide_completed"
+key = "z"
+modes = ["daily_normal"]
+short_text = "Hide done"
+short_description = "Toggle hide completed"
+long_description = "Toggle visibility of completed tasks"
+
+[[keys]]
+id = "return_to_filter"
+key = "Tab"
+modes = ["daily_normal"]
+short_text = "To filter"
+short_description = "Return to filter"
+long_description = "Return to the previous filter view"
+
+# =============================================================================
+# Filter Normal Mode
+# =============================================================================
+
+[[keys]]
+id = "exit_filter"
+key = "Esc"
+alt_key = "Tab"
+modes = ["filter_normal"]
+short_text = "Exit"
+short_description = "Exit to daily"
+long_description = "Exit filter view and return to daily view"
+
+[[keys]]
+id = "refresh_filter"
+key = "r"
+modes = ["filter_normal"]
+short_text = "Refresh"
+short_description = "Refresh results"
+long_description = "Refresh the filter results"
+
+[[keys]]
+id = "filter_quick_add"
+key = "Enter"
+modes = ["filter_normal"]
+short_text = "Quick add"
+short_description = "Quick add to today"
+long_description = "Add a new entry to today matching the current filter type"
+
+# =============================================================================
+# Edit Mode
+# =============================================================================
+
+[[keys]]
+id = "cycle_entry_type"
+key = "Shift+Tab"
+modes = ["edit"]
+short_text = "Type"
+short_description = "Toggle entry type"
+long_description = "Cycle through entry types (task, note, event)"
+
+[[keys]]
+id = "save_and_new"
+key = "Tab"
+modes = ["edit"]
+short_text = "Save+new"
+short_description = "Save and new"
+long_description = "Save the current entry and create a new one"
+
+[[keys]]
+id = "save_edit"
+key = "Enter"
+modes = ["edit"]
+short_text = "Save"
+short_description = "Save and exit"
+long_description = "Save the entry and exit edit mode"
+
+[[keys]]
+id = "cancel_edit"
+key = "Esc"
+modes = ["edit"]
+short_text = "Cancel"
+short_description = "Cancel"
+long_description = "Cancel editing without saving"
+
+# =============================================================================
+# Reorder Mode
+# =============================================================================
+
+[[keys]]
+id = "reorder_save"
+key = "r"
+alt_key = "Enter"
+modes = ["reorder"]
+short_text = "Save"
+short_description = "Save"
+long_description = "Save the new order"
+
+[[keys]]
+id = "reorder_cancel"
+key = "Esc"
+modes = ["reorder"]
+short_text = "Cancel"
+short_description = "Cancel"
+long_description = "Cancel reordering and restore original order"
+
+[[keys]]
+id = "reorder_move_up"
+key = "k"
+alt_key = "↑"
+modes = ["reorder"]
+short_text = "Move up"
+short_description = "Move entry up"
+long_description = "Move the selected entry up in the list"
+
+[[keys]]
+id = "reorder_move_down"
+key = "j"
+alt_key = "↓"
+modes = ["reorder"]
+short_text = "Move down"
+short_description = "Move entry down"
+long_description = "Move the selected entry down in the list"
+
+# =============================================================================
+# Help Popup
+# =============================================================================
+
+[[keys]]
+id = "close_help"
+key = "?"
+alt_key = "Esc"
+modes = ["help"]
+short_text = "Close"
+short_description = "Close help"
+long_description = "Close the help overlay"
+
+[[keys]]
+id = "help_scroll_down"
+key = "j"
+alt_key = "↓"
+modes = ["help"]
+short_text = "Down"
+short_description = "Scroll down"
+long_description = "Scroll the help content down"
+
+[[keys]]
+id = "help_scroll_up"
+key = "k"
+alt_key = "↑"
+modes = ["help"]
+short_text = "Up"
+short_description = "Scroll up"
+long_description = "Scroll the help content up"
+
+# =============================================================================
+# Text Editing (used in edit, command, and query modes)
+# =============================================================================
+
+[[keys]]
+id = "cursor_left"
+key = "←"
+modes = ["text_editing"]
+short_text = "Left"
+short_description = "Move cursor left"
+long_description = "Move cursor one character to the left"
+
+[[keys]]
+id = "cursor_right"
+key = "→"
+modes = ["text_editing"]
+short_text = "Right"
+short_description = "Move cursor right"
+long_description = "Move cursor one character to the right"
+
+[[keys]]
+id = "cursor_word_left"
+key = "Alt+B"
+alt_key = "Ctrl+←"
+modes = ["text_editing"]
+short_text = "Word left"
+short_description = "Move cursor one word left"
+long_description = "Move cursor to the start of the previous word"
+
+[[keys]]
+id = "cursor_word_right"
+key = "Alt+F"
+alt_key = "Ctrl+→"
+modes = ["text_editing"]
+short_text = "Word right"
+short_description = "Move cursor one word right"
+long_description = "Move cursor to the end of the next word"
+
+[[keys]]
+id = "cursor_to_start"
+key = "Home"
+alt_key = "Ctrl+A"
+modes = ["text_editing"]
+short_text = "Start"
+short_description = "Move cursor to start"
+long_description = "Move cursor to the beginning of the line"
+
+[[keys]]
+id = "cursor_to_end"
+key = "End"
+alt_key = "Ctrl+E"
+modes = ["text_editing"]
+short_text = "End"
+short_description = "Move cursor to end"
+long_description = "Move cursor to the end of the line"
+
+[[keys]]
+id = "delete_word_before"
+key = "Ctrl+W"
+modes = ["text_editing"]
+short_text = "Del word"
+short_description = "Delete word before cursor"
+long_description = "Delete the word before the cursor"
+
+[[keys]]
+id = "delete_word_after"
+key = "Alt+D"
+modes = ["text_editing"]
+short_text = "Del word"
+short_description = "Delete word after cursor"
+long_description = "Delete from cursor to end of word"
+
+[[keys]]
+id = "delete_to_start"
+key = "Ctrl+U"
+modes = ["text_editing"]
+short_text = "Del start"
+short_description = "Delete to start"
+long_description = "Delete from cursor to beginning of line"
+
+[[keys]]
+id = "delete_to_end"
+key = "Ctrl+K"
+modes = ["text_editing"]
+short_text = "Del end"
+short_description = "Delete to end"
+long_description = "Delete from cursor to end of line"
+
+[[keys]]
+id = "delete_char_after"
+key = "Delete"
+modes = ["text_editing"]
+short_text = "Delete"
+short_description = "Delete char after cursor"
+long_description = "Delete the character after the cursor"
+
+[[keys]]
+id = "delete_char_before"
+key = "Backspace"
+modes = ["text_editing"]
+short_text = "Backspace"
+short_description = "Delete char before cursor"
+long_description = "Delete the character before the cursor"

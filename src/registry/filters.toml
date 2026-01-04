@@ -1,0 +1,132 @@
+# Filter syntax definitions
+# Each entry defines a filter pattern with its help text variants
+
+# =============================================================================
+# Entry Type Filters
+# =============================================================================
+
+[[filters]]
+syntax = "!tasks"
+aliases = ["!t"]
+category = "entry_type"
+short_text = "Tasks"
+short_description = "Incomplete tasks"
+long_description = "Filter to show only incomplete tasks (- [ ] entries)"
+
+[[filters]]
+syntax = "!tasks/done"
+aliases = []
+category = "entry_type"
+short_text = "Done tasks"
+short_description = "Completed tasks"
+long_description = "Filter to show only completed tasks (- [x] entries)"
+
+[[filters]]
+syntax = "!tasks/all"
+aliases = []
+category = "entry_type"
+short_text = "All tasks"
+short_description = "All tasks"
+long_description = "Filter to show all tasks regardless of completion status"
+
+[[filters]]
+syntax = "!notes"
+aliases = ["!n"]
+category = "entry_type"
+short_text = "Notes"
+short_description = "Notes only"
+long_description = "Filter to show only notes (- entries without checkbox)"
+
+[[filters]]
+syntax = "!events"
+aliases = ["!e"]
+category = "entry_type"
+short_text = "Events"
+short_description = "Events only"
+long_description = "Filter to show only events (* entries)"
+
+# =============================================================================
+# Date Operation Filters
+# =============================================================================
+
+[[filters]]
+syntax = "@before:"
+display = "@before:DATE"
+aliases = []
+category = "date_op"
+short_text = "Before"
+short_description = "Entries before date"
+long_description = "Filter entries from days on or before DATE (inclusive). Supports natural dates."
+
+[[filters]]
+syntax = "@after:"
+display = "@after:DATE"
+aliases = []
+category = "date_op"
+short_text = "After"
+short_description = "Entries after date"
+long_description = "Filter entries from days on or after DATE (inclusive). Supports natural dates."
+
+[[filters]]
+syntax = "@overdue"
+aliases = []
+category = "date_op"
+short_text = "Overdue"
+short_description = "Entries with past @date"
+long_description = "Filter entries that have @date patterns targeting a date before today"
+
+# =============================================================================
+# Negation Patterns
+# =============================================================================
+
+[[filters]]
+syntax = "not:#tag"
+aliases = []
+category = "negation"
+short_text = "Not tag"
+short_description = "Entries without tag"
+long_description = "Exclude entries that contain the specified tag"
+
+[[filters]]
+syntax = "not:!type"
+aliases = []
+category = "negation"
+short_text = "Not type"
+short_description = "Exclude entry type"
+long_description = "Exclude entries of the specified type (tasks, notes, or events)"
+
+[[filters]]
+syntax = "not:word"
+aliases = []
+category = "negation"
+short_text = "Not text"
+short_description = "Entries not containing text"
+long_description = "Exclude entries that contain the specified text"
+
+# =============================================================================
+# Other Patterns (for documentation)
+# =============================================================================
+
+[[filters]]
+syntax = "#tag"
+aliases = []
+category = "tag"
+short_text = "Tag"
+short_description = "Entries with tag"
+long_description = "Filter entries that contain the specified tag"
+
+[[filters]]
+syntax = "$name"
+aliases = []
+category = "saved_filter"
+short_text = "Saved"
+short_description = "Saved filter"
+long_description = "Expand a saved filter defined in config.toml"
+
+[[filters]]
+syntax = "word"
+aliases = []
+category = "text_search"
+short_text = "Search"
+short_description = "Entries containing text"
+long_description = "Filter entries that contain the specified text (case-insensitive)"

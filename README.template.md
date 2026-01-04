@@ -114,126 +114,35 @@ The entry will appear in the "Later" section when you view that date.
 
 ### Daily Mode
 
-| Key | Action |
-|-----|--------|
-| `Enter` | New entry at end |
-| `o` | New entry below |
-| `O` | New entry above |
-| `h`/`[` | Previous day |
-| `l`/`]` | Next day |
-| `t` | Go to today |
-| `s` | Sort entries |
-| `r` | Reorder mode |
-| `z` | Toggle hide completed |
-| `Tab` | Return to filter |
-| `i` | Edit selected |
-| `c` | Toggle task complete |
-| `x` | Delete entry |
-| `y` | Yank to clipboard |
-| `u` | Undo delete |
-| `j`/`↓` | Navigate down |
-| `k`/`↑` | Navigate up |
-| `g` | Jump to first |
-| `G` | Jump to last |
-| `0-9` | Filter favorite tag |
-| `/` | Filter mode |
-| `` ` `` | Toggle Global/Project journal |
-| `?` | Show help |
-| `:` | Command mode |
-
+<!-- GENERATED:DAILY_KEYS -->
 
 ### Filter Mode
 
-| Key | Action |
-|-----|--------|
-| `j`/`↓` | Navigate down |
-| `k`/`↑` | Navigate up |
-| `g` | Jump to first |
-| `G` | Jump to last |
-| `Esc`/`Tab` | Exit to daily |
-| `r` | Refresh results |
-| `Enter` | Quick add to today |
-| `i` | Edit selected |
-| `c` | Toggle task complete |
-| `x` | Delete entry |
-| `y` | Yank to clipboard |
-| `v` | View entry source |
-| `/` | Filter mode |
-| `:` | Command mode |
-| `?` | Show help |
-
+<!-- GENERATED:FILTER_KEYS -->
 
 ### Edit Mode
 
-| Key | Action |
-|-----|--------|
-| `Shift+Tab` | Toggle entry type |
-| `Tab` | Save and new |
-| `Enter` | Save and exit |
-| `Esc` | Cancel |
-
+<!-- GENERATED:EDIT_KEYS -->
 
 ### Reorder Mode
 
 Reorder entries within a day.
 
-| Key | Action |
-|-----|--------|
-| `r`/`Enter` | Save |
-| `Esc` | Cancel |
-| `k`/`↑` | Move entry up |
-| `j`/`↓` | Move entry down |
-
+<!-- GENERATED:REORDER_KEYS -->
 
 ### Text Editing
 
 These shortcuts work in all text input modes (Edit, Command, and Filter query):
 
-| Key | Action |
-|-----|--------|
-| `←` | Move cursor left |
-| `→` | Move cursor right |
-| `Alt+B`/`Ctrl+←` | Move cursor one word left |
-| `Alt+F`/`Ctrl+→` | Move cursor one word right |
-| `Home`/`Ctrl+A` | Move cursor to start |
-| `End`/`Ctrl+E` | Move cursor to end |
-| `Ctrl+W` | Delete word before cursor |
-| `Alt+D` | Delete word after cursor |
-| `Ctrl+U` | Delete to start |
-| `Ctrl+K` | Delete to end |
-| `Delete` | Delete char after cursor |
-| `Backspace` | Delete char before cursor |
-
+<!-- GENERATED:TEXT_EDITING_KEYS -->
 
 ### Commands
 
-| Key | Action |
-|-----|--------|
-| `:[d]ate` | Go to date (MM/DD) |
-| `:[g]lobal` | Switch to Global journal |
-| `:[p]roject` | Project [init|default|path] |
-| `:[c]onfig` | Config [reload] |
-| `:[q]uit` | Quit application |
-
+<!-- GENERATED:COMMANDS -->
 
 ### Filter Syntax
 
-| Pattern | Matches |
-|---------|---------|
-| `!tasks` or `!t` | Incomplete tasks |
-| `!tasks/done` | Completed tasks |
-| `!tasks/all` | All tasks |
-| `!notes` or `!n` | Notes only |
-| `!events` or `!e` | Events only |
-| `@before:DATE` | Entries before date |
-| `@after:DATE` | Entries after date |
-| `@overdue` | Entries with past @date |
-| `not:#tag` | Entries without tag |
-| `not:!type` | Exclude entry type |
-| `not:word` | Entries not containing text |
-| `#tag` | Entries with tag |
-| `$name` | Saved filter |
-| `word` | Entries containing text |
+<!-- GENERATED:FILTER_SYNTAX -->
 
 DATE in filters supports natural language: `tomorrow`, `yesterday`, `next-mon`, `last-fri`, `7d`, `-7d`, plus standard formats.
 

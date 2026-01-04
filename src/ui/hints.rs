@@ -50,16 +50,16 @@ fn build_hint_lines(hint_state: &HintContext, width: usize, max_rows: usize) -> 
             matches.iter().map(|t| format!("#{t}")).collect()
         }
         HintContext::Commands { matches, .. } => {
-            matches.iter().map(|h| format!(":{}", h.command)).collect()
+            matches.iter().map(|cmd| format!(":{}", cmd.name)).collect()
         }
         HintContext::FilterTypes { matches, .. } => {
-            matches.iter().map(|h| h.syntax.to_string()).collect()
+            matches.iter().map(|f| f.syntax.to_string()).collect()
         }
         HintContext::DateOps { matches, .. } => {
-            matches.iter().map(|h| h.syntax.to_string()).collect()
+            matches.iter().map(|f| f.syntax.to_string()).collect()
         }
         HintContext::Negation { matches, .. } => {
-            matches.iter().map(|h| h.syntax.to_string()).collect()
+            matches.iter().map(|f| f.syntax.to_string()).collect()
         }
     };
 
