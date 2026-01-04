@@ -6,7 +6,7 @@ use helpers::TestContext;
 
 use caliber::app::App;
 use caliber::config::Config;
-use caliber::storage::{self, JournalSlot, Line};
+use caliber::storage::{JournalContext, JournalSlot, Line};
 
 /// PS-1: Edit persistence round-trip
 #[test]
@@ -19,12 +19,10 @@ fn test_edit_persists_after_reload() {
     let content = format!("# {}\n- [ ] Persistent entry\n", date.format("%Y/%m/%d"));
     std::fs::write(&journal_path, &content).unwrap();
 
-    // Load via App and verify
-    storage::reset_journal_context();
-    storage::set_journal_context(journal_path.clone(), None, JournalSlot::Global);
-
+    // Load via App with explicit context
+    let context = JournalContext::new(journal_path, None, JournalSlot::Global);
     let config = Config::default();
-    let app = App::new_with_date(config, date).unwrap();
+    let app = App::new_with_context(config, date, context).unwrap();
 
     // Entry should be loaded
     let has_entry = app.entry_indices.iter().any(|&i| {

@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::io;
+use std::path::Path;
 use std::sync::LazyLock;
 
 use chrono::{Days, NaiveDate};
@@ -64,8 +65,8 @@ pub fn extract_tags(content: &str) -> Vec<String> {
 
 /// Collects all unique tags from the current journal.
 /// Returns tags sorted alphabetically, deduplicated (case-insensitive, first occurrence preserved).
-pub fn collect_journal_tags() -> io::Result<Vec<String>> {
-    let journal = load_journal()?;
+pub fn collect_journal_tags(path: &Path) -> io::Result<Vec<String>> {
+    let journal = load_journal(path)?;
     let mut seen_lower: HashSet<String> = HashSet::new();
     let mut tags: Vec<String> = Vec::new();
 
@@ -333,8 +334,11 @@ fn extract_target_date_prefer_past(content: &str, today: NaiveDate) -> Option<Na
 
 /// Collects all entries with @date matching the target date.
 /// Entries from the target date itself are excluded (they're regular entries).
-pub fn collect_later_entries_for_date(target_date: NaiveDate) -> io::Result<Vec<CrossDayEntry>> {
-    let journal = load_journal()?;
+pub fn collect_later_entries_for_date(
+    target_date: NaiveDate,
+    path: &Path,
+) -> io::Result<Vec<CrossDayEntry>> {
+    let journal = load_journal(path)?;
     let mut entries = Vec::new();
     let mut current_date: Option<NaiveDate> = None;
     let mut line_index_in_day: usize = 0;
@@ -480,12 +484,12 @@ pub fn parse_filter_query(query: &str) -> Filter {
     filter
 }
 
-pub fn collect_filtered_entries(filter: &Filter) -> io::Result<Vec<CrossDayEntry>> {
+pub fn collect_filtered_entries(filter: &Filter, path: &Path) -> io::Result<Vec<CrossDayEntry>> {
     if !filter.invalid_tokens.is_empty() {
         return Ok(Vec::new());
     }
 
-    let journal = load_journal()?;
+    let journal = load_journal(path)?;
     let mut entries = Vec::new();
     let mut current_date: Option<NaiveDate> = None;
     let mut line_index_in_day: usize = 0;

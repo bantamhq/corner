@@ -4,7 +4,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{App, ConfirmContext, HintContext, InputMode, InsertPosition, ViewMode};
 use crate::cursor::CursorBuffer;
-use crate::storage;
+use crate::storage::{add_caliber_to_gitignore, create_project_journal};
 use crate::ui;
 
 pub fn handle_help_key(app: &mut App, key: KeyCode) {
@@ -341,9 +341,9 @@ pub fn handle_confirm_key(app: &mut App, key: KeyCode) -> io::Result<()> {
     match key {
         KeyCode::Char('y') | KeyCode::Char('Y') => match context {
             ConfirmContext::CreateProjectJournal => {
-                match storage::create_project_journal() {
+                match create_project_journal() {
                     Ok(path) => {
-                        storage::set_project_path(path);
+                        app.journal_context.set_project_path(path);
                         // Ask about .gitignore next
                         app.input_mode = InputMode::Confirm(ConfirmContext::AddToGitignore);
                     }
@@ -354,7 +354,7 @@ pub fn handle_confirm_key(app: &mut App, key: KeyCode) -> io::Result<()> {
                 }
             }
             ConfirmContext::AddToGitignore => {
-                if let Err(e) = storage::add_caliber_to_gitignore() {
+                if let Err(e) = add_caliber_to_gitignore() {
                     app.set_status(format!("Failed to update .gitignore: {e}"));
                 } else {
                     app.set_status("Project journal created and added to .gitignore");

@@ -22,7 +22,7 @@ use caliber::app::{
 };
 use caliber::config::{self, Config, resolve_path};
 use caliber::cursor::cursor_position_in_wrap;
-use caliber::storage::Line;
+use caliber::storage::{JournalContext, JournalSlot, Line};
 use caliber::ui::{CursorContext, ensure_selected_visible, set_edit_cursor};
 use caliber::{handlers, storage, ui};
 
@@ -60,17 +60,17 @@ fn main() -> Result<(), io::Error> {
         // CLI path overrides project slot
         (
             Some(resolve_path(&path.to_string_lossy())),
-            storage::JournalSlot::Project,
+            JournalSlot::Project,
         )
     } else if let Some(path) = storage::detect_project_journal() {
         // Existing project journal detected
-        (Some(path), storage::JournalSlot::Project)
+        (Some(path), JournalSlot::Project)
     } else {
         // No project journal, start in Global
-        (None, storage::JournalSlot::Global)
+        (None, JournalSlot::Global)
     };
 
-    storage::set_journal_context(global_path, project_path.clone(), active_slot);
+    let journal_context = JournalContext::new(global_path, project_path.clone(), active_slot);
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -78,7 +78,7 @@ fn main() -> Result<(), io::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let res = run_app(&mut terminal, config);
+    let res = run_app(&mut terminal, config, journal_context);
 
     disable_raw_mode()?;
     execute!(
@@ -98,11 +98,13 @@ fn main() -> Result<(), io::Error> {
 fn run_app<B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     config: Config,
+    journal_context: JournalContext,
 ) -> io::Result<()> {
-    let mut app = App::new(config)?;
+    let date = chrono::Local::now().date_naive();
+    let mut app = App::new_with_context(config, date, journal_context)?;
 
     // If in git repo without project journal, prompt to create one
-    if app.in_git_repo && storage::get_project_path().is_none() {
+    if app.in_git_repo && app.journal_context.project_path().is_none() {
         app.input_mode = InputMode::Confirm(ConfirmContext::CreateProjectJournal);
     }
 
@@ -313,9 +315,9 @@ fn run_app<B: ratatui::backend::Backend>(
             // Render hint overlay above footer (if active)
             ui::render_hint_overlay(f, &app.hint_state, chunks[1]);
 
-            let (indicator, indicator_color) = match app.active_journal {
-                storage::JournalSlot::Global => ("[GLOBAL]", Color::Green),
-                storage::JournalSlot::Project => ("[PROJECT]", Color::Blue),
+            let (indicator, indicator_color) = match app.active_journal() {
+                JournalSlot::Global => ("[GLOBAL]", Color::Green),
+                JournalSlot::Project => ("[PROJECT]", Color::Blue),
             };
             let indicator_width = indicator.len() as u16;
             let indicator_area = ratatui::layout::Rect {

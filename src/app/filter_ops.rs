@@ -34,7 +34,7 @@ impl App {
             ));
         }
 
-        let entries = storage::collect_filtered_entries(&filter)?;
+        let entries = storage::collect_filtered_entries(&filter, self.active_path())?;
         let selected = entries.len().saturating_sub(1);
 
         self.view = ViewMode::Filter(FilterState {
@@ -92,7 +92,8 @@ impl App {
             self.last_filter_query = Some(state.query.clone());
         }
         let later_entries =
-            storage::collect_later_entries_for_date(self.current_date).unwrap_or_default();
+            storage::collect_later_entries_for_date(self.current_date, self.active_path())
+                .unwrap_or_default();
         self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
         self.input_mode = InputMode::Normal;
     }
@@ -106,6 +107,7 @@ impl App {
     }
 
     pub fn refresh_filter(&mut self) -> io::Result<()> {
+        let path = self.active_path().to_path_buf();
         let ViewMode::Filter(state) = &mut self.view else {
             return Ok(());
         };
@@ -119,7 +121,7 @@ impl App {
             ));
         }
 
-        state.entries = storage::collect_filtered_entries(&filter)?;
+        state.entries = storage::collect_filtered_entries(&filter, &path)?;
         state.selected = state.selected.min(state.entries.len().saturating_sub(1));
         state.scroll_offset = 0;
         Ok(())

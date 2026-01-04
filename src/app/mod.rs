@@ -13,12 +13,15 @@ pub use hints::{HintContext, HintMode};
 
 use std::collections::BTreeSet;
 use std::io;
+use std::path::Path;
 
 use chrono::{Local, NaiveDate};
 
 use crate::config::Config;
 use crate::cursor::CursorBuffer;
-use crate::storage::{self, Entry, EntryType, FilterEntry, JournalSlot, LaterEntry, Line};
+use crate::storage::{
+    self, Entry, EntryType, FilterEntry, JournalContext, JournalSlot, LaterEntry, Line,
+};
 
 pub const DAILY_HEADER_LINES: usize = 1;
 pub const FILTER_HEADER_LINES: usize = 1;
@@ -219,7 +222,7 @@ pub struct App {
     pub last_deleted: Option<(NaiveDate, usize, Entry)>,
     pub last_filter_query: Option<String>,
     pub config: Config,
-    pub active_journal: JournalSlot,
+    pub journal_context: JournalContext,
     pub in_git_repo: bool,
     pub hide_completed: bool,
     pub hint_state: HintContext,
@@ -231,13 +234,30 @@ impl App {
         Self::new_with_date(config, Local::now().date_naive())
     }
 
-    /// Creates a new App with a specific date (for testing)
+    /// Creates a new App with a specific date, detecting paths from config
     pub fn new_with_date(config: Config, date: NaiveDate) -> io::Result<Self> {
-        let lines = storage::load_day_lines(date)?;
+        let global_path = config
+            .global_file
+            .as_ref()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(crate::config::get_default_journal_path);
+        let project_path = storage::detect_project_journal();
+        let context = JournalContext::new(global_path, project_path, JournalSlot::Global);
+        Self::new_with_context(config, date, context)
+    }
+
+    /// Creates a new App with explicit context (for testing and main)
+    pub fn new_with_context(
+        config: Config,
+        date: NaiveDate,
+        journal_context: JournalContext,
+    ) -> io::Result<Self> {
+        let path = journal_context.active_path().to_path_buf();
+        let lines = storage::load_day_lines(date, &path)?;
         let entry_indices = Self::compute_entry_indices(&lines);
-        let later_entries = storage::collect_later_entries_for_date(date)?;
-        let active_journal = storage::get_active_slot();
+        let later_entries = storage::collect_later_entries_for_date(date, &path)?;
         let in_git_repo = storage::find_git_root().is_some();
+        let cached_journal_tags = storage::collect_journal_tags(&path).unwrap_or_default();
 
         Ok(Self {
             current_date: date,
@@ -255,12 +275,24 @@ impl App {
             last_deleted: None,
             last_filter_query: None,
             config,
-            active_journal,
+            journal_context,
             in_git_repo,
             hide_completed: false,
             hint_state: HintContext::Inactive,
-            cached_journal_tags: storage::collect_journal_tags().unwrap_or_default(),
+            cached_journal_tags,
         })
+    }
+
+    /// Returns the active journal path
+    #[must_use]
+    pub fn active_path(&self) -> &Path {
+        self.journal_context.active_path()
+    }
+
+    /// Returns the active journal slot
+    #[must_use]
+    pub fn active_journal(&self) -> JournalSlot {
+        self.journal_context.active_slot()
     }
 
     #[must_use]
@@ -302,7 +334,8 @@ impl App {
 
     /// Saves current day's lines to storage, displaying any error as a status message.
     pub fn save(&mut self) {
-        if let Err(e) = storage::save_day_lines(self.current_date, &self.lines) {
+        if let Err(e) = storage::save_day_lines(self.current_date, self.active_path(), &self.lines)
+        {
             self.set_status(format!("Failed to save: {e}"));
         }
     }
@@ -345,10 +378,11 @@ impl App {
                 self.save();
             }
             ViewMode::Filter(_) => {
-                if let Ok(mut lines) = storage::load_day_lines(date) {
+                let path = self.active_path();
+                if let Ok(mut lines) = storage::load_day_lines(date, path) {
                     let insert_idx = line_idx.min(lines.len());
                     lines.insert(insert_idx, Line::Entry(entry.clone()));
-                    let _ = storage::save_day_lines(date, &lines);
+                    let _ = storage::save_day_lines(date, path, &lines);
 
                     let filter_entry = FilterEntry {
                         source_date: date,
@@ -417,7 +451,7 @@ impl App {
     }
 
     pub(crate) fn reload_current_day(&mut self) -> io::Result<()> {
-        self.lines = storage::load_day_lines(self.current_date)?;
+        self.lines = storage::load_day_lines(self.current_date, self.active_path())?;
         self.entry_indices = Self::compute_entry_indices(&self.lines);
         Ok(())
     }
@@ -456,7 +490,8 @@ impl App {
     }
 
     pub fn refresh_tag_cache(&mut self) {
-        self.cached_journal_tags = storage::collect_journal_tags().unwrap_or_default();
+        self.cached_journal_tags =
+            storage::collect_journal_tags(self.active_path()).unwrap_or_default();
     }
 
     pub fn accept_hint(&mut self) -> bool {

@@ -94,6 +94,7 @@ impl App {
 
     /// Execute delete on a target
     pub fn execute_delete(&mut self, target: DeleteTarget) -> io::Result<()> {
+        let path = self.active_path().to_path_buf();
         match target {
             DeleteTarget::Later {
                 source_date,
@@ -102,7 +103,7 @@ impl App {
                 content,
                 ..
             } => {
-                storage::delete_entry(source_date, line_index)?;
+                storage::delete_entry(source_date, &path, line_index)?;
                 self.last_deleted = Some((
                     source_date,
                     line_index,
@@ -114,7 +115,7 @@ impl App {
 
                 if let ViewMode::Daily(state) = &mut self.view {
                     state.later_entries =
-                        storage::collect_later_entries_for_date(self.current_date)?;
+                        storage::collect_later_entries_for_date(self.current_date, &path)?;
                 }
                 self.clamp_daily_selection();
             }
@@ -140,7 +141,7 @@ impl App {
                         content,
                     },
                 ));
-                storage::delete_entry(source_date, line_index)?;
+                storage::delete_entry(source_date, &path, line_index)?;
 
                 if let ViewMode::Filter(state) = &mut self.view {
                     state.entries.remove(index);
@@ -214,15 +215,16 @@ impl App {
 
     /// Execute toggle on a target
     pub fn execute_toggle(&mut self, target: ToggleTarget) -> io::Result<()> {
+        let path = self.active_path().to_path_buf();
         match target {
             ToggleTarget::Later {
                 source_date,
                 line_index,
             } => {
-                storage::toggle_entry_complete(source_date, line_index)?;
+                storage::toggle_entry_complete(source_date, &path, line_index)?;
                 if let ViewMode::Daily(state) = &mut self.view {
                     state.later_entries =
-                        storage::collect_later_entries_for_date(self.current_date)?;
+                        storage::collect_later_entries_for_date(self.current_date, &path)?;
                 }
             }
             ToggleTarget::Daily { line_idx } => {
@@ -236,7 +238,7 @@ impl App {
                 source_date,
                 line_index,
             } => {
-                storage::toggle_entry_complete(source_date, line_index)?;
+                storage::toggle_entry_complete(source_date, &path, line_index)?;
 
                 if let ViewMode::Filter(state) = &mut self.view {
                     let filter_entry = &mut state.entries[index];
@@ -356,12 +358,13 @@ impl App {
     where
         F: Fn(&str) -> Option<String>,
     {
+        let path = self.active_path().to_path_buf();
         match target {
             TagRemovalTarget::Later {
                 source_date,
                 line_index,
             } => {
-                let changed = storage::mutate_entry(source_date, line_index, |entry| {
+                let changed = storage::mutate_entry(source_date, &path, line_index, |entry| {
                     if let Some(new_content) = remover(&entry.content) {
                         entry.content = new_content;
                         true
@@ -373,7 +376,7 @@ impl App {
                 if changed == Some(true) {
                     if let ViewMode::Daily(state) = &mut self.view {
                         state.later_entries =
-                            storage::collect_later_entries_for_date(self.current_date)?;
+                            storage::collect_later_entries_for_date(self.current_date, &path)?;
                     }
                     self.refresh_tag_cache();
                 }
@@ -392,7 +395,7 @@ impl App {
                 source_date,
                 line_index,
             } => {
-                let changed = storage::mutate_entry(source_date, line_index, |entry| {
+                let changed = storage::mutate_entry(source_date, &path, line_index, |entry| {
                     if let Some(new_content) = remover(&entry.content) {
                         entry.content = new_content;
                         true

@@ -5,10 +5,8 @@ mod persistence;
 
 // Re-export context types and functions
 pub use context::{
-    JournalSlot, add_caliber_to_gitignore, create_project_journal, detect_project_journal,
-    find_git_root, get_active_journal_path, get_active_slot, get_project_path,
-    reset_journal_context, reset_project_path, set_active_slot, set_journal_context,
-    set_project_path,
+    JournalContext, JournalSlot, add_caliber_to_gitignore, create_project_journal,
+    detect_project_journal, find_git_root,
 };
 
 // Re-export entry types

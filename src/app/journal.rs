@@ -3,7 +3,7 @@ use std::io;
 use chrono::Local;
 
 use crate::config::{Config, resolve_path};
-use crate::storage::{self, JournalSlot};
+use crate::storage::JournalSlot;
 
 use super::{App, ConfirmContext, DailyState, InputMode, ViewMode};
 
@@ -12,9 +12,8 @@ impl App {
         self.save();
 
         let path = resolve_path(path);
-        storage::set_project_path(path.clone());
-        storage::set_active_slot(storage::JournalSlot::Project);
-        self.active_journal = JournalSlot::Project;
+        self.journal_context.set_project_path(path.clone());
+        self.journal_context.set_active_slot(JournalSlot::Project);
         let later_entries = self.load_day(Local::now().date_naive())?;
         self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
         self.refresh_tag_cache();
@@ -23,12 +22,11 @@ impl App {
     }
 
     fn switch_to_journal(&mut self, slot: JournalSlot) -> io::Result<()> {
-        if self.active_journal == slot {
+        if self.active_journal() == slot {
             return Ok(());
         }
         self.save();
-        storage::set_active_slot(slot);
-        self.active_journal = slot;
+        self.journal_context.set_active_slot(slot);
         let later_entries = self.load_day(Local::now().date_naive())?;
         self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
         self.refresh_tag_cache();
@@ -48,9 +46,9 @@ impl App {
     }
 
     pub fn toggle_journal(&mut self) -> io::Result<()> {
-        match self.active_journal {
+        match self.active_journal() {
             JournalSlot::Global => {
-                if storage::get_project_path().is_some() {
+                if self.journal_context.project_path().is_some() {
                     self.switch_to_project()?;
                 } else if self.in_git_repo {
                     self.input_mode = InputMode::Confirm(ConfirmContext::CreateProjectJournal);

@@ -1,34 +1,39 @@
 use std::fs;
 use std::io;
+use std::path::Path;
 
 use chrono::NaiveDate;
 
-use super::context::get_active_journal_path;
 use super::entries::{Entry, EntryType, Line, parse_lines, serialize_lines};
 
-pub fn load_day_lines(date: NaiveDate) -> io::Result<Vec<Line>> {
-    let content = load_day(date)?;
+pub fn load_day_lines(date: NaiveDate, path: &Path) -> io::Result<Vec<Line>> {
+    let content = load_day(date, path)?;
     Ok(parse_lines(&content))
 }
 
-pub fn save_day_lines(date: NaiveDate, lines: &[Line]) -> io::Result<()> {
+pub fn save_day_lines(date: NaiveDate, path: &Path, lines: &[Line]) -> io::Result<()> {
     let content = serialize_lines(lines);
-    save_day(date, &content)
+    save_day(date, path, &content)
 }
 
 /// Helper to load, mutate an entry, and save in one operation.
 /// Returns the result of the mutation function if the entry exists.
-pub fn mutate_entry<F, R>(date: NaiveDate, line_index: usize, f: F) -> io::Result<Option<R>>
+pub fn mutate_entry<F, R>(
+    date: NaiveDate,
+    path: &Path,
+    line_index: usize,
+    f: F,
+) -> io::Result<Option<R>>
 where
     F: FnOnce(&mut Entry) -> R,
 {
-    let mut lines = load_day_lines(date)?;
+    let mut lines = load_day_lines(date, path)?;
     let result = lines.get_mut(line_index).and_then(|line| match line {
         Line::Entry(entry) => Some(f(entry)),
         _ => None,
     });
     if result.is_some() {
-        save_day_lines(date, &lines)?;
+        save_day_lines(date, path, &lines)?;
     }
     Ok(result)
 }
@@ -37,18 +42,19 @@ where
 /// Returns Ok(true) if update succeeded, Ok(false) if no entry at that index.
 pub fn update_entry_content(
     date: NaiveDate,
+    path: &Path,
     line_index: usize,
     content: String,
 ) -> io::Result<bool> {
-    mutate_entry(date, line_index, |entry| {
+    mutate_entry(date, path, line_index, |entry| {
         entry.content = content;
     })
     .map(|opt| opt.is_some())
 }
 
 /// Toggles the completion status of a task at a specific line index.
-pub fn toggle_entry_complete(date: NaiveDate, line_index: usize) -> io::Result<()> {
-    mutate_entry(date, line_index, |entry| {
+pub fn toggle_entry_complete(date: NaiveDate, path: &Path, line_index: usize) -> io::Result<()> {
+    mutate_entry(date, path, line_index, |entry| {
         entry.toggle_complete();
     })?;
     Ok(())
@@ -56,28 +62,31 @@ pub fn toggle_entry_complete(date: NaiveDate, line_index: usize) -> io::Result<(
 
 /// Cycles the entry type (Task -> Note -> Event -> Task) at a specific line index.
 /// Returns the new entry type if successful.
-pub fn cycle_entry_type(date: NaiveDate, line_index: usize) -> io::Result<Option<EntryType>> {
-    mutate_entry(date, line_index, |entry| {
+pub fn cycle_entry_type(
+    date: NaiveDate,
+    path: &Path,
+    line_index: usize,
+) -> io::Result<Option<EntryType>> {
+    mutate_entry(date, path, line_index, |entry| {
         entry.entry_type = entry.entry_type.cycle();
         entry.entry_type.clone()
     })
 }
 
 /// Deletes an entry at a specific line index for a given date.
-pub fn delete_entry(date: NaiveDate, line_index: usize) -> io::Result<()> {
-    let mut lines = load_day_lines(date)?;
+pub fn delete_entry(date: NaiveDate, path: &Path, line_index: usize) -> io::Result<()> {
+    let mut lines = load_day_lines(date, path)?;
     if line_index < lines.len() {
         lines.remove(line_index);
     }
-    save_day_lines(date, &lines)
+    save_day_lines(date, path, &lines)
 }
 
 fn day_header(date: NaiveDate) -> String {
     format!("# {}", date.format("%Y/%m/%d"))
 }
 
-pub fn load_journal() -> io::Result<String> {
-    let path = get_active_journal_path();
+pub fn load_journal(path: &Path) -> io::Result<String> {
     if path.exists() {
         fs::read_to_string(path)
     } else {
@@ -85,9 +94,7 @@ pub fn load_journal() -> io::Result<String> {
     }
 }
 
-pub fn save_journal(content: &str) -> io::Result<()> {
-    let path = get_active_journal_path();
-
+pub fn save_journal(path: &Path, content: &str) -> io::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -250,13 +257,13 @@ fn find_insertion_point(journal: &str, date: NaiveDate) -> Option<usize> {
     None
 }
 
-pub fn load_day(date: NaiveDate) -> io::Result<String> {
-    let journal = load_journal()?;
+pub fn load_day(date: NaiveDate, path: &Path) -> io::Result<String> {
+    let journal = load_journal(path)?;
     Ok(extract_day_content(&journal, date))
 }
 
-pub fn save_day(date: NaiveDate, content: &str) -> io::Result<()> {
-    let journal = load_journal()?;
+pub fn save_day(date: NaiveDate, path: &Path, content: &str) -> io::Result<()> {
+    let journal = load_journal(path)?;
     let updated = update_day_content(&journal, date, content);
-    save_journal(&updated)
+    save_journal(path, &updated)
 }

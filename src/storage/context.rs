@@ -1,7 +1,6 @@
 use std::fs;
 use std::io;
 use std::path::PathBuf;
-use std::sync::RwLock;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JournalSlot {
@@ -9,88 +8,51 @@ pub enum JournalSlot {
     Project,
 }
 
-struct JournalContext {
+pub struct JournalContext {
     global_path: PathBuf,
     project_path: Option<PathBuf>,
     active: JournalSlot,
 }
 
-static JOURNAL_CONTEXT: RwLock<Option<JournalContext>> = RwLock::new(None);
-
-pub fn set_journal_context(global: PathBuf, project: Option<PathBuf>, active: JournalSlot) {
-    if let Ok(mut guard) = JOURNAL_CONTEXT.write() {
-        *guard = Some(JournalContext {
-            global_path: global,
-            project_path: project,
+impl JournalContext {
+    #[must_use]
+    pub fn new(global_path: PathBuf, project_path: Option<PathBuf>, active: JournalSlot) -> Self {
+        Self {
+            global_path,
+            project_path,
             active,
-        });
+        }
     }
-}
 
-#[must_use]
-pub fn get_active_slot() -> JournalSlot {
-    JOURNAL_CONTEXT
-        .read()
-        .ok()
-        .and_then(|guard| guard.as_ref().map(|ctx| ctx.active))
-        .unwrap_or(JournalSlot::Global)
-}
-
-pub fn set_active_slot(slot: JournalSlot) {
-    if let Ok(mut guard) = JOURNAL_CONTEXT.write()
-        && let Some(ctx) = guard.as_mut()
-    {
-        ctx.active = slot;
+    #[must_use]
+    pub fn active_path(&self) -> &std::path::Path {
+        match self.active {
+            JournalSlot::Global => &self.global_path,
+            JournalSlot::Project => self.project_path.as_deref().unwrap_or(&self.global_path),
+        }
     }
-}
 
-#[must_use]
-pub fn get_project_path() -> Option<PathBuf> {
-    JOURNAL_CONTEXT
-        .read()
-        .ok()
-        .and_then(|guard| guard.as_ref().and_then(|ctx| ctx.project_path.clone()))
-}
-
-pub fn set_project_path(path: PathBuf) {
-    if let Ok(mut guard) = JOURNAL_CONTEXT.write()
-        && let Some(ctx) = guard.as_mut()
-    {
-        ctx.project_path = Some(path);
+    #[must_use]
+    pub fn active_slot(&self) -> JournalSlot {
+        self.active
     }
-}
 
-/// Resets project path to the auto-detected default (.caliber/journal.md)
-pub fn reset_project_path() {
-    if let Ok(mut guard) = JOURNAL_CONTEXT.write()
-        && let Some(ctx) = guard.as_mut()
-    {
-        ctx.project_path = detect_project_journal();
+    pub fn set_active_slot(&mut self, slot: JournalSlot) {
+        self.active = slot;
     }
-}
 
-/// Resets the journal context (for testing only)
-pub fn reset_journal_context() {
-    if let Ok(mut guard) = JOURNAL_CONTEXT.write() {
-        *guard = None;
+    #[must_use]
+    pub fn project_path(&self) -> Option<&std::path::Path> {
+        self.project_path.as_deref()
     }
-}
 
-#[must_use]
-pub fn get_active_journal_path() -> PathBuf {
-    JOURNAL_CONTEXT
-        .read()
-        .ok()
-        .and_then(|guard| {
-            guard.as_ref().map(|ctx| match ctx.active {
-                JournalSlot::Global => ctx.global_path.clone(),
-                JournalSlot::Project => ctx
-                    .project_path
-                    .clone()
-                    .unwrap_or_else(|| ctx.global_path.clone()),
-            })
-        })
-        .unwrap_or_else(crate::config::get_default_journal_path)
+    pub fn set_project_path(&mut self, path: PathBuf) {
+        self.project_path = Some(path);
+    }
+
+    pub fn reset_project_path(&mut self) {
+        self.project_path = detect_project_journal();
+    }
 }
 
 /// Detects if we're in a git repository and returns the project root path.

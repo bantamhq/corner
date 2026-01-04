@@ -32,8 +32,9 @@ impl App {
                 let date = *date;
                 let line_index = *line_index;
                 let filter_index = *filter_index;
+                let path = self.active_path();
 
-                if let Ok(Some(new_type)) = storage::cycle_entry_type(date, line_index)
+                if let Ok(Some(new_type)) = storage::cycle_entry_type(date, path, line_index)
                     && let ViewMode::Filter(state) = &mut self.view
                     && let Some(filter_entry) = state.entries.get_mut(filter_index)
                 {
@@ -56,8 +57,9 @@ impl App {
                 let source_date = *source_date;
                 let line_index = *line_index;
                 let later_index = *later_index;
+                let path = self.active_path();
 
-                if let Ok(Some(new_type)) = storage::cycle_entry_type(source_date, line_index)
+                if let Ok(Some(new_type)) = storage::cycle_entry_type(source_date, path, line_index)
                     && let ViewMode::Daily(state) = &mut self.view
                     && let Some(later_entry) = state.later_entries.get_mut(later_index)
                 {
@@ -131,10 +133,11 @@ impl App {
         line_index: usize,
         content: String,
     ) {
+        let path = self.active_path();
         if content.trim().is_empty() {
-            let _ = storage::delete_entry(date, line_index);
+            let _ = storage::delete_entry(date, path, line_index);
         } else {
-            match storage::update_entry_content(date, line_index, content) {
+            match storage::update_entry_content(date, path, line_index, content) {
                 Ok(false) => {
                     self.set_status(format!(
                         "Failed to update: no entry at index {line_index} for {date}"
@@ -162,15 +165,16 @@ impl App {
         entry_type: EntryType,
         content: String,
     ) {
+        let path = self.active_path();
         if !content.trim().is_empty()
-            && let Ok(mut lines) = storage::load_day_lines(date)
+            && let Ok(mut lines) = storage::load_day_lines(date, path)
         {
             let entry = Entry {
                 entry_type,
                 content,
             };
             lines.push(Line::Entry(entry));
-            let _ = storage::save_day_lines(date, &lines);
+            let _ = storage::save_day_lines(date, path, &lines);
             if date == self.current_date {
                 let _ = self.reload_current_day();
             }
@@ -188,9 +192,10 @@ impl App {
         content: String,
     ) {
         self.save_or_delete_entry(source_date, line_index, content);
+        let path = self.active_path().to_path_buf();
         if let ViewMode::Daily(state) = &mut self.view {
-            state.later_entries =
-                storage::collect_later_entries_for_date(self.current_date).unwrap_or_default();
+            state.later_entries = storage::collect_later_entries_for_date(self.current_date, &path)
+                .unwrap_or_default();
         }
     }
 

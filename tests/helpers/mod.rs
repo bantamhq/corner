@@ -9,7 +9,7 @@ use tempfile::TempDir;
 use caliber::app::{App, InputMode, ViewMode};
 use caliber::config::Config;
 use caliber::handlers;
-use caliber::storage::{self, JournalSlot};
+use caliber::storage::{JournalContext, JournalSlot};
 use caliber::ui;
 
 /// Test context holding temporary directory and app state
@@ -30,12 +30,10 @@ impl TestContext {
         let journal_path = temp_dir.path().join("test_journal.md");
         std::fs::write(&journal_path, "").expect("Failed to create journal");
 
-        // Reset and set up journal context
-        storage::reset_journal_context();
-        storage::set_journal_context(journal_path, None, JournalSlot::Global);
+        let context = JournalContext::new(journal_path, None, JournalSlot::Global);
 
         let config = Config::default();
-        let app = App::new_with_date(config, date).expect("Failed to create app");
+        let app = App::new_with_context(config, date, context).expect("Failed to create app");
 
         Self { app, temp_dir }
     }
@@ -51,10 +49,8 @@ impl TestContext {
         let journal_path = temp_dir.path().join("test_journal.md");
         std::fs::write(&journal_path, content).expect("Failed to write journal");
 
-        storage::reset_journal_context();
-        storage::set_journal_context(journal_path, None, JournalSlot::Global);
-
-        let app = App::new_with_date(config, date).expect("Failed to create app");
+        let context = JournalContext::new(journal_path, None, JournalSlot::Global);
+        let app = App::new_with_context(config, date, context).expect("Failed to create app");
 
         Self { app, temp_dir }
     }
@@ -178,7 +174,6 @@ impl TestContext {
 
 impl Drop for TestContext {
     fn drop(&mut self) {
-        // Reset global state after each test
-        storage::reset_journal_context();
+        // No global state to reset - context is owned by App
     }
 }

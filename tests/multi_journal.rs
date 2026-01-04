@@ -22,11 +22,11 @@ fn test_journal_isolation() {
     fs::write(&global_path, "# 2026/01/15\n- [ ] Global entry\n").unwrap();
     fs::write(&project_path, "# 2026/01/15\n- [ ] Project entry\n").unwrap();
 
-    storage::reset_journal_context();
-    storage::set_journal_context(global_path, Some(project_path), JournalSlot::Global);
+    let context =
+        storage::JournalContext::new(global_path, Some(project_path), JournalSlot::Global);
 
     let config = Config::default();
-    let app = App::new_with_date(config, date).unwrap();
+    let app = App::new_with_context(config, date, context).unwrap();
 
     // Should see global entry
     let has_global = app.entry_indices.iter().any(|&i| {
@@ -64,15 +64,12 @@ fn test_project_journal_switch() {
     fs::write(&global_path, "# 2026/01/15\n- [ ] Global entry\n").unwrap();
     fs::write(&project_path, "# 2026/01/15\n- [ ] Project entry\n").unwrap();
 
-    storage::reset_journal_context();
-    storage::set_journal_context(
-        global_path,
-        Some(project_path),
-        JournalSlot::Project, // Start in project
-    );
+    // Start in project
+    let context =
+        storage::JournalContext::new(global_path, Some(project_path), JournalSlot::Project);
 
     let config = Config::default();
-    let app = App::new_with_date(config, date).unwrap();
+    let app = App::new_with_context(config, date, context).unwrap();
 
     // Should see project entry
     let has_project = app.entry_indices.iter().any(|&i| {
@@ -109,15 +106,15 @@ fn test_journal_toggle_key() {
     fs::write(&global_path, "# 2026/01/15\n- [ ] Global entry\n").unwrap();
     fs::write(&project_path, "# 2026/01/15\n- [ ] Project entry\n").unwrap();
 
-    storage::reset_journal_context();
-    storage::set_journal_context(global_path, Some(project_path), JournalSlot::Global);
+    let context =
+        storage::JournalContext::new(global_path, Some(project_path), JournalSlot::Global);
 
     let config = Config::default();
-    let mut app = App::new_with_date(config, date).unwrap();
+    let mut app = App::new_with_context(config, date, context).unwrap();
 
     // Verify we're in global
     assert_eq!(
-        storage::get_active_slot(),
+        app.active_journal(),
         JournalSlot::Global,
         "Should start in global journal"
     );
@@ -128,7 +125,7 @@ fn test_journal_toggle_key() {
 
     // Should now be in project
     assert_eq!(
-        storage::get_active_slot(),
+        app.active_journal(),
         JournalSlot::Project,
         "Should switch to project journal"
     );
@@ -136,13 +133,10 @@ fn test_journal_toggle_key() {
     // Toggle back
     let _ = caliber::handlers::handle_normal_key(&mut app, event.code);
     assert_eq!(
-        storage::get_active_slot(),
+        app.active_journal(),
         JournalSlot::Global,
         "Should switch back to global journal"
     );
-
-    // Cleanup
-    storage::reset_journal_context();
 }
 
 /// MJ-3: Command mode journal switch (:global, :project)
@@ -159,11 +153,11 @@ fn test_command_journal_switch() {
     fs::write(&global_path, "# 2026/01/15\n- [ ] Global entry\n").unwrap();
     fs::write(&project_path, "# 2026/01/15\n- [ ] Project entry\n").unwrap();
 
-    storage::reset_journal_context();
-    storage::set_journal_context(global_path, Some(project_path), JournalSlot::Global);
+    let context =
+        storage::JournalContext::new(global_path, Some(project_path), JournalSlot::Global);
 
     let config = Config::default();
-    let mut app = App::new_with_date(config, date).unwrap();
+    let mut app = App::new_with_context(config, date, context).unwrap();
 
     // Enter command mode
     let _ = caliber::handlers::handle_normal_key(&mut app, KeyCode::Char(':'));
@@ -177,7 +171,7 @@ fn test_command_journal_switch() {
     let _ = caliber::handlers::handle_command_key(&mut app, enter_event);
 
     assert_eq!(
-        storage::get_active_slot(),
+        app.active_journal(),
         JournalSlot::Project,
         ":project should switch to project journal"
     );
@@ -191,13 +185,10 @@ fn test_command_journal_switch() {
     let _ = caliber::handlers::handle_command_key(&mut app, enter_event);
 
     assert_eq!(
-        storage::get_active_slot(),
+        app.active_journal(),
         JournalSlot::Global,
         ":global should switch back to global journal"
     );
-
-    // Cleanup
-    storage::reset_journal_context();
 }
 
 /// MJ-2: Project journal creation confirmation flow
@@ -218,11 +209,10 @@ fn test_project_journal_creation() {
     fs::write(&global_path, "# 2026/01/15\n- [ ] Global entry\n").unwrap();
 
     // Set up with no project journal - will trigger creation flow
-    storage::reset_journal_context();
-    storage::set_journal_context(global_path.clone(), None, JournalSlot::Global);
+    let context = storage::JournalContext::new(global_path.clone(), None, JournalSlot::Global);
 
     let config = Config::default();
-    let mut app = App::new_with_date(config, date).unwrap();
+    let mut app = App::new_with_context(config, date, context).unwrap();
 
     // Press backtick to try switching to project journal
     let event = KeyEvent::new(KeyCode::Char('`'), KeyModifiers::NONE);
@@ -252,7 +242,4 @@ fn test_project_journal_creation() {
         matches!(app.input_mode, InputMode::Normal),
         "Should return to normal mode after confirmation flow"
     );
-
-    // Cleanup
-    storage::reset_journal_context();
 }

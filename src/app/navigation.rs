@@ -288,9 +288,10 @@ impl App {
     /// Load a day's data into self, returning later entries for view construction.
     pub(super) fn load_day(&mut self, date: NaiveDate) -> io::Result<Vec<LaterEntry>> {
         self.current_date = date;
-        self.lines = storage::load_day_lines(date)?;
+        let path = self.active_path().to_path_buf();
+        self.lines = storage::load_day_lines(date, &path)?;
         self.entry_indices = Self::compute_entry_indices(&self.lines);
-        storage::collect_later_entries_for_date(date)
+        storage::collect_later_entries_for_date(date, &path)
     }
 
     pub fn goto_day(&mut self, date: NaiveDate) -> io::Result<()> {

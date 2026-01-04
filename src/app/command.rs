@@ -1,7 +1,5 @@
 use std::io;
 
-use crate::storage;
-
 use super::{App, ConfirmContext, InputMode};
 
 impl App {
@@ -38,7 +36,7 @@ impl App {
             }
             "p" | "project" => match arg {
                 "" => {
-                    if storage::get_project_path().is_some() {
+                    if self.journal_context.project_path().is_some() {
                         self.switch_to_project()?;
                     } else if self.in_git_repo {
                         self.input_mode = InputMode::Confirm(ConfirmContext::CreateProjectJournal);
@@ -48,7 +46,7 @@ impl App {
                     }
                 }
                 "init" => {
-                    if storage::get_project_path().is_some() {
+                    if self.journal_context.project_path().is_some() {
                         self.set_status("Project journal already exists");
                     } else if self.in_git_repo {
                         self.input_mode = InputMode::Confirm(ConfirmContext::CreateProjectJournal);
@@ -61,14 +59,14 @@ impl App {
                         if !journal_path.exists() {
                             std::fs::write(&journal_path, "")?;
                         }
-                        storage::set_project_path(journal_path);
+                        self.journal_context.set_project_path(journal_path);
                         self.switch_to_project()?;
                         self.set_status("Project journal created");
                     }
                 }
                 "default" => {
-                    storage::reset_project_path();
-                    if storage::get_project_path().is_some() {
+                    self.journal_context.reset_project_path();
+                    if self.journal_context.project_path().is_some() {
                         self.switch_to_project()?;
                     } else {
                         self.set_status("No default project journal found");

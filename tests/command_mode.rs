@@ -8,7 +8,6 @@ use helpers::TestContext;
 use tempfile::TempDir;
 
 use caliber::app::InputMode;
-use caliber::storage;
 
 /// CM-1: Config command without valid subcommand shows usage
 #[test]
@@ -156,9 +155,6 @@ fn test_project_command_loads_file() {
         ctx.screen_contains("Entry from other journal"),
         "Content from opened journal should be visible"
     );
-
-    // Cleanup
-    storage::reset_journal_context();
 }
 
 /// CM-2: Config reload applies new config
