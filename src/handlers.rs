@@ -7,6 +7,24 @@ use crate::cursor::CursorBuffer;
 use crate::storage::{add_caliber_to_gitignore, create_project_journal};
 use crate::ui;
 
+/// Maps shifted number characters to their digit equivalent for favorite tag shortcuts.
+/// Shift+1='!', Shift+2='@', ..., Shift+0=')'
+fn shifted_char_to_digit(c: char) -> Option<char> {
+    match c {
+        '!' => Some('1'),
+        '@' => Some('2'),
+        '#' => Some('3'),
+        '$' => Some('4'),
+        '%' => Some('5'),
+        '^' => Some('6'),
+        '&' => Some('7'),
+        '*' => Some('8'),
+        '(' => Some('9'),
+        ')' => Some('0'),
+        _ => None,
+    }
+}
+
 pub fn handle_help_key(app: &mut App, key: KeyCode) {
     let total_lines = ui::get_help_total_lines();
     let max_scroll = total_lines.saturating_sub(app.help_visible_height);
@@ -57,9 +75,11 @@ pub fn handle_command_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
     Ok(())
 }
 
-pub fn handle_normal_key(app: &mut App, key: KeyCode) -> io::Result<()> {
+pub fn handle_normal_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    let KeyEvent { code, .. } = key;
+
     // Shared keys (work in both Daily and Filter views)
-    match key {
+    match code {
         KeyCode::Char('?') => {
             app.show_help = true;
             return Ok(());
@@ -131,12 +151,24 @@ pub fn handle_normal_key(app: &mut App, key: KeyCode) -> io::Result<()> {
             }
             return Ok(());
         }
+        // Shift+number appends favorite tag to current entry
+        KeyCode::Char(c) if shifted_char_to_digit(c).is_some() => {
+            let digit = shifted_char_to_digit(c).unwrap();
+            if let Some(tag) = app.config.get_favorite_tag(digit).map(str::to_string) {
+                app.append_tag_to_current_entry(&tag)?;
+            }
+            return Ok(());
+        }
+        KeyCode::BackTab => {
+            app.cycle_current_entry_type()?;
+            return Ok(());
+        }
         _ => {}
     }
 
     // View-specific keys
     match &app.view {
-        ViewMode::Daily(_) => match key {
+        ViewMode::Daily(_) => match code {
             KeyCode::Enter => app.new_task(InsertPosition::Bottom),
             KeyCode::Char('o') => app.new_task(InsertPosition::Below),
             KeyCode::Char('O') => app.new_task(InsertPosition::Above),
@@ -149,7 +181,7 @@ pub fn handle_normal_key(app: &mut App, key: KeyCode) -> io::Result<()> {
             KeyCode::Tab => app.return_to_filter()?,
             _ => {}
         },
-        ViewMode::Filter(_) => match key {
+        ViewMode::Filter(_) => match code {
             KeyCode::Esc | KeyCode::Tab => app.exit_filter(),
             KeyCode::Char('r') => app.refresh_filter()?,
             KeyCode::Enter => app.filter_quick_add(),
@@ -421,6 +453,16 @@ pub fn handle_selection_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
         }
         KeyCode::Char('X') => {
             app.remove_all_tags_from_selected()?;
+        }
+        // Shift+number appends favorite tag to all selected entries
+        KeyCode::Char(c) if shifted_char_to_digit(c).is_some() => {
+            let digit = shifted_char_to_digit(c).unwrap();
+            if let Some(tag) = app.config.get_favorite_tag(digit).map(str::to_string) {
+                app.append_tag_to_selected(&tag)?;
+            }
+        }
+        KeyCode::BackTab => {
+            app.cycle_selected_entry_types()?;
         }
         _ => {}
     }

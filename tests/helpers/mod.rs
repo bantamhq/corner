@@ -84,7 +84,7 @@ impl TestContext {
                     let _ = handlers::handle_command_key(&mut self.app, key);
                 }
                 InputMode::Normal => {
-                    let _ = handlers::handle_normal_key(&mut self.app, key.code);
+                    let _ = handlers::handle_normal_key(&mut self.app, key);
                 }
                 InputMode::Edit(_) => {
                     handlers::handle_edit_key(&mut self.app, key);

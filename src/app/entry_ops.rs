@@ -438,6 +438,121 @@ impl App {
         self.execute_tag_removal(target, remove_all_trailing_tags)
     }
 
+    /// Execute tag append on a target
+    pub fn execute_append_tag(&mut self, target: EntryLocation, tag: &str) -> io::Result<()> {
+        let path = self.active_path().to_path_buf();
+        let tag_with_hash = format!(" #{tag}");
+
+        match target {
+            EntryLocation::Later {
+                source_date,
+                line_index,
+            } => {
+                storage::mutate_entry(source_date, &path, line_index, |entry| {
+                    entry.content.push_str(&tag_with_hash);
+                })?;
+
+                if let ViewMode::Daily(state) = &mut self.view {
+                    state.later_entries =
+                        storage::collect_later_entries_for_date(self.current_date, &path)?;
+                }
+                self.refresh_tag_cache();
+            }
+            EntryLocation::Daily { line_idx } => {
+                if let Line::Entry(entry) = &mut self.lines[line_idx] {
+                    entry.content.push_str(&tag_with_hash);
+                    self.save();
+                    self.refresh_tag_cache();
+                }
+            }
+            EntryLocation::Filter {
+                index,
+                source_date,
+                line_index,
+            } => {
+                storage::mutate_entry(source_date, &path, line_index, |entry| {
+                    entry.content.push_str(&tag_with_hash);
+                })?;
+
+                if let ViewMode::Filter(state) = &mut self.view
+                    && let Some(filter_entry) = state.entries.get_mut(index)
+                {
+                    filter_entry.content.push_str(&tag_with_hash);
+                }
+
+                if source_date == self.current_date {
+                    self.reload_current_day()?;
+                }
+                self.refresh_tag_cache();
+            }
+        }
+        Ok(())
+    }
+
+    /// Append a favorite tag to the current entry
+    pub fn append_tag_to_current_entry(&mut self, tag: &str) -> io::Result<()> {
+        let Some(target) = self.extract_tag_removal_target_from_current() else {
+            return Ok(());
+        };
+        self.execute_append_tag(target, tag)
+    }
+
+    /// Execute cycle entry type on a target
+    pub fn execute_cycle_type(&mut self, target: EntryLocation) -> io::Result<()> {
+        let path = self.active_path().to_path_buf();
+
+        match target {
+            EntryLocation::Later {
+                source_date,
+                line_index,
+            } => {
+                if let Ok(Some(new_type)) = storage::cycle_entry_type(source_date, &path, line_index)
+                    && let ViewMode::Daily(state) = &mut self.view
+                    && let Some(later_entry) = state.later_entries.iter_mut().find(|e| {
+                        e.source_date == source_date && e.line_index == line_index
+                    })
+                {
+                    later_entry.entry_type = new_type;
+                    later_entry.completed =
+                        matches!(later_entry.entry_type, EntryType::Task { completed: true });
+                }
+            }
+            EntryLocation::Daily { line_idx } => {
+                if let Line::Entry(entry) = &mut self.lines[line_idx] {
+                    entry.entry_type = entry.entry_type.cycle();
+                    self.save();
+                }
+            }
+            EntryLocation::Filter {
+                index,
+                source_date,
+                line_index,
+            } => {
+                if let Ok(Some(new_type)) = storage::cycle_entry_type(source_date, &path, line_index)
+                    && let ViewMode::Filter(state) = &mut self.view
+                    && let Some(filter_entry) = state.entries.get_mut(index)
+                {
+                    filter_entry.entry_type = new_type;
+                    filter_entry.completed =
+                        matches!(filter_entry.entry_type, EntryType::Task { completed: true });
+                }
+
+                if source_date == self.current_date {
+                    self.reload_current_day()?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Cycle entry type on the current entry
+    pub fn cycle_current_entry_type(&mut self) -> io::Result<()> {
+        let Some(target) = self.extract_tag_removal_target_from_current() else {
+            return Ok(());
+        };
+        self.execute_cycle_type(target)
+    }
+
     fn copy_to_clipboard(text: &str) -> Result<(), arboard::Error> {
         let mut clipboard = arboard::Clipboard::new()?;
         clipboard.set_text(text)?;

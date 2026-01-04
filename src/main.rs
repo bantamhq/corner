@@ -470,7 +470,7 @@ fn run_app<B: ratatui::backend::Backend>(
             } else {
                 match &app.input_mode {
                     InputMode::Command => handlers::handle_command_key(&mut app, key)?,
-                    InputMode::Normal => handlers::handle_normal_key(&mut app, key.code)?,
+                    InputMode::Normal => handlers::handle_normal_key(&mut app, key)?,
                     InputMode::Edit(_) => handlers::handle_edit_key(&mut app, key),
                     InputMode::QueryInput => handlers::handle_query_input_key(&mut app, key)?,
                     InputMode::Reorder => handlers::handle_reorder_key(&mut app, key.code),

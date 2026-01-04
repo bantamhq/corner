@@ -121,7 +121,7 @@ fn test_journal_toggle_key() {
 
     // Press backtick to toggle (simulating the handler)
     let event = KeyEvent::new(KeyCode::Char('`'), KeyModifiers::NONE);
-    let _ = caliber::handlers::handle_normal_key(&mut app, event.code);
+    let _ = caliber::handlers::handle_normal_key(&mut app, event);
 
     // Should now be in project
     assert_eq!(
@@ -131,7 +131,7 @@ fn test_journal_toggle_key() {
     );
 
     // Toggle back
-    let _ = caliber::handlers::handle_normal_key(&mut app, event.code);
+    let _ = caliber::handlers::handle_normal_key(&mut app, event);
     assert_eq!(
         app.active_journal(),
         JournalSlot::Global,
@@ -160,7 +160,8 @@ fn test_command_journal_switch() {
     let mut app = App::new_with_context(config, date, context).unwrap();
 
     // Enter command mode
-    let _ = caliber::handlers::handle_normal_key(&mut app, KeyCode::Char(':'));
+    let colon_event = KeyEvent::new(KeyCode::Char(':'), KeyModifiers::NONE);
+    let _ = caliber::handlers::handle_normal_key(&mut app, colon_event);
 
     // Type "project" and enter
     for c in "project".chars() {
@@ -177,7 +178,7 @@ fn test_command_journal_switch() {
     );
 
     // Switch back with :global
-    let _ = caliber::handlers::handle_normal_key(&mut app, KeyCode::Char(':'));
+    let _ = caliber::handlers::handle_normal_key(&mut app, colon_event);
     for c in "global".chars() {
         let event = KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE);
         let _ = caliber::handlers::handle_command_key(&mut app, event);
@@ -216,7 +217,7 @@ fn test_project_journal_creation() {
 
     // Press backtick to try switching to project journal
     let event = KeyEvent::new(KeyCode::Char('`'), KeyModifiers::NONE);
-    let _ = caliber::handlers::handle_normal_key(&mut app, event.code);
+    let _ = caliber::handlers::handle_normal_key(&mut app, event);
 
     // Should be in Confirm mode (asking to create project journal)
     assert!(

@@ -138,6 +138,8 @@ The entry will appear in the "Later" section when you view that date.
 | `r` | Reorder mode |
 | `v` | Selection mode |
 | `0-9` | Filter favorite tag |
+| `Shift+0-9` | Append favorite tag |
+| `Shift+Tab` | Cycle entry type |
 | `Tab` | Return to filter |
 | `` ` `` | Toggle Global/Project journal |
 | `/` | Filter mode |
@@ -162,6 +164,8 @@ The entry will appear in the "Later" section when you view that date.
 | `G` | Jump to last |
 | `v` | Selection mode |
 | `0-9` | Filter favorite tag |
+| `Shift+0-9` | Append favorite tag |
+| `Shift+Tab` | Cycle entry type |
 | `` ` `` | Toggle Global/Project journal |
 | `/` | Filter mode |
 | `:` | Command mode |

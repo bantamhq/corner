@@ -221,6 +221,24 @@ short_text = "Tag filter"
 short_description = "Filter favorite tag"
 long_description = "Quick filter by favorite tag (configured in config.toml)"
 
+[[keys]]
+id = "append_favorite_tag"
+key = "Shift+0-9"
+modes = ["shared_normal"]
+help_sections = ["daily", "filter"]
+short_text = "Add tag"
+short_description = "Append favorite tag"
+long_description = "Append favorite tag to the selected entry (configured in config.toml)"
+
+[[keys]]
+id = "cycle_entry_type_normal"
+key = "Shift+Tab"
+modes = ["shared_normal"]
+help_sections = ["daily", "filter"]
+short_text = "Cycle type"
+short_description = "Cycle entry type"
+long_description = "Cycle through entry types (task → note → event)"
+
 # --- Mode Switching ---
 
 [[keys]]
@@ -404,7 +422,7 @@ key = "v"
 modes = ["selection"]
 help_sections = ["selection"]
 footer = ["selection"]
-short_text = "Toggle"
+short_text = "Toggle selection"
 short_description = "Toggle selection"
 long_description = "Toggle selection on the current entry"
 
@@ -414,7 +432,7 @@ key = "V"
 modes = ["selection"]
 help_sections = ["selection"]
 footer = ["selection"]
-short_text = "Range"
+short_text = "Select Range"
 short_description = "Select range"
 long_description = "Select all entries between last selection and cursor"
 
@@ -484,6 +502,24 @@ help_sections = ["selection"]
 short_text = "Detag all"
 short_description = "Remove all tags"
 long_description = "Remove all trailing tags from all selected entries"
+
+[[keys]]
+id = "selection_append_tag"
+key = "Shift+0-9"
+modes = ["selection"]
+help_sections = ["selection"]
+short_text = "Add tag"
+short_description = "Append favorite tag"
+long_description = "Append favorite tag to all selected entries"
+
+[[keys]]
+id = "selection_cycle_type"
+key = "Shift+Tab"
+modes = ["selection"]
+help_sections = ["selection"]
+short_text = "Cycle type"
+short_description = "Cycle entry type"
+long_description = "Cycle through entry types on all selected entries"
 
 [[keys]]
 id = "selection_exit"

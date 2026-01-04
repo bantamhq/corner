@@ -269,7 +269,6 @@ impl App {
     pub fn toggle_selected(&mut self) -> io::Result<()> {
         let targets = self.collect_toggle_targets_from_selected();
         if targets.is_empty() {
-            self.exit_selection_mode();
             return Ok(());
         }
 
@@ -280,7 +279,6 @@ impl App {
         }
 
         self.set_status(format!("Toggled {} entries", count));
-        self.exit_selection_mode();
         Ok(())
     }
 
@@ -288,20 +286,17 @@ impl App {
     pub fn yank_selected(&mut self) {
         let targets = self.collect_yank_targets_from_selected();
         if targets.is_empty() {
-            self.exit_selection_mode();
             return;
         }
 
         let contents: Vec<&str> = targets.iter().map(Self::yank_target_content).collect();
         self.execute_yank(&contents);
-        self.exit_selection_mode();
     }
 
     /// Remove last trailing tag from all selected entries
     pub fn remove_last_tag_from_selected(&mut self) -> io::Result<()> {
         let targets = self.collect_tag_removal_targets_from_selected();
         if targets.is_empty() {
-            self.exit_selection_mode();
             return Ok(());
         }
 
@@ -312,7 +307,6 @@ impl App {
         }
 
         self.set_status(format!("Removed tags from {} entries", count));
-        self.exit_selection_mode();
         Ok(())
     }
 
@@ -320,7 +314,6 @@ impl App {
     pub fn remove_all_tags_from_selected(&mut self) -> io::Result<()> {
         let targets = self.collect_tag_removal_targets_from_selected();
         if targets.is_empty() {
-            self.exit_selection_mode();
             return Ok(());
         }
 
@@ -331,7 +324,40 @@ impl App {
         }
 
         self.set_status(format!("Removed all tags from {} entries", count));
-        self.exit_selection_mode();
+        Ok(())
+    }
+
+    /// Append a tag to all selected entries
+    pub fn append_tag_to_selected(&mut self, tag: &str) -> io::Result<()> {
+        let targets = self.collect_tag_removal_targets_from_selected();
+        if targets.is_empty() {
+            return Ok(());
+        }
+
+        let count = targets.len();
+
+        for target in targets {
+            self.execute_append_tag(target, tag)?;
+        }
+
+        self.set_status(format!("Added #{tag} to {} entries", count));
+        Ok(())
+    }
+
+    /// Cycle entry type on all selected entries
+    pub fn cycle_selected_entry_types(&mut self) -> io::Result<()> {
+        let targets = self.collect_tag_removal_targets_from_selected();
+        if targets.is_empty() {
+            return Ok(());
+        }
+
+        let count = targets.len();
+
+        for target in targets {
+            self.execute_cycle_type(target)?;
+        }
+
+        self.set_status(format!("Cycled type on {} entries", count));
         Ok(())
     }
 

@@ -152,10 +152,10 @@ fn test_batch_yank() {
 
     ctx.press(KeyCode::Char('y')); // Yank
 
-    // Should exit selection mode
+    // Should stay in selection mode (only delete exits)
     assert!(
-        matches!(ctx.app.input_mode, InputMode::Normal),
-        "Should exit selection mode after yank"
+        matches!(ctx.app.input_mode, InputMode::Selection(_)),
+        "Should stay in selection mode after yank"
     );
 
     // Entries should still exist
