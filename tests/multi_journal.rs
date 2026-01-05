@@ -139,59 +139,6 @@ fn test_journal_toggle_key() {
     );
 }
 
-/// MJ-3: Command mode journal switch (:global, :project)
-#[test]
-fn test_command_journal_switch() {
-    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-
-    let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
-    let temp_dir = TempDir::new().unwrap();
-
-    let global_path = temp_dir.path().join("global.md");
-    let project_path = temp_dir.path().join("project.md");
-
-    fs::write(&global_path, "# 2026/01/15\n- [ ] Global entry\n").unwrap();
-    fs::write(&project_path, "# 2026/01/15\n- [ ] Project entry\n").unwrap();
-
-    let context =
-        storage::JournalContext::new(global_path, Some(project_path), JournalSlot::Global);
-
-    let config = Config::default();
-    let mut app = App::new_with_context(config, date, context).unwrap();
-
-    // Enter command mode
-    let colon_event = KeyEvent::new(KeyCode::Char(':'), KeyModifiers::NONE);
-    let _ = caliber::handlers::handle_normal_key(&mut app, colon_event);
-
-    // Type "project" and enter
-    for c in "project".chars() {
-        let event = KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE);
-        let _ = caliber::handlers::handle_command_key(&mut app, event);
-    }
-    let enter_event = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
-    let _ = caliber::handlers::handle_command_key(&mut app, enter_event);
-
-    assert_eq!(
-        app.active_journal(),
-        JournalSlot::Project,
-        ":project should switch to project journal"
-    );
-
-    // Switch back with :global
-    let _ = caliber::handlers::handle_normal_key(&mut app, colon_event);
-    for c in "global".chars() {
-        let event = KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE);
-        let _ = caliber::handlers::handle_command_key(&mut app, event);
-    }
-    let _ = caliber::handlers::handle_command_key(&mut app, enter_event);
-
-    assert_eq!(
-        app.active_journal(),
-        JournalSlot::Global,
-        ":global should switch back to global journal"
-    );
-}
-
 /// MJ-2: Project journal creation confirmation flow
 #[test]
 fn test_project_journal_creation() {

@@ -1,6 +1,18 @@
-use std::io;
+use std::io::{self, Write};
+use std::path::PathBuf;
+use std::process::Command;
 
-use super::{App, ConfirmContext, InputMode};
+use crossterm::{
+    event::{DisableMouseCapture, EnableMouseCapture},
+    execute,
+    terminal::{
+        Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode,
+        enable_raw_mode,
+    },
+};
+
+use super::{App, InputMode};
+use crate::config;
 
 impl App {
     pub fn execute_command(&mut self) -> io::Result<()> {
@@ -24,74 +36,9 @@ impl App {
                     self.set_status(format!("Invalid date: {arg}"));
                 }
             }
-            "c" | "config" => {
-                if arg == "reload" {
-                    self.reload_config()?;
-                } else {
-                    self.set_status("Usage: :config reload");
-                }
+            "o" | "open" => {
+                self.handle_open_command(arg)?;
             }
-            "g" | "global" => {
-                self.switch_to_global()?;
-            }
-            "p" | "project" => match arg {
-                "" => {
-                    if self.journal_context.project_path().is_some() {
-                        self.switch_to_project()?;
-                    } else if self.in_git_repo {
-                        self.input_mode = InputMode::Confirm(ConfirmContext::CreateProjectJournal);
-                        return Ok(());
-                    } else {
-                        self.set_status("Not in a git repository - no project journal available");
-                    }
-                }
-                "init" => {
-                    if self.journal_context.project_path().is_some() {
-                        // Project exists - ensure config.toml exists too
-                        if let Some(root) = crate::storage::find_git_root() {
-                            let config_path = root.join(".caliber").join("config.toml");
-                            if !config_path.exists() {
-                                std::fs::write(&config_path, "")?;
-                                self.set_status("Project config created");
-                            } else {
-                                self.set_status("Project already initialized");
-                            }
-                        }
-                    } else if self.in_git_repo {
-                        self.input_mode = InputMode::Confirm(ConfirmContext::CreateProjectJournal);
-                        return Ok(());
-                    } else {
-                        let cwd = std::env::current_dir()?;
-                        let caliber_dir = cwd.join(".caliber");
-                        std::fs::create_dir_all(&caliber_dir)?;
-                        let journal_path = caliber_dir.join("journal.md");
-                        if !journal_path.exists() {
-                            std::fs::write(&journal_path, "")?;
-                        }
-                        let config_path = caliber_dir.join("config.toml");
-                        if !config_path.exists() {
-                            std::fs::write(&config_path, "")?;
-                        }
-                        self.journal_context.set_project_path(journal_path);
-                        self.switch_to_project()?;
-                        self.set_status("Project journal created");
-                    }
-                }
-                "default" => {
-                    self.journal_context.reset_project_path();
-                    if self.journal_context.project_path().is_some() {
-                        self.switch_to_project()?;
-                    } else {
-                        self.set_status("No default project journal found");
-                    }
-                }
-                path if path.ends_with(".md") => {
-                    self.open_journal(path)?;
-                }
-                _ => {
-                    self.set_status("Usage: :project [init|default|path.md]");
-                }
-            },
             _ => {
                 if !command.is_empty() {
                     self.set_status(format!("Unknown command: {command}"));
@@ -99,6 +46,107 @@ impl App {
             }
         }
         self.input_mode = InputMode::Normal;
+        Ok(())
+    }
+
+    fn handle_open_command(&mut self, arg: &str) -> io::Result<()> {
+        let parts: Vec<&str> = arg.split_whitespace().collect();
+        let target = parts.first().copied().unwrap_or("");
+        let scope = parts.get(1).copied();
+
+        let (path, is_config) = match target {
+            "config" => (self.resolve_config_path(scope), true),
+            "journal" => (self.resolve_journal_path(scope), false),
+            "" => {
+                self.set_status("Usage: :open <config|journal> [project|global]");
+                return Ok(());
+            }
+            _ => {
+                self.set_status(format!(
+                    "Unknown target: {target}. Use 'config' or 'journal'"
+                ));
+                return Ok(());
+            }
+        };
+
+        match path {
+            Ok(p) => self.open_in_editor(&p, is_config)?,
+            Err(msg) => self.set_status(msg),
+        }
+        Ok(())
+    }
+
+    fn resolve_config_path(&self, scope: Option<&str>) -> Result<PathBuf, String> {
+        match scope {
+            None | Some("global") => Ok(config::get_config_path()),
+            Some("project") => {
+                if let Some(project_path) = self.journal_context.project_path() {
+                    let config_path = project_path
+                        .parent()
+                        .map(|p| p.join("config.toml"))
+                        .ok_or_else(|| "Cannot determine project config path".to_string())?;
+                    Ok(config_path)
+                } else {
+                    Err("No project journal active".to_string())
+                }
+            }
+            Some(other) => Err(format!("Unknown scope: {other}. Use 'project' or 'global'")),
+        }
+    }
+
+    fn resolve_journal_path(&self, scope: Option<&str>) -> Result<PathBuf, String> {
+        match scope {
+            None => Ok(self.journal_context.active_path().to_path_buf()),
+            Some("global") => Ok(self.journal_context.global_path().to_path_buf()),
+            Some("project") => self
+                .journal_context
+                .project_path()
+                .map(|p| p.to_path_buf())
+                .ok_or_else(|| "No project journal active".to_string()),
+            Some(other) => Err(format!("Unknown scope: {other}. Use 'project' or 'global'")),
+        }
+    }
+
+    fn open_in_editor(&mut self, path: &std::path::Path, is_config: bool) -> io::Result<()> {
+        let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+
+        // Save before opening editor
+        self.save();
+
+        // Suspend TUI
+        disable_raw_mode()?;
+        execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
+
+        let status = Command::new(&editor).arg(path).status();
+
+        // Restore TUI
+        enable_raw_mode()?;
+        execute!(
+            io::stdout(),
+            EnterAlternateScreen,
+            EnableMouseCapture,
+            Clear(ClearType::All)
+        )?;
+        io::stdout().flush()?;
+
+        self.needs_redraw = true;
+
+        match status {
+            Ok(exit) if exit.success() => {
+                if is_config {
+                    self.reload_config()?;
+                } else {
+                    self.reload_current_day()?;
+                }
+            }
+            Ok(_) => {
+                self.set_status("Editor exited with error");
+            }
+            Err(e) => {
+                self.set_status(format!("Failed to open editor: {e}"));
+            }
+        }
+
         Ok(())
     }
 }

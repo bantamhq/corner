@@ -15,6 +15,12 @@ pub enum HintContext {
         prefix: String,
         matches: Vec<&'static Command>,
     },
+    /// Subargument hints for a command
+    SubArgs {
+        prefix: String,
+        matches: Vec<&'static str>,
+        command: &'static Command,
+    },
     /// Filter type hints (!tasks, !notes, etc.)
     FilterTypes {
         prefix: String,
@@ -55,25 +61,66 @@ impl HintContext {
     }
 
     fn compute_command_hints(input: &str) -> Self {
-        let prefix = input.trim();
+        let trimmed = input.trim_start();
+        let has_trailing_space = trimmed.ends_with(' ');
+        let prefix = trimmed.trim_end();
+        let words: Vec<&str> = prefix.split_whitespace().collect();
+        let first_word = words.first().copied().unwrap_or("");
 
-        // Check if first word is a complete command (user is typing arguments)
-        let first_word = prefix.split_whitespace().next().unwrap_or("");
-        let has_args = prefix.contains(' ');
+        let matched_command = COMMANDS
+            .iter()
+            .find(|c| c.name == first_word || c.aliases.contains(&first_word));
 
-        if has_args {
-            // Show the matched command's description while typing arguments
-            let exact_match: Vec<&'static Command> = COMMANDS
-                .iter()
-                .filter(|c| c.name == first_word || c.aliases.contains(&first_word))
-                .collect();
+        if let Some(cmd) = matched_command {
+            if !cmd.subargs.is_empty() {
+                // words[0] = command, words[1] = arg0, words[2] = arg1, etc.
+                let num_complete_args = words.len().saturating_sub(1);
 
-            if !exact_match.is_empty() {
-                return Self::Commands {
-                    prefix: first_word.to_string(),
-                    matches: exact_match,
+                let (arg_position, current_arg) = if has_trailing_space {
+                    (num_complete_args, "")
+                } else if num_complete_args > 0 {
+                    (num_complete_args - 1, words.last().copied().unwrap_or(""))
+                } else {
+                    return Self::Commands {
+                        prefix: first_word.to_string(),
+                        matches: vec![cmd],
+                    };
                 };
+
+                if arg_position < cmd.subargs.len() {
+                    let subarg = &cmd.subargs[arg_position];
+                    let matches: Vec<&'static str> = subarg
+                        .options
+                        .iter()
+                        .filter(|opt| opt.starts_with(current_arg))
+                        .copied()
+                        .collect();
+
+                    if !has_trailing_space
+                        && matches.len() == 1
+                        && matches[0] == current_arg
+                        && arg_position + 1 >= cmd.subargs.len()
+                    {
+                        return Self::Inactive;
+                    }
+
+                    if !matches.is_empty() {
+                        return Self::SubArgs {
+                            prefix: current_arg.to_string(),
+                            matches,
+                            command: cmd,
+                        };
+                    }
+                    return Self::Inactive;
+                } else {
+                    return Self::Inactive;
+                }
             }
+
+            return Self::Commands {
+                prefix: first_word.to_string(),
+                matches: vec![cmd],
+            };
         }
 
         let matches: Vec<&'static Command> = COMMANDS
@@ -94,6 +141,10 @@ impl HintContext {
     }
 
     fn compute_tag_hints(input: &str, journal_tags: &[String]) -> Self {
+        if input.ends_with(' ') {
+            return Self::Inactive;
+        }
+
         let current_token = input.split_whitespace().last().unwrap_or("");
 
         if let Some(tag_prefix) = current_token.strip_prefix('#') {
@@ -122,6 +173,10 @@ impl HintContext {
     }
 
     fn compute_filter_hints(input: &str, journal_tags: &[String]) -> Self {
+        if input.ends_with(' ') {
+            return Self::Inactive;
+        }
+
         let current_token = input.split_whitespace().last().unwrap_or("");
 
         if current_token.starts_with('#') {
@@ -196,6 +251,9 @@ impl HintContext {
             Self::Commands { prefix, matches } => matches
                 .first()
                 .map(|cmd| cmd.name[prefix.len()..].to_string()),
+            Self::SubArgs {
+                prefix, matches, ..
+            } => matches.first().map(|opt| opt[prefix.len()..].to_string()),
             Self::FilterTypes { prefix, matches } => matches
                 .first()
                 .map(|f| f.syntax[1 + prefix.len()..].to_string()),

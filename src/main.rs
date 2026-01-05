@@ -30,24 +30,16 @@ fn main() -> Result<(), io::Error> {
     let args: Vec<String> = std::env::args().collect();
 
     if args.get(1).map(String::as_str) == Some("init") {
-        return match Config::init() {
-            Ok(true) => {
-                println!(
-                    "Created config file at: {}",
-                    config::get_config_path().display()
-                );
-                Ok(())
-            }
-            Ok(false) => {
-                println!(
-                    "Config file already exists at: {}",
-                    config::get_config_path().display()
-                );
-                Ok(())
-            }
-            Err(e) => {
-                eprintln!("Failed to create config file: {e}");
-                Err(e)
+        return match args.get(2).map(String::as_str) {
+            Some("project") => init_project(),
+            None => init_config(),
+            Some(other) => {
+                eprintln!("Unknown subcommand: init {other}");
+                eprintln!("Usage: caliber init [project]");
+                Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Unknown subcommand",
+                ))
             }
         };
     }
@@ -100,6 +92,42 @@ fn main() -> Result<(), io::Error> {
     Ok(())
 }
 
+fn init_config() -> io::Result<()> {
+    match Config::init() {
+        Ok(true) => {
+            println!(
+                "Created config file at: {}",
+                config::get_config_path().display()
+            );
+            Ok(())
+        }
+        Ok(false) => {
+            println!(
+                "Config file already exists at: {}",
+                config::get_config_path().display()
+            );
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("Failed to create config file: {e}");
+            Err(e)
+        }
+    }
+}
+
+fn init_project() -> io::Result<()> {
+    match storage::create_project_journal() {
+        Ok(path) => {
+            println!("Created project journal at: {}", path.display());
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("Failed to create project journal: {e}");
+            Err(e)
+        }
+    }
+}
+
 fn run_app<B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     config: Config,
@@ -114,6 +142,12 @@ fn run_app<B: ratatui::backend::Backend>(
     }
 
     loop {
+        // Check if we need a full terminal redraw (e.g., after returning from external editor)
+        if app.needs_redraw {
+            terminal.clear()?;
+            app.needs_redraw = false;
+        }
+
         let is_filter_context = matches!(app.view, ViewMode::Filter(_))
             || matches!(
                 app.input_mode,

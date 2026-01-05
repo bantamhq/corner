@@ -48,6 +48,7 @@ fn build_hint_lines(hint_state: &HintContext, width: usize, max_rows: usize) -> 
         HintContext::Commands { prefix, matches } if !prefix.is_empty() => {
             matches.first().map(|c| c.long_description)
         }
+        HintContext::SubArgs { command, .. } => Some(command.long_description),
         HintContext::FilterTypes { prefix, matches } if !prefix.is_empty() => {
             matches.first().map(|f| f.long_description)
         }
@@ -63,7 +64,7 @@ fn build_hint_lines(hint_state: &HintContext, width: usize, max_rows: usize) -> 
     // Context-specific colors: tags = light yellow, commands = blue, filters = magenta
     let hint_color = match hint_state {
         HintContext::Tags { .. } => Color::LightYellow,
-        HintContext::Commands { .. } => Color::Blue,
+        HintContext::Commands { .. } | HintContext::SubArgs { .. } => Color::Blue,
         HintContext::FilterTypes { .. }
         | HintContext::DateOps { .. }
         | HintContext::Negation { .. } => Color::Magenta,
@@ -76,6 +77,7 @@ fn build_hint_lines(hint_state: &HintContext, width: usize, max_rows: usize) -> 
         HintContext::Commands { matches, .. } => {
             matches.iter().map(|cmd| format!(":{}", cmd.name)).collect()
         }
+        HintContext::SubArgs { matches, .. } => matches.iter().map(|s| (*s).to_string()).collect(),
         HintContext::FilterTypes { matches, .. } => {
             matches.iter().map(|f| f.syntax.to_string()).collect()
         }

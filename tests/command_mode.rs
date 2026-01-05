@@ -1,34 +1,42 @@
 mod helpers;
 
-use std::fs;
-use std::io::Write;
-
 use crossterm::event::KeyCode;
 use helpers::TestContext;
-use tempfile::TempDir;
 
 use caliber::app::InputMode;
 
-/// CM-1: Config command without valid subcommand shows usage
+/// CM-1: :open without args shows usage
 #[test]
-fn test_config_command_usage() {
+fn test_open_command_usage() {
     let mut ctx = TestContext::new();
 
-    // Enter command mode and try :config without argument
     ctx.press(KeyCode::Char(':'));
-    ctx.type_str("config");
+    ctx.type_str("open");
     ctx.press(KeyCode::Enter);
 
-    // App should show usage message but remain functional
-    // (Status message is set internally, we verify app still works)
+    // App should remain functional
     ctx.press(KeyCode::Enter);
-    ctx.type_str("Test after config command");
+    ctx.type_str("Test after open");
     ctx.press(KeyCode::Enter);
 
-    assert!(
-        ctx.screen_contains("Test after config command"),
-        "App should still work after :config command"
-    );
+    assert!(ctx.screen_contains("Test after open"));
+}
+
+/// CM-2: :open with invalid target shows error
+#[test]
+fn test_open_command_invalid_target() {
+    let mut ctx = TestContext::new();
+
+    ctx.press(KeyCode::Char(':'));
+    ctx.type_str("open invalid");
+    ctx.press(KeyCode::Enter);
+
+    // App should remain functional
+    ctx.press(KeyCode::Enter);
+    ctx.type_str("Test after invalid open");
+    ctx.press(KeyCode::Enter);
+
+    assert!(ctx.screen_contains("Test after invalid open"));
 }
 
 /// CM-3: Invalid command shows error but app remains functional
@@ -124,66 +132,4 @@ fn test_help_overlay_scroll() {
     // Close with Esc
     ctx.press(KeyCode::Esc);
     assert!(!ctx.app.show_help, "Help should close with Esc");
-}
-
-/// CM-1: Project with path loads that journal
-#[test]
-fn test_project_command_loads_file() {
-    let temp_dir = TempDir::new().unwrap();
-    let other_journal = temp_dir.path().join("other_journal.md");
-
-    // Use actual today's date since open_journal loads Local::now()
-    let today = chrono::Local::now().date_naive();
-    let date_str = today.format("%Y/%m/%d").to_string();
-
-    // Create a journal file with content for today
-    fs::write(
-        &other_journal,
-        format!("# {}\n- [ ] Entry from other journal\n", date_str),
-    )
-    .unwrap();
-
-    let mut ctx = TestContext::new();
-
-    // Open the other journal via :project path
-    ctx.press(KeyCode::Char(':'));
-    ctx.type_str(&format!("project {}", other_journal.display()));
-    ctx.press(KeyCode::Enter);
-
-    // Should now see content from the other journal
-    assert!(
-        ctx.screen_contains("Entry from other journal"),
-        "Content from opened journal should be visible"
-    );
-}
-
-/// CM-2: Config reload applies new config
-#[test]
-fn test_config_reload_command() {
-    let temp_dir = TempDir::new().unwrap();
-    let config_path = temp_dir.path().join("config.toml");
-
-    // Create a minimal config file
-    let mut file = fs::File::create(&config_path).unwrap();
-    writeln!(file, "[favorite_tags]").unwrap();
-    writeln!(file, "1 = \"work\"").unwrap();
-    drop(file);
-
-    let mut ctx = TestContext::new();
-
-    // Note: The actual config reload command reads from the standard config path,
-    // but we can verify the command doesn't crash the app
-    ctx.press(KeyCode::Char(':'));
-    ctx.type_str("config reload");
-    ctx.press(KeyCode::Enter);
-
-    // App should remain functional after config reload
-    ctx.press(KeyCode::Enter);
-    ctx.type_str("Test after config reload");
-    ctx.press(KeyCode::Enter);
-
-    assert!(
-        ctx.screen_contains("Test after config reload"),
-        "App should remain functional after :config reload"
-    );
 }

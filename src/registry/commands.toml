@@ -9,36 +9,21 @@ key = ":date DATE"
 help_section = "commands"
 short_text = "Go to date"
 short_description = "Go to date (MM/DD)"
-long_description = "Navigate to a specific date. Supports MM/DD, YYYY/MM/DD, or natural dates like 'tomorrow', 'next-mon', '3d'"
+long_description = "Go to a specific date. Accepts MM/DD, YYYY/MM/DD, or natural dates (tomorrow, next-mon, 3d). Aliases: d"
 
 [[commands]]
-name = "global"
-aliases = ["g"]
-key = ":global"
+name = "open"
+aliases = ["o"]
+args = "<config|journal> [project|global]"
+subargs = [
+  { options = ["config", "journal"] },
+  { options = ["global", "project"] },
+]
+key = ":open"
 help_section = "commands"
-short_text = "Global"
-short_description = "Switch to Global journal"
-long_description = "Switch to the global journal at ~/.config/caliber/global_journal.md"
-
-[[commands]]
-name = "project"
-aliases = ["p"]
-args = "[init|default|path]"
-key = ":project"
-help_section = "commands"
-short_text = "Project"
-short_description = "Project [init|default|path]"
-long_description = "Manage project journal. Use 'init' to create, 'default' to reset, or provide a path"
-
-[[commands]]
-name = "config"
-aliases = ["c"]
-args = "[reload]"
-key = ":config"
-help_section = "commands"
-short_text = "Config"
-short_description = "Config [reload]"
-long_description = "Configuration management. Use 'reload' to refresh settings from config file"
+short_text = "Open in editor"
+short_description = "Open config or journal in $EDITOR"
+long_description = "Open a file in $EDITOR. Use 'config' or 'journal', optionally with 'project' or 'global' scope. Aliases: o"
 
 [[commands]]
 name = "quit"
@@ -47,4 +32,4 @@ key = ":quit"
 help_section = "commands"
 short_text = "Quit"
 short_description = "Quit application"
-long_description = "Save and exit the application"
+long_description = "Save and exit the application. Aliases: q"

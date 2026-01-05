@@ -42,6 +42,11 @@ impl JournalContext {
     }
 
     #[must_use]
+    pub fn global_path(&self) -> &std::path::Path {
+        &self.global_path
+    }
+
+    #[must_use]
     pub fn project_path(&self) -> Option<&std::path::Path> {
         self.project_path.as_deref()
     }

@@ -28,10 +28,16 @@ struct CommandsFile {
 }
 
 #[derive(Debug, Deserialize)]
+struct SubArgDef {
+    options: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
 struct CommandDef {
     name: String,
     aliases: Vec<String>,
     args: Option<String>,
+    subargs: Option<Vec<SubArgDef>>,
     key: String,
     help_section: String,
     short_text: String,
@@ -273,12 +279,19 @@ fn generate_keys_code(keys: &[KeyDef]) -> String {
 fn generate_commands_code(commands: &[CommandDef]) -> String {
     let mut code = String::new();
 
+    // Generate SubArg struct
+    code.push_str("#[derive(Clone, Debug, PartialEq)]\n");
+    code.push_str("pub struct SubArg {\n");
+    code.push_str("    pub options: &'static [&'static str],\n");
+    code.push_str("}\n\n");
+
     // Generate Command struct
     code.push_str("#[derive(Clone, Debug, PartialEq)]\n");
     code.push_str("pub struct Command {\n");
     code.push_str("    pub name: &'static str,\n");
     code.push_str("    pub aliases: &'static [&'static str],\n");
     code.push_str("    pub args: Option<&'static str>,\n");
+    code.push_str("    pub subargs: &'static [SubArg],\n");
     code.push_str("    pub key: &'static str,\n");
     code.push_str("    pub short_text: &'static str,\n");
     code.push_str("    pub short_description: &'static str,\n");
@@ -293,11 +306,26 @@ fn generate_commands_code(commands: &[CommandDef]) -> String {
             Some(a) => format!("Some(\"{}\")", a),
             None => "None".to_string(),
         };
+        let subargs = match &cmd.subargs {
+            Some(subs) => {
+                let subargs_str: Vec<String> = subs
+                    .iter()
+                    .map(|s| {
+                        let opts: Vec<String> =
+                            s.options.iter().map(|o| format!("\"{}\"", o)).collect();
+                        format!("SubArg {{ options: &[{}] }}", opts.join(", "))
+                    })
+                    .collect();
+                format!("&[{}]", subargs_str.join(", "))
+            }
+            None => "&[]".to_string(),
+        };
         code.push_str(&format!(
-            "    Command {{\n        name: \"{}\",\n        aliases: &[{}],\n        args: {},\n        key: \"{}\",\n        short_text: \"{}\",\n        short_description: \"{}\",\n        long_description: \"{}\",\n    }},\n",
+            "    Command {{\n        name: \"{}\",\n        aliases: &[{}],\n        args: {},\n        subargs: {},\n        key: \"{}\",\n        short_text: \"{}\",\n        short_description: \"{}\",\n        long_description: \"{}\",\n    }},\n",
             cmd.name,
             aliases_str.join(", "),
             args,
+            subargs,
             cmd.key,
             cmd.short_text,
             cmd.short_description,
