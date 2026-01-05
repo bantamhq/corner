@@ -378,8 +378,13 @@ impl App {
         self.executor = executor;
 
         match result {
-            Ok(Some(msg)) => self.set_status(msg),
-            Ok(None) => {}
+            Ok(Some(msg)) => {
+                self.refresh_tag_cache();
+                self.set_status(msg);
+            }
+            Ok(None) => {
+                self.refresh_tag_cache();
+            }
             Err(e) => {
                 self.set_status(format!("Action failed: {e}"));
                 return Err(e);
@@ -402,7 +407,10 @@ impl App {
         self.executor = executor;
 
         match result {
-            Ok(Some(msg)) => self.set_status(msg),
+            Ok(Some(msg)) => {
+                self.refresh_tag_cache();
+                self.set_status(msg);
+            }
             Ok(None) => {}
             Err(e) => self.set_status(format!("Undo failed: {e}")),
         }
@@ -414,7 +422,10 @@ impl App {
         self.executor = executor;
 
         match result {
-            Ok(Some(msg)) => self.set_status(msg),
+            Ok(Some(msg)) => {
+                self.refresh_tag_cache();
+                self.set_status(msg);
+            }
             Ok(None) => {}
             Err(e) => self.set_status(format!("Redo failed: {e}")),
         }

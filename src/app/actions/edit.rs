@@ -145,6 +145,5 @@ fn set_entry_content_raw(app: &mut App, target: &EditTarget) -> io::Result<()> {
             }
         }
     }
-    app.refresh_tag_cache();
     Ok(())
 }

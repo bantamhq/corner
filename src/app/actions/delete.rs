@@ -189,8 +189,6 @@ impl Action for RestoreEntries {
             }
         }
 
-        app.refresh_tag_cache();
-
         Ok(Box::new(DeleteEntries {
             targets: delete_targets,
         }))

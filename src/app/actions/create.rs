@@ -90,8 +90,6 @@ impl Action for UncreateEntry {
                 }
             }
 
-        app.refresh_tag_cache();
-
         // Return action to redo the create
         Ok(Box::new(RecreateEntry::new(self.target.clone())))
     }
@@ -138,8 +136,6 @@ impl Action for RecreateEntry {
             // Refresh filter to pick up the recreated entry
             let _ = app.refresh_filter();
         }
-
-        app.refresh_tag_cache();
 
         // Return action to undo again
         Ok(Box::new(UncreateEntry::new(self.target.clone())))

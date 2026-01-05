@@ -319,21 +319,20 @@ where
                 }
             })?;
 
-            if changed == Some(true) {
-                if let ViewMode::Daily(state) = &mut app.view {
-                    state.later_entries =
-                        storage::collect_later_entries_for_date(app.current_date, &path)?;
-                }
-                app.refresh_tag_cache();
+            if changed == Some(true)
+                && let ViewMode::Daily(state) = &mut app.view
+            {
+                state.later_entries =
+                    storage::collect_later_entries_for_date(app.current_date, &path)?;
             }
         }
         EntryLocation::Daily { line_idx } => {
             if let Line::Entry(entry) = &mut app.lines[*line_idx]
-                && let Some(new_content) = remover(&entry.content) {
-                    entry.content = new_content;
-                    app.save();
-                    app.refresh_tag_cache();
-                }
+                && let Some(new_content) = remover(&entry.content)
+            {
+                entry.content = new_content;
+                app.save();
+            }
         }
         EntryLocation::Filter {
             index,
@@ -352,14 +351,14 @@ where
             if changed == Some(true) {
                 if let ViewMode::Filter(state) = &mut app.view
                     && let Some(filter_entry) = state.entries.get_mut(*index)
-                        && let Some(new_content) = remover(&filter_entry.content) {
-                            filter_entry.content = new_content;
-                        }
+                    && let Some(new_content) = remover(&filter_entry.content)
+                {
+                    filter_entry.content = new_content;
+                }
 
                 if *source_date == app.current_date {
                     app.reload_current_day()?;
                 }
-                app.refresh_tag_cache();
             }
         }
     }
@@ -384,13 +383,11 @@ fn execute_append_tag_raw(app: &mut App, location: &EntryLocation, tag: &str) ->
                 state.later_entries =
                     storage::collect_later_entries_for_date(app.current_date, &path)?;
             }
-            app.refresh_tag_cache();
         }
         EntryLocation::Daily { line_idx } => {
             if let Line::Entry(entry) = &mut app.lines[*line_idx] {
                 entry.content.push_str(&tag_with_hash);
                 app.save();
-                app.refresh_tag_cache();
             }
         }
         EntryLocation::Filter {
@@ -403,14 +400,14 @@ fn execute_append_tag_raw(app: &mut App, location: &EntryLocation, tag: &str) ->
             })?;
 
             if let ViewMode::Filter(state) = &mut app.view
-                && let Some(filter_entry) = state.entries.get_mut(*index) {
-                    filter_entry.content.push_str(&tag_with_hash);
-                }
+                && let Some(filter_entry) = state.entries.get_mut(*index)
+            {
+                filter_entry.content.push_str(&tag_with_hash);
+            }
 
             if *source_date == app.current_date {
                 app.reload_current_day()?;
             }
-            app.refresh_tag_cache();
         }
     }
     Ok(())
@@ -433,13 +430,11 @@ fn set_entry_content_raw(app: &mut App, location: &EntryLocation, content: &str)
                 state.later_entries =
                     storage::collect_later_entries_for_date(app.current_date, &path)?;
             }
-            app.refresh_tag_cache();
         }
         EntryLocation::Daily { line_idx } => {
             if let Line::Entry(entry) = &mut app.lines[*line_idx] {
                 entry.content = content.to_string();
                 app.save();
-                app.refresh_tag_cache();
             }
         }
         EntryLocation::Filter {
@@ -452,14 +447,14 @@ fn set_entry_content_raw(app: &mut App, location: &EntryLocation, content: &str)
             })?;
 
             if let ViewMode::Filter(state) = &mut app.view
-                && let Some(filter_entry) = state.entries.get_mut(*index) {
-                    filter_entry.content = content.to_string();
-                }
+                && let Some(filter_entry) = state.entries.get_mut(*index)
+            {
+                filter_entry.content = content.to_string();
+            }
 
             if *source_date == app.current_date {
                 app.reload_current_day()?;
             }
-            app.refresh_tag_cache();
         }
     }
     Ok(())
