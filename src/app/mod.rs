@@ -262,7 +262,7 @@ impl App {
         let cached_journal_tags = storage::collect_journal_tags(&path).unwrap_or_default();
         let hide_completed = config.hide_completed;
 
-        Ok(Self {
+        let mut app = Self {
             current_date: date,
             lines,
             view: ViewMode::Daily(DailyState::new(entry_indices.len(), later_entries)),
@@ -284,7 +284,13 @@ impl App {
             hide_completed,
             hint_state: HintContext::Inactive,
             cached_journal_tags,
-        })
+        };
+
+        if hide_completed {
+            app.clamp_selection_to_visible();
+        }
+
+        Ok(app)
     }
 
     /// Returns the active journal path

@@ -5,7 +5,7 @@ use chrono::Local;
 use crate::config::{Config, resolve_path};
 use crate::storage::JournalSlot;
 
-use super::{App, ConfirmContext, DailyState, InputMode, ViewMode};
+use super::{App, ConfirmContext, InputMode};
 
 impl App {
     pub fn open_journal(&mut self, path: &str) -> io::Result<()> {
@@ -14,8 +14,7 @@ impl App {
         let path = resolve_path(path);
         self.journal_context.set_project_path(path.clone());
         self.journal_context.set_active_slot(JournalSlot::Project);
-        let later_entries = self.load_day(Local::now().date_naive())?;
-        self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
+        self.reset_daily_view(Local::now().date_naive())?;
         self.refresh_tag_cache();
         self.set_status(format!("Opened: {}", path.display()));
         Ok(())
@@ -28,15 +27,13 @@ impl App {
         self.save();
         self.journal_context.set_active_slot(slot);
 
-        // Reload config appropriate for the journal context
         self.config = match slot {
             JournalSlot::Global => Config::load_global()?,
             JournalSlot::Project => Config::load_merged()?,
         };
         self.hide_completed = self.config.hide_completed;
 
-        let later_entries = self.load_day(Local::now().date_naive())?;
-        self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
+        self.reset_daily_view(Local::now().date_naive())?;
         self.refresh_tag_cache();
         self.set_status(match slot {
             JournalSlot::Global => "Switched to Global journal",

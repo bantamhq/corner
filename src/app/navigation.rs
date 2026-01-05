@@ -294,19 +294,24 @@ impl App {
         storage::collect_later_entries_for_date(date, &path)
     }
 
+    /// Load a day and reset to daily view with proper selection clamping
+    pub(super) fn reset_daily_view(&mut self, date: NaiveDate) -> io::Result<()> {
+        let later_entries = self.load_day(date)?;
+        self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
+        if self.hide_completed {
+            self.clamp_selection_to_visible();
+        }
+        Ok(())
+    }
+
     pub fn goto_day(&mut self, date: NaiveDate) -> io::Result<()> {
         if date == self.current_date {
             return Ok(());
         }
 
         self.save();
-        let later_entries = self.load_day(date)?;
+        self.reset_daily_view(date)?;
         self.edit_buffer = None;
-        self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
-
-        if self.hide_completed {
-            self.clamp_selection_to_visible();
-        }
         self.input_mode = InputMode::Normal;
 
         Ok(())
