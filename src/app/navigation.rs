@@ -294,14 +294,33 @@ impl App {
         storage::collect_later_entries_for_date(date, &path)
     }
 
-    /// Load a day and reset to daily view with proper selection clamping
+    /// Shared cleanup for all view switches - resets input mode and clears undo/redo.
+    pub(super) fn finalize_view_switch(&mut self) {
+        self.input_mode = InputMode::Normal;
+        self.executor.clear();
+    }
+
+    /// Load a day and reset to daily view with proper selection clamping.
     pub(super) fn reset_daily_view(&mut self, date: NaiveDate) -> io::Result<()> {
         let later_entries = self.load_day(date)?;
         self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
         if self.hide_completed {
             self.clamp_selection_to_visible();
         }
+        self.finalize_view_switch();
         Ok(())
+    }
+
+    /// Restore daily view without reloading from disk (for returning from filter).
+    pub(super) fn restore_daily_view(&mut self) {
+        let later_entries =
+            storage::collect_later_entries_for_date(self.current_date, self.active_path())
+                .unwrap_or_default();
+        self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
+        if self.hide_completed {
+            self.clamp_selection_to_visible();
+        }
+        self.finalize_view_switch();
     }
 
     pub fn goto_day(&mut self, date: NaiveDate) -> io::Result<()> {
@@ -312,7 +331,6 @@ impl App {
         self.save();
         self.reset_daily_view(date)?;
         self.edit_buffer = None;
-        self.input_mode = InputMode::Normal;
         self.last_daily_date = date;
 
         Ok(())

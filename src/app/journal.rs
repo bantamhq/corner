@@ -8,14 +8,20 @@ use crate::storage::JournalSlot;
 use super::{App, ConfirmContext, InputMode};
 
 impl App {
+    /// Reset to daily view and refresh tag cache (for journal switches).
+    fn reset_journal_view(&mut self) -> io::Result<()> {
+        self.reset_daily_view(Local::now().date_naive())?;
+        self.refresh_tag_cache();
+        Ok(())
+    }
+
     pub fn open_journal(&mut self, path: &str) -> io::Result<()> {
         self.save();
 
         let path = resolve_path(path);
         self.journal_context.set_project_path(path.clone());
         self.journal_context.set_active_slot(JournalSlot::Project);
-        self.reset_daily_view(Local::now().date_naive())?;
-        self.refresh_tag_cache();
+        self.reset_journal_view()?;
         self.set_status(format!("Opened: {}", path.display()));
         Ok(())
     }
@@ -33,8 +39,7 @@ impl App {
         };
         self.hide_completed = self.config.hide_completed;
 
-        self.reset_daily_view(Local::now().date_naive())?;
-        self.refresh_tag_cache();
+        self.reset_journal_view()?;
         self.set_status(match slot {
             JournalSlot::Global => "Switched to Global journal",
             JournalSlot::Project => "Switched to Project journal",

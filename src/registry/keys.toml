@@ -82,8 +82,17 @@ key = "u"
 modes = ["shared_normal"]
 help_sections = ["daily", "filter"]
 short_text = "Undo"
-short_description = "Undo delete"
-long_description = "Undo the last delete operation"
+short_description = "Undo last action"
+long_description = "Undo the last action"
+
+[[keys]]
+id = "redo"
+key = "U"
+modes = ["shared_normal"]
+help_sections = ["daily", "filter"]
+short_text = "Redo"
+short_description = "Redo undone action"
+long_description = "Redo the last undone action"
 
 # --- Tag Operations ---
 

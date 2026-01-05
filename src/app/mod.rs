@@ -1,3 +1,4 @@
+pub mod actions;
 mod command;
 mod datepicker;
 mod edit_mode;
@@ -246,7 +247,6 @@ pub struct App {
     pub show_help: bool,
     pub help_scroll: usize,
     pub help_visible_height: usize,
-    pub last_deleted: Option<(NaiveDate, usize, Entry)>,
     pub last_filter_query: Option<String>,
     pub config: Config,
     pub journal_context: JournalContext,
@@ -254,6 +254,9 @@ pub struct App {
     pub hide_completed: bool,
     pub hint_state: HintContext,
     pub cached_journal_tags: Vec<String>,
+    pub executor: actions::ActionExecutor,
+    /// Original content when entering edit mode (for undo support)
+    original_edit_content: Option<String>,
 }
 
 impl App {
@@ -302,7 +305,6 @@ impl App {
             show_help: false,
             help_scroll: 0,
             help_visible_height: 0,
-            last_deleted: None,
             last_filter_query: None,
             config,
             journal_context,
@@ -310,6 +312,8 @@ impl App {
             hide_completed,
             hint_state: HintContext::Inactive,
             cached_journal_tags,
+            executor: actions::ActionExecutor::new(),
+            original_edit_content: None,
         };
 
         if hide_completed {
@@ -368,6 +372,22 @@ impl App {
         self.status_message = Some(msg.into());
     }
 
+    pub fn execute_action(&mut self, action: Box<dyn actions::Action>) -> io::Result<()> {
+        let mut executor = std::mem::take(&mut self.executor);
+        let result = executor.execute(action, self);
+        self.executor = executor;
+
+        match result {
+            Ok(Some(msg)) => self.set_status(msg),
+            Ok(None) => {}
+            Err(e) => {
+                self.set_status(format!("Action failed: {e}"));
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
+
     /// Saves current day's lines to storage, displaying any error as a status message.
     pub fn save(&mut self) {
         if let Err(e) = storage::save_day_lines(self.current_date, self.active_path(), &self.lines)
@@ -377,69 +397,28 @@ impl App {
     }
 
     pub fn undo(&mut self) {
-        let Some((date, line_idx, entry)) = self.last_deleted.take() else {
-            return;
-        };
+        let mut executor = std::mem::take(&mut self.executor);
+        let result = executor.undo(self);
+        self.executor = executor;
 
-        match &self.view {
-            ViewMode::Daily(_) => {
-                if date != self.current_date {
-                    self.set_status(format!(
-                        "Undo: entry was from {}, go to that day first",
-                        date.format("%m/%d")
-                    ));
-                    self.last_deleted = Some((date, line_idx, entry));
-                    return;
-                }
-                let insert_idx = line_idx.min(self.lines.len());
-                let is_completed = matches!(entry.entry_type, EntryType::Task { completed: true });
-                self.lines.insert(insert_idx, Line::Entry(entry));
-                self.entry_indices = Self::compute_entry_indices(&self.lines);
-
-                if self.hide_completed && is_completed {
-                    self.hide_completed = false;
-                }
-
-                let visible_idx = self
-                    .entry_indices
-                    .iter()
-                    .position(|&i| i == insert_idx)
-                    .map(|actual_idx| self.actual_to_visible_index(actual_idx));
-
-                if let ViewMode::Daily(state) = &mut self.view
-                    && let Some(idx) = visible_idx
-                {
-                    state.selected = idx;
-                }
-                self.save();
-            }
-            ViewMode::Filter(_) => {
-                let path = self.active_path();
-                if let Ok(mut lines) = storage::load_day_lines(date, path) {
-                    let insert_idx = line_idx.min(lines.len());
-                    lines.insert(insert_idx, Line::Entry(entry.clone()));
-                    let _ = storage::save_day_lines(date, path, &lines);
-
-                    let filter_entry = FilterEntry {
-                        source_date: date,
-                        line_index: insert_idx,
-                        entry_type: entry.entry_type.clone(),
-                        content: entry.content,
-                        completed: matches!(entry.entry_type, EntryType::Task { completed: true }),
-                    };
-
-                    if let ViewMode::Filter(state) = &mut self.view {
-                        state.entries.push(filter_entry);
-                        state.selected = state.entries.len() - 1;
-                    }
-
-                    if date == self.current_date {
-                        let _ = self.reload_current_day();
-                    }
-                }
-            }
+        match result {
+            Ok(Some(msg)) => self.set_status(msg),
+            Ok(None) => {}
+            Err(e) => self.set_status(format!("Undo failed: {e}")),
         }
-        self.refresh_tag_cache();
+    }
+
+    pub fn redo(&mut self) -> io::Result<()> {
+        let mut executor = std::mem::take(&mut self.executor);
+        let result = executor.redo(self);
+        self.executor = executor;
+
+        match result {
+            Ok(Some(msg)) => self.set_status(msg),
+            Ok(None) => {}
+            Err(e) => self.set_status(format!("Redo failed: {e}")),
+        }
+        Ok(())
     }
 
     pub fn sort_entries(&mut self) {

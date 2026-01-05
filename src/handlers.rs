@@ -137,6 +137,10 @@ pub fn handle_normal_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
             app.undo();
             return Ok(());
         }
+        KeyCode::Char('U') => {
+            app.redo()?;
+            return Ok(());
+        }
         KeyCode::Char('`') => {
             app.toggle_journal()?;
             return Ok(());

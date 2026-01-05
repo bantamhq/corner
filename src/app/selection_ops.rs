@@ -1,7 +1,6 @@
 use std::io;
 
 use crate::storage::{Entry, EntryType, FilterEntry, LaterEntry};
-use crate::ui::{remove_all_trailing_tags, remove_last_trailing_tag};
 
 use super::{
     App, DeleteTarget, InputMode, Line, SelectionState, TagRemovalTarget, ToggleTarget, ViewMode,
@@ -215,52 +214,66 @@ impl App {
         })
     }
 
-    /// Collect tag removal targets for all selected entries
-    fn collect_tag_removal_targets_from_selected(&self) -> Vec<TagRemovalTarget> {
+    /// Collect cycle targets (with entry types) for all selected entries
+    fn collect_cycle_targets_from_selected(&self) -> Vec<super::actions::CycleTarget> {
         self.collect_targets_from_selected(|entry| match entry {
-            SelectedEntry::Later(later) => Some(TagRemovalTarget::Later {
-                source_date: later.source_date,
-                line_index: later.line_index,
+            SelectedEntry::Later(later) => Some(super::actions::CycleTarget {
+                location: TagRemovalTarget::Later {
+                    source_date: later.source_date,
+                    line_index: later.line_index,
+                },
+                original_type: later.entry_type.clone(),
             }),
-            SelectedEntry::Daily { line_idx, .. } => Some(TagRemovalTarget::Daily { line_idx }),
-            SelectedEntry::Filter { index, entry } => Some(TagRemovalTarget::Filter {
-                index,
-                source_date: entry.source_date,
-                line_index: entry.line_index,
+            SelectedEntry::Daily { line_idx, entry } => Some(super::actions::CycleTarget {
+                location: TagRemovalTarget::Daily { line_idx },
+                original_type: entry.entry_type.clone(),
+            }),
+            SelectedEntry::Filter { index, entry } => Some(super::actions::CycleTarget {
+                location: TagRemovalTarget::Filter {
+                    index,
+                    source_date: entry.source_date,
+                    line_index: entry.line_index,
+                },
+                original_type: entry.entry_type.clone(),
+            }),
+        })
+    }
+
+    /// Collect tag targets (with content) for all selected entries
+    fn collect_tag_targets_from_selected(&self) -> Vec<super::actions::TagTarget> {
+        self.collect_targets_from_selected(|entry| match entry {
+            SelectedEntry::Later(later) => Some(super::actions::TagTarget {
+                location: TagRemovalTarget::Later {
+                    source_date: later.source_date,
+                    line_index: later.line_index,
+                },
+                original_content: later.content.clone(),
+            }),
+            SelectedEntry::Daily { line_idx, entry } => Some(super::actions::TagTarget {
+                location: TagRemovalTarget::Daily { line_idx },
+                original_content: entry.content.clone(),
+            }),
+            SelectedEntry::Filter { index, entry } => Some(super::actions::TagTarget {
+                location: TagRemovalTarget::Filter {
+                    index,
+                    source_date: entry.source_date,
+                    line_index: entry.line_index,
+                },
+                original_content: entry.content.clone(),
             }),
         })
     }
 
     /// Delete all selected entries
     pub fn delete_selected(&mut self) -> io::Result<()> {
-        let mut targets = self.collect_delete_targets_from_selected();
+        let targets = self.collect_delete_targets_from_selected();
         if targets.is_empty() {
             self.exit_selection_mode();
             return Ok(());
         }
 
-        let count = targets.len();
-
-        // Sort by line index descending to maintain valid indices during deletion
-        targets.sort_by(|a, b| {
-            let idx_a = match a {
-                DeleteTarget::Daily { line_idx, .. } => *line_idx,
-                DeleteTarget::Later { line_index, .. } => *line_index,
-                DeleteTarget::Filter { line_index, .. } => *line_index,
-            };
-            let idx_b = match b {
-                DeleteTarget::Daily { line_idx, .. } => *line_idx,
-                DeleteTarget::Later { line_index, .. } => *line_index,
-                DeleteTarget::Filter { line_index, .. } => *line_index,
-            };
-            idx_b.cmp(&idx_a)
-        });
-
-        for target in targets {
-            self.execute_delete(target)?;
-        }
-
-        self.set_status(format!("Deleted {} entries", count));
+        let action = super::actions::DeleteEntries::new(targets);
+        self.execute_action(Box::new(action))?;
         self.exit_selection_mode();
         Ok(())
     }
@@ -295,70 +308,46 @@ impl App {
 
     /// Remove last trailing tag from all selected entries
     pub fn remove_last_tag_from_selected(&mut self) -> io::Result<()> {
-        let targets = self.collect_tag_removal_targets_from_selected();
+        let targets = self.collect_tag_targets_from_selected();
         if targets.is_empty() {
             return Ok(());
         }
 
-        let count = targets.len();
-
-        for target in targets {
-            self.execute_tag_removal(target, remove_last_trailing_tag)?;
-        }
-
-        self.set_status(format!("Removed tags from {} entries", count));
-        Ok(())
+        let action = super::actions::RemoveLastTag::new(targets);
+        self.execute_action(Box::new(action))
     }
 
     /// Remove all trailing tags from all selected entries
     pub fn remove_all_tags_from_selected(&mut self) -> io::Result<()> {
-        let targets = self.collect_tag_removal_targets_from_selected();
+        let targets = self.collect_tag_targets_from_selected();
         if targets.is_empty() {
             return Ok(());
         }
 
-        let count = targets.len();
-
-        for target in targets {
-            self.execute_tag_removal(target, remove_all_trailing_tags)?;
-        }
-
-        self.set_status(format!("Removed all tags from {} entries", count));
-        Ok(())
+        let action = super::actions::RemoveAllTags::new(targets);
+        self.execute_action(Box::new(action))
     }
 
     /// Append a tag to all selected entries
     pub fn append_tag_to_selected(&mut self, tag: &str) -> io::Result<()> {
-        let targets = self.collect_tag_removal_targets_from_selected();
+        let targets = self.collect_tag_targets_from_selected();
         if targets.is_empty() {
             return Ok(());
         }
 
-        let count = targets.len();
-
-        for target in targets {
-            self.execute_append_tag(target, tag)?;
-        }
-
-        self.set_status(format!("Added #{tag} to {} entries", count));
-        Ok(())
+        let action = super::actions::AppendTag::new(targets, tag.to_string());
+        self.execute_action(Box::new(action))
     }
 
     /// Cycle entry type on all selected entries
     pub fn cycle_selected_entry_types(&mut self) -> io::Result<()> {
-        let targets = self.collect_tag_removal_targets_from_selected();
+        let targets = self.collect_cycle_targets_from_selected();
         if targets.is_empty() {
             return Ok(());
         }
 
-        let count = targets.len();
-
-        for target in targets {
-            self.execute_cycle_type(target)?;
-        }
-
-        self.set_status(format!("Cycled type on {} entries", count));
-        Ok(())
+        let action = super::actions::CycleEntryType::new(targets);
+        self.execute_action(Box::new(action))
     }
 
     /// Check if in selection mode and get selection state

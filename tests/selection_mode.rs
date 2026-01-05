@@ -280,7 +280,87 @@ fn test_selection_in_filter_view() {
     );
 }
 
-/// SM-11: Navigation in selection mode
+/// SM-11: Undo after batch delete restores all entries
+#[test]
+fn test_batch_delete_undo() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+    let content = "# 2026/01/15\n- [ ] Keep\n- [ ] Delete A\n- [ ] Delete B\n- [ ] Delete C\n";
+    let mut ctx = TestContext::with_journal_content(date, content);
+
+    // Go to second entry ("Delete A")
+    ctx.press(KeyCode::Char('g'));
+    ctx.press(KeyCode::Char('j'));
+
+    // Enter selection mode
+    ctx.press(KeyCode::Char('v'));
+
+    // Move to last entry and extend selection
+    ctx.press(KeyCode::Char('G'));
+    ctx.press_with_modifiers(KeyCode::Char('V'), KeyModifiers::SHIFT);
+
+    // Verify 3 entries selected
+    let state = ctx.app.get_selection_state().unwrap();
+    assert_eq!(state.count(), 3, "Should have 3 entries selected");
+
+    // Delete selected entries
+    ctx.press(KeyCode::Char('d'));
+
+    // Verify deletion
+    let journal = ctx.read_journal();
+    assert!(journal.contains("Keep"), "Keep should remain");
+    assert!(!journal.contains("Delete A"), "Delete A should be removed");
+    assert!(!journal.contains("Delete B"), "Delete B should be removed");
+    assert!(!journal.contains("Delete C"), "Delete C should be removed");
+
+    // Undo the batch delete
+    ctx.press(KeyCode::Char('u'));
+
+    // Verify all entries restored
+    let journal = ctx.read_journal();
+    assert!(journal.contains("Keep"), "Keep should still be there");
+    assert!(journal.contains("Delete A"), "Delete A should be restored");
+    assert!(journal.contains("Delete B"), "Delete B should be restored");
+    assert!(journal.contains("Delete C"), "Delete C should be restored");
+}
+
+/// SM-12: Redo after undo restores the deletion
+#[test]
+fn test_batch_delete_undo_redo() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+    let content = "# 2026/01/15\n- [ ] Keep\n- [ ] Delete Me\n";
+    let mut ctx = TestContext::with_journal_content(date, content);
+
+    // Delete "Delete Me"
+    ctx.press(KeyCode::Char('G')); // Go to last
+    ctx.press(KeyCode::Char('d')); // Delete
+
+    // Verify deletion
+    let journal = ctx.read_journal();
+    assert!(!journal.contains("Delete Me"), "Should be deleted");
+
+    // Undo
+    ctx.press(KeyCode::Char('u'));
+    let journal = ctx.read_journal();
+    assert!(journal.contains("Delete Me"), "Should be restored after undo");
+
+    // Redo (Shift+U)
+    ctx.press(KeyCode::Char('U'));
+    let journal = ctx.read_journal();
+    assert!(
+        !journal.contains("Delete Me"),
+        "Should be deleted again after redo"
+    );
+
+    // Undo again to verify cycle works
+    ctx.press(KeyCode::Char('u'));
+    let journal = ctx.read_journal();
+    assert!(
+        journal.contains("Delete Me"),
+        "Should be restored after second undo"
+    );
+}
+
+/// SM-13: Navigation in selection mode
 #[test]
 fn test_selection_navigation() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();

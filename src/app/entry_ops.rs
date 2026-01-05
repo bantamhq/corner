@@ -2,7 +2,6 @@ use std::io;
 
 use crate::cursor::CursorBuffer;
 use crate::storage::{self, Entry, EntryType};
-use crate::ui::{remove_all_trailing_tags, remove_last_trailing_tag};
 
 use super::{App, EditContext, InputMode, Line, SelectedItem, ViewMode};
 
@@ -29,6 +28,7 @@ pub enum DeleteTarget {
 
 /// Location of an entry for operations that just need to find it (toggle, tag removal).
 /// Shared between ToggleTarget and TagRemovalTarget since they have identical structure.
+#[derive(Clone)]
 pub enum EntryLocation {
     Later {
         source_date: chrono::NaiveDate,
@@ -92,88 +92,13 @@ impl App {
         }
     }
 
-    /// Execute delete on a target
-    pub fn execute_delete(&mut self, target: DeleteTarget) -> io::Result<()> {
-        let path = self.active_path().to_path_buf();
-        match target {
-            DeleteTarget::Later {
-                source_date,
-                line_index,
-                entry_type,
-                content,
-                ..
-            } => {
-                storage::delete_entry(source_date, &path, line_index)?;
-                self.last_deleted = Some((
-                    source_date,
-                    line_index,
-                    Entry {
-                        entry_type,
-                        content,
-                    },
-                ));
-
-                if let ViewMode::Daily(state) = &mut self.view {
-                    state.later_entries =
-                        storage::collect_later_entries_for_date(self.current_date, &path)?;
-                }
-                self.clamp_daily_selection();
-            }
-            DeleteTarget::Daily { line_idx, entry } => {
-                self.last_deleted = Some((self.current_date, line_idx, entry));
-                self.lines.remove(line_idx);
-                self.entry_indices = Self::compute_entry_indices(&self.lines);
-                self.clamp_daily_selection();
-                self.save();
-            }
-            DeleteTarget::Filter {
-                index,
-                source_date,
-                line_index,
-                entry_type,
-                content,
-            } => {
-                self.last_deleted = Some((
-                    source_date,
-                    line_index,
-                    Entry {
-                        entry_type,
-                        content,
-                    },
-                ));
-                storage::delete_entry(source_date, &path, line_index)?;
-
-                if let ViewMode::Filter(state) = &mut self.view {
-                    state.entries.remove(index);
-
-                    for filter_entry in &mut state.entries {
-                        if filter_entry.source_date == source_date
-                            && filter_entry.line_index > line_index
-                        {
-                            filter_entry.line_index -= 1;
-                        }
-                    }
-
-                    if !state.entries.is_empty() && state.selected >= state.entries.len() {
-                        state.selected = state.entries.len() - 1;
-                    }
-                }
-
-                if source_date == self.current_date {
-                    self.reload_current_day()?;
-                }
-            }
-        }
-        self.refresh_tag_cache();
-        Ok(())
-    }
-
     /// Delete the currently selected entry (view-aware)
     pub fn delete_current_entry(&mut self) -> io::Result<()> {
         let Some(target) = self.extract_delete_target_from_current() else {
             return Ok(());
         };
-        self.execute_delete(target)
+        let action = super::actions::DeleteEntries::single(target);
+        self.execute_action(Box::new(action))
     }
 
     /// Extract toggle target from current selection (only for tasks)
@@ -290,6 +215,7 @@ impl App {
             SelectedItem::None => return,
         };
 
+        self.original_edit_content = Some(content.clone());
         self.edit_buffer = Some(CursorBuffer::new(content));
         self.input_mode = InputMode::Edit(ctx);
     }
@@ -353,207 +279,102 @@ impl App {
         }
     }
 
-    /// Execute tag removal on a target
-    pub fn execute_tag_removal<F>(&mut self, target: TagRemovalTarget, remover: F) -> io::Result<()>
-    where
-        F: Fn(&str) -> Option<String>,
-    {
-        let path = self.active_path().to_path_buf();
-        match target {
-            TagRemovalTarget::Later {
-                source_date,
-                line_index,
-            } => {
-                let changed = storage::mutate_entry(source_date, &path, line_index, |entry| {
-                    if let Some(new_content) = remover(&entry.content) {
-                        entry.content = new_content;
-                        true
-                    } else {
-                        false
-                    }
-                })?;
-
-                if changed == Some(true) {
-                    if let ViewMode::Daily(state) = &mut self.view {
-                        state.later_entries =
-                            storage::collect_later_entries_for_date(self.current_date, &path)?;
-                    }
-                    self.refresh_tag_cache();
-                }
-            }
-            TagRemovalTarget::Daily { line_idx } => {
-                if let Line::Entry(entry) = &mut self.lines[line_idx]
-                    && let Some(new_content) = remover(&entry.content)
-                {
-                    entry.content = new_content;
-                    self.save();
-                    self.refresh_tag_cache();
-                }
-            }
-            TagRemovalTarget::Filter {
-                index,
-                source_date,
-                line_index,
-            } => {
-                let changed = storage::mutate_entry(source_date, &path, line_index, |entry| {
-                    if let Some(new_content) = remover(&entry.content) {
-                        entry.content = new_content;
-                        true
-                    } else {
-                        false
-                    }
-                })?;
-
-                if changed == Some(true) {
-                    if let ViewMode::Filter(state) = &mut self.view
-                        && let Some(filter_entry) = state.entries.get_mut(index)
-                        && let Some(new_content) = remover(&filter_entry.content)
-                    {
-                        filter_entry.content = new_content;
-                    }
-
-                    if source_date == self.current_date {
-                        self.reload_current_day()?;
-                    }
-                    self.refresh_tag_cache();
-                }
-            }
+    /// Extract cycle target (location + entry type) from current selection
+    pub fn extract_cycle_target_from_current(&self) -> Option<super::actions::CycleTarget> {
+        match self.get_selected_item() {
+            SelectedItem::Later { entry, .. } => Some(super::actions::CycleTarget {
+                location: EntryLocation::Later {
+                    source_date: entry.source_date,
+                    line_index: entry.line_index,
+                },
+                original_type: entry.entry_type.clone(),
+            }),
+            SelectedItem::Daily {
+                line_idx, entry, ..
+            } => Some(super::actions::CycleTarget {
+                location: EntryLocation::Daily { line_idx },
+                original_type: entry.entry_type.clone(),
+            }),
+            SelectedItem::Filter { index, entry } => Some(super::actions::CycleTarget {
+                location: EntryLocation::Filter {
+                    index,
+                    source_date: entry.source_date,
+                    line_index: entry.line_index,
+                },
+                original_type: entry.entry_type.clone(),
+            }),
+            SelectedItem::None => None,
         }
-        Ok(())
+    }
+
+    /// Extract tag target (location + content) from current selection
+    pub fn extract_tag_target_from_current(&self) -> Option<super::actions::TagTarget> {
+        match self.get_selected_item() {
+            SelectedItem::Later { entry, .. } => Some(super::actions::TagTarget {
+                location: EntryLocation::Later {
+                    source_date: entry.source_date,
+                    line_index: entry.line_index,
+                },
+                original_content: entry.content.clone(),
+            }),
+            SelectedItem::Daily {
+                line_idx, entry, ..
+            } => Some(super::actions::TagTarget {
+                location: EntryLocation::Daily { line_idx },
+                original_content: entry.content.clone(),
+            }),
+            SelectedItem::Filter { index, entry } => Some(super::actions::TagTarget {
+                location: EntryLocation::Filter {
+                    index,
+                    source_date: entry.source_date,
+                    line_index: entry.line_index,
+                },
+                original_content: entry.content.clone(),
+            }),
+            SelectedItem::None => None,
+        }
     }
 
     /// Remove the last trailing tag from the selected entry
     pub fn remove_last_tag_from_current_entry(&mut self) -> io::Result<()> {
-        let Some(target) = self.extract_tag_removal_target_from_current() else {
+        let Some(target) = self.extract_tag_target_from_current() else {
             return Ok(());
         };
-        self.execute_tag_removal(target, remove_last_trailing_tag)
+        let action =
+            super::actions::RemoveLastTag::single(target.location, target.original_content);
+        self.execute_action(Box::new(action))
     }
 
     /// Remove all trailing tags from the selected entry
     pub fn remove_all_tags_from_current_entry(&mut self) -> io::Result<()> {
-        let Some(target) = self.extract_tag_removal_target_from_current() else {
+        let Some(target) = self.extract_tag_target_from_current() else {
             return Ok(());
         };
-        self.execute_tag_removal(target, remove_all_trailing_tags)
-    }
-
-    /// Execute tag append on a target
-    pub fn execute_append_tag(&mut self, target: EntryLocation, tag: &str) -> io::Result<()> {
-        let path = self.active_path().to_path_buf();
-        let tag_with_hash = format!(" #{tag}");
-
-        match target {
-            EntryLocation::Later {
-                source_date,
-                line_index,
-            } => {
-                storage::mutate_entry(source_date, &path, line_index, |entry| {
-                    entry.content.push_str(&tag_with_hash);
-                })?;
-
-                if let ViewMode::Daily(state) = &mut self.view {
-                    state.later_entries =
-                        storage::collect_later_entries_for_date(self.current_date, &path)?;
-                }
-                self.refresh_tag_cache();
-            }
-            EntryLocation::Daily { line_idx } => {
-                if let Line::Entry(entry) = &mut self.lines[line_idx] {
-                    entry.content.push_str(&tag_with_hash);
-                    self.save();
-                    self.refresh_tag_cache();
-                }
-            }
-            EntryLocation::Filter {
-                index,
-                source_date,
-                line_index,
-            } => {
-                storage::mutate_entry(source_date, &path, line_index, |entry| {
-                    entry.content.push_str(&tag_with_hash);
-                })?;
-
-                if let ViewMode::Filter(state) = &mut self.view
-                    && let Some(filter_entry) = state.entries.get_mut(index)
-                {
-                    filter_entry.content.push_str(&tag_with_hash);
-                }
-
-                if source_date == self.current_date {
-                    self.reload_current_day()?;
-                }
-                self.refresh_tag_cache();
-            }
-        }
-        Ok(())
+        let action =
+            super::actions::RemoveAllTags::single(target.location, target.original_content);
+        self.execute_action(Box::new(action))
     }
 
     /// Append a favorite tag to the current entry
     pub fn append_tag_to_current_entry(&mut self, tag: &str) -> io::Result<()> {
-        let Some(target) = self.extract_tag_removal_target_from_current() else {
+        let Some(target) = self.extract_tag_target_from_current() else {
             return Ok(());
         };
-        self.execute_append_tag(target, tag)
-    }
-
-    /// Execute cycle entry type on a target
-    pub fn execute_cycle_type(&mut self, target: EntryLocation) -> io::Result<()> {
-        let path = self.active_path().to_path_buf();
-
-        match target {
-            EntryLocation::Later {
-                source_date,
-                line_index,
-            } => {
-                if let Ok(Some(new_type)) =
-                    storage::cycle_entry_type(source_date, &path, line_index)
-                    && let ViewMode::Daily(state) = &mut self.view
-                    && let Some(later_entry) = state
-                        .later_entries
-                        .iter_mut()
-                        .find(|e| e.source_date == source_date && e.line_index == line_index)
-                {
-                    later_entry.entry_type = new_type;
-                    later_entry.completed =
-                        matches!(later_entry.entry_type, EntryType::Task { completed: true });
-                }
-            }
-            EntryLocation::Daily { line_idx } => {
-                if let Line::Entry(entry) = &mut self.lines[line_idx] {
-                    entry.entry_type = entry.entry_type.cycle();
-                    self.save();
-                }
-            }
-            EntryLocation::Filter {
-                index,
-                source_date,
-                line_index,
-            } => {
-                if let Ok(Some(new_type)) =
-                    storage::cycle_entry_type(source_date, &path, line_index)
-                    && let ViewMode::Filter(state) = &mut self.view
-                    && let Some(filter_entry) = state.entries.get_mut(index)
-                {
-                    filter_entry.entry_type = new_type;
-                    filter_entry.completed =
-                        matches!(filter_entry.entry_type, EntryType::Task { completed: true });
-                }
-
-                if source_date == self.current_date {
-                    self.reload_current_day()?;
-                }
-            }
-        }
-        Ok(())
+        let action = super::actions::AppendTag::single(
+            target.location,
+            target.original_content,
+            tag.to_string(),
+        );
+        self.execute_action(Box::new(action))
     }
 
     /// Cycle entry type on the current entry
     pub fn cycle_current_entry_type(&mut self) -> io::Result<()> {
-        let Some(target) = self.extract_tag_removal_target_from_current() else {
+        let Some(target) = self.extract_cycle_target_from_current() else {
             return Ok(());
         };
-        self.execute_cycle_type(target)
+        let action = super::actions::CycleEntryType::single(target.location, target.original_type);
+        self.execute_action(Box::new(action))
     }
 
     fn copy_to_clipboard(text: &str) -> Result<(), arboard::Error> {
@@ -567,11 +388,6 @@ impl App {
             return;
         }
         let line_idx = self.entry_indices[entry_index];
-        if let Line::Entry(entry) = &self.lines[line_idx]
-            && !entry.content.trim().is_empty()
-        {
-            self.last_deleted = Some((self.current_date, line_idx, entry.clone()));
-        }
         self.lines.remove(line_idx);
         self.entry_indices = Self::compute_entry_indices(&self.lines);
         self.clamp_daily_selection();

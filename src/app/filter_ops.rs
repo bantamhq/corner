@@ -5,7 +5,7 @@ use chrono::Local;
 use crate::cursor::CursorBuffer;
 use crate::storage::{self, EntryType};
 
-use super::{App, DailyState, EditContext, FILTER_HEADER_LINES, FilterState, InputMode, ViewMode};
+use super::{App, EditContext, FILTER_HEADER_LINES, FilterState, InputMode, ViewMode};
 
 impl App {
     pub fn enter_filter_input(&mut self) {
@@ -21,8 +21,8 @@ impl App {
         self.input_mode = InputMode::QueryInput;
     }
 
-    /// Shared helper for applying a filter query and switching to filter view.
-    fn apply_filter(&mut self, query: String) -> io::Result<()> {
+    /// Switch to filter view with the given query.
+    fn reset_filter_view(&mut self, query: String) -> io::Result<()> {
         let (query, unknown_filters) = storage::expand_saved_filters(&query, &self.config.filters);
         let mut filter = storage::parse_filter_query(&query);
         filter.invalid_tokens.extend(unknown_filters);
@@ -44,7 +44,7 @@ impl App {
             selected,
             scroll_offset: 0,
         });
-        self.input_mode = InputMode::Normal;
+        self.finalize_view_switch();
         Ok(())
     }
 
@@ -67,12 +67,12 @@ impl App {
     pub fn execute_filter(&mut self) -> io::Result<()> {
         self.save();
         let query = self.extract_query_buffer();
-        self.apply_filter(query)
+        self.reset_filter_view(query)
     }
 
     pub fn quick_filter(&mut self, query: &str) -> io::Result<()> {
         self.save();
-        self.apply_filter(query.to_string())
+        self.reset_filter_view(query.to_string())
     }
 
     pub fn cancel_filter_input(&mut self) {
@@ -91,11 +91,7 @@ impl App {
         if let ViewMode::Filter(state) = &self.view {
             self.last_filter_query = Some(state.query.clone());
         }
-        let later_entries =
-            storage::collect_later_entries_for_date(self.current_date, self.active_path())
-                .unwrap_or_default();
-        self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), later_entries));
-        self.input_mode = InputMode::Normal;
+        self.restore_daily_view();
     }
 
     pub fn return_to_filter(&mut self) -> io::Result<()> {
@@ -129,6 +125,7 @@ impl App {
 
     pub fn filter_quick_add(&mut self) {
         let today = Local::now().date_naive();
+        self.original_edit_content = Some(String::new());
         self.edit_buffer = Some(CursorBuffer::empty());
         self.input_mode = InputMode::Edit(EditContext::FilterQuickAdd {
             date: today,

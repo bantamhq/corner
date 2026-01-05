@@ -3,7 +3,8 @@ use chrono::Local;
 use crate::cursor::CursorBuffer;
 use crate::storage::{self, Entry, EntryType, Line};
 
-use super::{App, EditContext, InputMode, InsertPosition, ViewMode};
+use super::actions::{CreateEntry, CreateTarget, EditEntry, EditTarget};
+use super::{App, EditContext, EntryLocation, InputMode, InsertPosition, ViewMode};
 
 impl App {
     /// Preprocesses content before saving: expands favorite tags and normalizes dates.
@@ -75,8 +76,10 @@ impl App {
     /// Save current edit buffer. Returns (context, had_content) or None if no buffer.
     fn save_current_edit(&mut self) -> Option<(EditContext, bool)> {
         let buffer = self.edit_buffer.take()?;
-        let content = self.preprocess_content(&buffer.into_content());
-        let had_content = !content.trim().is_empty();
+        let new_content = self.preprocess_content(&buffer.into_content());
+        let had_content = !new_content.trim().is_empty();
+        let original_content = self.original_edit_content.take().unwrap_or_default();
+        let is_new_entry = original_content.is_empty();
 
         let context = match std::mem::replace(&mut self.input_mode, InputMode::Normal) {
             InputMode::Edit(ctx) => ctx,
@@ -85,22 +88,40 @@ impl App {
 
         match &context {
             EditContext::Daily { entry_index } => {
-                self.save_daily_edit(*entry_index, content);
+                self.save_daily_edit_with_action(
+                    *entry_index,
+                    new_content,
+                    original_content,
+                    is_new_entry,
+                );
             }
             EditContext::FilterEdit {
-                date, line_index, ..
+                date,
+                line_index,
+                filter_index,
             } => {
-                self.save_filter_edit(*date, *line_index, content);
+                self.save_filter_edit_with_action(
+                    *date,
+                    *line_index,
+                    *filter_index,
+                    new_content,
+                    original_content,
+                );
             }
             EditContext::FilterQuickAdd { date, entry_type } => {
-                self.save_filter_quick_add(*date, entry_type.clone(), content);
+                self.save_filter_quick_add_with_action(*date, entry_type.clone(), new_content);
             }
             EditContext::LaterEdit {
                 source_date,
                 line_index,
                 ..
             } => {
-                self.save_later_edit(*source_date, *line_index, content);
+                self.save_later_edit_with_action(
+                    *source_date,
+                    *line_index,
+                    new_content,
+                    original_content,
+                );
             }
         }
 
@@ -115,29 +136,93 @@ impl App {
         }
     }
 
-    fn save_daily_edit(&mut self, entry_index: usize, content: String) {
-        if content.trim().is_empty() {
+    fn save_daily_edit_with_action(
+        &mut self,
+        entry_index: usize,
+        new_content: String,
+        original_content: String,
+        is_new_entry: bool,
+    ) {
+        let line_idx = match self.entry_indices.get(entry_index) {
+            Some(&idx) => idx,
+            None => return,
+        };
+
+        if new_content.trim().is_empty() {
+            // Empty content - delete the entry (no action for new empty entries)
             self.delete_at_index_daily(entry_index);
             if let ViewMode::Daily(state) = &mut self.view {
                 state.scroll_offset = 0;
             }
-        } else if let Some(entry) = self.get_daily_entry_mut(entry_index) {
-            entry.content = content;
+            return;
+        }
+
+        // Get entry type before modifying
+        let entry_type = if let Line::Entry(entry) = &self.lines[line_idx] {
+            entry.entry_type.clone()
+        } else {
+            return;
+        };
+
+        // Save the content
+        if let Some(entry) = self.get_daily_entry_mut(entry_index) {
+            entry.content = new_content.clone();
             self.save();
+        }
+
+        // Create appropriate action
+        if is_new_entry {
+            // Get the full entry after saving
+            if let Line::Entry(entry) = &self.lines[line_idx] {
+                let target = CreateTarget {
+                    date: self.current_date,
+                    line_index: line_idx,
+                    entry: entry.clone(),
+                    is_filter_quick_add: false,
+                };
+                let action = CreateEntry::new(target);
+                let _ = self.execute_action(Box::new(action));
+            }
+        } else if original_content != new_content {
+            let target = EditTarget {
+                location: EntryLocation::Daily { line_idx },
+                original_content,
+                new_content,
+                entry_type,
+            };
+            let action = EditEntry::new(target);
+            let _ = self.execute_action(Box::new(action));
         }
     }
 
-    fn save_or_delete_entry(
+    fn save_filter_edit_with_action(
         &mut self,
         date: chrono::NaiveDate,
         line_index: usize,
-        content: String,
+        filter_index: usize,
+        new_content: String,
+        original_content: String,
     ) {
-        let path = self.active_path();
-        if content.trim().is_empty() {
-            let _ = storage::delete_entry(date, path, line_index);
+        let path = self.active_path().to_path_buf();
+
+        if new_content.trim().is_empty() {
+            let _ = storage::delete_entry(date, &path, line_index);
         } else {
-            match storage::update_entry_content(date, path, line_index, content) {
+            // Get entry type before updating
+            let entry_type = storage::load_day_lines(date, &path)
+                .ok()
+                .and_then(|lines| {
+                    lines.get(line_index).and_then(|line| {
+                        if let Line::Entry(entry) = line {
+                            Some(entry.entry_type.clone())
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .unwrap_or(EntryType::Task { completed: false });
+
+            match storage::update_entry_content(date, &path, line_index, new_content.clone()) {
                 Ok(false) => {
                     self.set_status(format!(
                         "Failed to update: no entry at index {line_index} for {date}"
@@ -146,62 +231,134 @@ impl App {
                 Err(e) => {
                     self.set_status(format!("Failed to save: {e}"));
                 }
+                Ok(true) if original_content != new_content => {
+                    let target = EditTarget {
+                        location: EntryLocation::Filter {
+                            index: filter_index,
+                            source_date: date,
+                            line_index,
+                        },
+                        original_content,
+                        new_content,
+                        entry_type,
+                    };
+                    let action = EditEntry::new(target);
+                    let _ = self.execute_action(Box::new(action));
+                }
                 Ok(true) => {}
             }
         }
-    }
 
-    fn save_filter_edit(&mut self, date: chrono::NaiveDate, line_index: usize, content: String) {
-        self.save_or_delete_entry(date, line_index, content);
         if date == self.current_date {
             let _ = self.reload_current_day();
         }
         let _ = self.refresh_filter();
     }
 
-    fn save_filter_quick_add(
+    fn save_filter_quick_add_with_action(
         &mut self,
         date: chrono::NaiveDate,
         entry_type: EntryType,
         content: String,
     ) {
-        let path = self.active_path();
+        let path = self.active_path().to_path_buf();
+
         if !content.trim().is_empty()
-            && let Ok(mut lines) = storage::load_day_lines(date, path)
+            && let Ok(mut lines) = storage::load_day_lines(date, &path)
         {
             let entry = Entry {
                 entry_type,
                 content,
             };
-            lines.push(Line::Entry(entry));
-            let _ = storage::save_day_lines(date, path, &lines);
+            let line_index = lines.len();
+            lines.push(Line::Entry(entry.clone()));
+            let _ = storage::save_day_lines(date, &path, &lines);
+
+            // Create action for the new entry
+            let target = CreateTarget {
+                date,
+                line_index,
+                entry,
+                is_filter_quick_add: true,
+            };
+            let action = CreateEntry::new(target);
+            let _ = self.execute_action(Box::new(action));
+
             if date == self.current_date {
                 let _ = self.reload_current_day();
             }
         }
+
         let _ = self.refresh_filter();
         if let ViewMode::Filter(state) = &mut self.view {
             state.selected = state.entries.len().saturating_sub(1);
         }
     }
 
-    fn save_later_edit(
+    fn save_later_edit_with_action(
         &mut self,
         source_date: chrono::NaiveDate,
         line_index: usize,
-        content: String,
+        new_content: String,
+        original_content: String,
     ) {
-        self.save_or_delete_entry(source_date, line_index, content);
         let path = self.active_path().to_path_buf();
+
+        if new_content.trim().is_empty() {
+            let _ = storage::delete_entry(source_date, &path, line_index);
+        } else {
+            // Get entry type before updating
+            let entry_type = storage::load_day_lines(source_date, &path)
+                .ok()
+                .and_then(|lines| {
+                    lines.get(line_index).and_then(|line| {
+                        if let Line::Entry(entry) = line {
+                            Some(entry.entry_type.clone())
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .unwrap_or(EntryType::Task { completed: false });
+
+            match storage::update_entry_content(source_date, &path, line_index, new_content.clone())
+            {
+                Ok(false) => {
+                    self.set_status(format!(
+                        "Failed to update: no entry at index {line_index} for {source_date}"
+                    ));
+                }
+                Err(e) => {
+                    self.set_status(format!("Failed to save: {e}"));
+                }
+                Ok(true) if original_content != new_content => {
+                    let target = EditTarget {
+                        location: EntryLocation::Later {
+                            source_date,
+                            line_index,
+                        },
+                        original_content,
+                        new_content,
+                        entry_type,
+                    };
+                    let action = EditEntry::new(target);
+                    let _ = self.execute_action(Box::new(action));
+                }
+                Ok(true) => {}
+            }
+        }
+
         if let ViewMode::Daily(state) = &mut self.view {
-            state.later_entries = storage::collect_later_entries_for_date(self.current_date, &path)
-                .unwrap_or_default();
+            state.later_entries =
+                storage::collect_later_entries_for_date(self.current_date, &path)
+                    .unwrap_or_default();
         }
     }
 
     /// Cancel edit mode without saving (Esc)
     pub fn cancel_edit(&mut self) {
         self.edit_buffer = None;
+        self.original_edit_content = None;
 
         match std::mem::replace(&mut self.input_mode, InputMode::Normal) {
             InputMode::Edit(EditContext::Daily { entry_index }) => {
@@ -244,6 +401,7 @@ impl App {
                 self.add_entry_internal(new_entry, InsertPosition::Below);
             }
             EditContext::FilterQuickAdd { date, entry_type } => {
+                self.original_edit_content = Some(String::new());
                 self.edit_buffer = Some(CursorBuffer::empty());
                 self.input_mode = InputMode::Edit(EditContext::FilterQuickAdd {
                     date,
@@ -288,6 +446,8 @@ impl App {
             state.selected = visible_index;
         }
 
+        // Mark as new entry for action tracking
+        self.original_edit_content = Some(String::new());
         self.edit_buffer = Some(CursorBuffer::empty());
         self.input_mode = InputMode::Edit(EditContext::Daily { entry_index });
     }
