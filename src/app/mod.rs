@@ -42,8 +42,10 @@ pub struct DailyState {
 impl DailyState {
     #[must_use]
     pub fn new(entry_count: usize, later_entries: Vec<LaterEntry>) -> Self {
-        let selected = if later_entries.is_empty() {
-            entry_count.saturating_sub(1)
+        let selected = if entry_count > 0 {
+            later_entries.len() + entry_count - 1
+        } else if !later_entries.is_empty() {
+            later_entries.len() - 1
         } else {
             0
         };
