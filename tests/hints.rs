@@ -1,7 +1,11 @@
 mod helpers;
 
+use std::collections::HashMap;
+
 use crossterm::event::KeyCode;
 use helpers::TestContext;
+
+use caliber::config::Config;
 
 /// HI-1: Command hint completion workflow
 /// Type partial command, accept hint, verify buffer contains completed command with trailing space
@@ -68,14 +72,17 @@ fn test_date_op_hint_completion() {
 /// HI-5: Negation hint completion
 #[test]
 fn test_negation_hint_completion() {
-    let mut ctx = TestContext::new();
+    let content = "# 2026/01/15\n- [ ] Task with #feature tag\n";
+    let date = chrono::NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+    let mut ctx = TestContext::with_journal_content(date, content);
 
     ctx.press(KeyCode::Char('/'));
-    ctx.type_str("not:");
+    ctx.type_str("not:#fe");
     ctx.press(KeyCode::Right);
 
     let query = ctx.app.command_buffer.content();
-    assert!(query.starts_with("not:#"));
+    // Should complete the tag after not:#
+    assert_eq!(query, "not:#feature ");
 }
 
 /// HI-6: Tag hints work with multi-word input
@@ -162,4 +169,97 @@ fn test_tags_collected_from_journal() {
 
     // Should complete to #alpha (first alphabetically)
     assert!(ctx.screen_contains("#alpha"));
+}
+
+/// HI-10: Saved filter hint completion
+#[test]
+fn test_saved_filter_hint_completion() {
+    let date = chrono::NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+    let mut config = Config::default();
+    config.filters = HashMap::from([
+        ("work".to_string(), "#work !tasks".to_string()),
+        ("weekly".to_string(), "@after:d7".to_string()),
+    ]);
+
+    let mut ctx = TestContext::with_config_and_content(date, "", config);
+
+    ctx.press(KeyCode::Char('/'));
+    ctx.type_str("$wo");
+    ctx.press(KeyCode::Right);
+
+    assert_eq!(ctx.app.command_buffer.content(), "$work ");
+}
+
+/// HI-11: Date value hints after @before:
+#[test]
+fn test_date_value_hints() {
+    let mut ctx = TestContext::new();
+
+    ctx.press(KeyCode::Char('/'));
+    ctx.type_str("@before:d");
+    ctx.press(KeyCode::Right);
+
+    assert!(ctx.app.command_buffer.content().starts_with("@before:d"));
+}
+
+/// HI-12: Empty filter shows guidance (not completable)
+#[test]
+fn test_empty_filter_shows_guidance() {
+    let mut ctx = TestContext::new();
+
+    ctx.press(KeyCode::Char('/'));
+
+    assert!(matches!(
+        ctx.app.hint_state,
+        caliber::app::HintContext::GuidanceMessage { .. }
+    ));
+
+    ctx.press(KeyCode::Right);
+    assert!(ctx.app.command_buffer.is_empty());
+}
+
+/// HI-13: Command with optional subargs is considered complete
+#[test]
+fn test_optional_subargs_command_complete() {
+    let mut ctx = TestContext::new();
+
+    ctx.press(KeyCode::Char(':'));
+    ctx.type_str("config");
+
+    assert!(ctx.app.command_is_complete());
+}
+
+/// HI-14: Date value hints show for relative days with + suffix
+#[test]
+fn test_date_value_hints_with_future_suffix() {
+    let mut ctx = TestContext::new();
+
+    ctx.press(KeyCode::Char('/'));
+    ctx.type_str("@before:d7+");
+
+    assert!(matches!(
+        ctx.app.hint_state,
+        caliber::app::HintContext::DateValues { .. }
+    ));
+}
+
+/// HI-15: Relative days limited to 3 digits
+#[test]
+fn test_relative_days_three_digit_limit() {
+    let mut ctx = TestContext::new();
+
+    ctx.press(KeyCode::Char('/'));
+    ctx.type_str("@before:d999");
+
+    assert!(matches!(
+        ctx.app.hint_state,
+        caliber::app::HintContext::DateValues { .. }
+    ));
+
+    ctx.type_str("9");
+
+    assert!(matches!(
+        ctx.app.hint_state,
+        caliber::app::HintContext::Inactive
+    ));
 }

@@ -1,18 +1,37 @@
 # Command definitions (: commands)
-# Each entry defines a command with its aliases and help text variants
+# Each entry defines a command with its subargs and help text variants
 
 [[commands]]
-name = "edit"
-args = "<config|journal|scratchpad> [hub|project]"
+name = "config"
+args = "[hub|project]"
 subargs = [
-  { options = ["config", "journal", "scratchpad"] },
   { options = ["hub", "project"] },
 ]
-key = ":edit"
+key = ":config"
 help_section = "commands"
-short_text = "Edit in editor"
-short_description = "Edit config, journal, or scratchpad in $EDITOR"
-long_description = "Edit a file in $EDITOR. Use 'config', 'journal', or 'scratchpad' (alias: sp), optionally with 'hub' or 'project' scope for config/journal."
+short_text = "Edit config"
+short_description = "Edit config in $EDITOR"
+long_description = "Edit configuration file. Defaults to base config, use 'hub' or 'project' for scoped configs."
+
+[[commands]]
+name = "journal"
+args = "[hub|project]"
+subargs = [
+  { options = ["hub", "project"] },
+]
+key = ":journal"
+help_section = "commands"
+short_text = "Edit journal"
+short_description = "Edit journal in $EDITOR"
+long_description = "Edit journal file. Defaults to current context, use 'hub' or 'project' for specific journal."
+
+[[commands]]
+name = "scratchpad"
+key = ":scratchpad"
+help_section = "commands"
+short_text = "Edit scratchpad"
+short_description = "Edit scratchpad in $EDITOR"
+long_description = "Edit scratchpad file for temporary notes."
 
 [[commands]]
 name = "quit"

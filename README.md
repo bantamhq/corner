@@ -367,7 +367,9 @@ These shortcuts work in all text input modes (Edit, Command, and Filter query):
 
 | Key | Action |
 |-----|--------|
-| `:edit` | Edit config, journal, or scratchpad in $EDITOR |
+| `:config` | Edit config in $EDITOR |
+| `:journal` | Edit journal in $EDITOR |
+| `:scratchpad` | Edit scratchpad in $EDITOR |
 | `:quit` | Quit application |
 
 

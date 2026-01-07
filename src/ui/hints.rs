@@ -43,8 +43,33 @@ pub fn render_hint_overlay(f: &mut Frame, hint_state: &HintContext, footer_area:
     true
 }
 
+/// Get the effective hint context for rendering (unwraps Negation)
+fn effective_context(hint_state: &HintContext) -> &HintContext {
+    match hint_state {
+        HintContext::Negation { inner } => inner.as_ref(),
+        _ => hint_state,
+    }
+}
+
 fn build_hint_lines(hint_state: &HintContext, width: usize, max_rows: usize) -> Vec<Line<'static>> {
-    let description: Option<&str> = match hint_state {
+    let is_negation = matches!(hint_state, HintContext::Negation { .. });
+    let negation_prefix = if is_negation { "not:" } else { "" };
+    let effective = effective_context(hint_state);
+
+    if let HintContext::GuidanceMessage { message } = effective {
+        let mut lines: Vec<Line<'static>> = Vec::new();
+        // Push message to bottom
+        for _ in 0..max_rows.saturating_sub(1) {
+            lines.push(Line::from(""));
+        }
+        lines.push(Line::from(Span::styled(
+            (*message).to_string(),
+            Style::default().fg(Color::Gray).italic(),
+        )));
+        return lines;
+    }
+
+    let description: Option<&str> = match effective {
         HintContext::Commands { prefix, matches } if !prefix.is_empty() => {
             matches.first().map(|c| c.long_description)
         }
@@ -55,38 +80,57 @@ fn build_hint_lines(hint_state: &HintContext, width: usize, max_rows: usize) -> 
         HintContext::DateOps { prefix, matches } if !prefix.is_empty() => {
             matches.first().map(|f| f.long_description)
         }
-        HintContext::Negation { prefix, matches } if !prefix.is_empty() => {
-            matches.first().map(|f| f.long_description)
-        }
+        HintContext::DateValues {
+            prefix, matches, ..
+        } if !prefix.is_empty() => matches.first().map(|(_, desc)| *desc),
+        HintContext::DateValues { .. } => Some("Dates default to past. Append + for future."),
         _ => None,
     };
 
-    // Context-specific colors: tags = yellow, commands = blue, filters = magenta
-    let hint_color = match hint_state {
+    let hint_color = match effective {
         HintContext::Tags { .. } => Color::Yellow,
         HintContext::Commands { .. } | HintContext::SubArgs { .. } => Color::Blue,
         HintContext::FilterTypes { .. }
         | HintContext::DateOps { .. }
-        | HintContext::Negation { .. } => Color::Magenta,
-        HintContext::Inactive => unreachable!(),
+        | HintContext::DateValues { .. }
+        | HintContext::SavedFilters { .. } => Color::Magenta,
+        HintContext::Inactive
+        | HintContext::GuidanceMessage { .. }
+        | HintContext::Negation { .. } => {
+            return vec![];
+        }
     };
 
-    let items: Vec<String> = match hint_state {
-        HintContext::Inactive => return vec![],
-        HintContext::Tags { matches, .. } => matches.iter().map(|t| format!("#{t}")).collect(),
+    let items: Vec<String> = match effective {
+        HintContext::Inactive
+        | HintContext::GuidanceMessage { .. }
+        | HintContext::Negation { .. } => {
+            return vec![];
+        }
+        HintContext::Tags { matches, .. } => matches
+            .iter()
+            .map(|t| format!("{}#{t}", negation_prefix))
+            .collect(),
         HintContext::Commands { matches, .. } => {
             matches.iter().map(|cmd| format!(":{}", cmd.name)).collect()
         }
         HintContext::SubArgs { matches, .. } => matches.iter().map(|s| (*s).to_string()).collect(),
-        HintContext::FilterTypes { matches, .. } => {
-            matches.iter().map(|f| f.syntax.to_string()).collect()
-        }
-        HintContext::DateOps { matches, .. } => {
-            matches.iter().map(|f| f.syntax.to_string()).collect()
-        }
-        HintContext::Negation { matches, .. } => {
-            matches.iter().map(|f| f.syntax.to_string()).collect()
-        }
+        HintContext::FilterTypes { matches, .. } => matches
+            .iter()
+            .map(|f| format!("{}{}", negation_prefix, f.syntax))
+            .collect(),
+        HintContext::DateOps { matches, .. } => matches
+            .iter()
+            .map(|f| format!("{}{}", negation_prefix, f.syntax))
+            .collect(),
+        HintContext::DateValues { matches, .. } => matches
+            .iter()
+            .map(|(syntax, _)| (*syntax).to_string())
+            .collect(),
+        HintContext::SavedFilters { matches, .. } => matches
+            .iter()
+            .map(|f| format!("{}${f}", negation_prefix))
+            .collect(),
     };
 
     let num_cols = width / COLUMN_WIDTH;

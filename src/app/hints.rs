@@ -1,10 +1,27 @@
 use crate::registry::{COMMANDS, Command, FILTER_SYNTAX, FilterCategory, FilterSyntax};
 
+/// Date values available for autocomplete after @before: or @after:
+pub static DATE_VALUES: &[(&str, &str)] = &[
+    ("d", "Relative days (d1, d7, d30). Append + for future."),
+    ("today", "Today"),
+    ("tomorrow", "Tomorrow"),
+    ("yesterday", "Yesterday"),
+    ("mon", "Monday"),
+    ("tue", "Tuesday"),
+    ("wed", "Wednesday"),
+    ("thu", "Thursday"),
+    ("fri", "Friday"),
+    ("sat", "Saturday"),
+    ("sun", "Sunday"),
+];
+
 /// What kind of hints to display
 #[derive(Clone, Debug, PartialEq)]
 pub enum HintContext {
     /// No hints to display
     Inactive,
+    /// Guidance text (help message only, shown at bottom)
+    GuidanceMessage { message: &'static str },
     /// Tag hints from current journal
     Tags {
         prefix: String,
@@ -31,11 +48,19 @@ pub enum HintContext {
         prefix: String,
         matches: Vec<&'static FilterSyntax>,
     },
-    /// Negation hints (not:#, not:!, not:word)
-    Negation {
+    /// Date value hints (after @before: or @after:)
+    DateValues {
         prefix: String,
-        matches: Vec<&'static FilterSyntax>,
+        op: &'static str,
+        matches: Vec<(&'static str, &'static str)>,
     },
+    /// Saved filter hints ($name)
+    SavedFilters {
+        prefix: String,
+        matches: Vec<String>,
+    },
+    /// Negation hints - wraps inner context for recursive hints
+    Negation { inner: Box<HintContext> },
 }
 
 /// Which input context we're computing hints for
@@ -52,10 +77,15 @@ pub enum HintMode {
 impl HintContext {
     /// Compute hints based on current input buffer and mode
     #[must_use]
-    pub fn compute(input: &str, mode: HintMode, journal_tags: &[String]) -> Self {
+    pub fn compute(
+        input: &str,
+        mode: HintMode,
+        journal_tags: &[String],
+        saved_filters: &[String],
+    ) -> Self {
         match mode {
             HintMode::Command => Self::compute_command_hints(input),
-            HintMode::Filter => Self::compute_filter_hints(input, journal_tags),
+            HintMode::Filter => Self::compute_filter_hints(input, journal_tags, saved_filters),
             HintMode::Entry => Self::compute_entry_hints(input, journal_tags),
         }
     }
@@ -71,7 +101,6 @@ impl HintContext {
 
         if let Some(cmd) = matched_command {
             if !cmd.subargs.is_empty() {
-                // words[0] = command, words[1] = arg0, words[2] = arg1, etc.
                 let num_complete_args = words.len().saturating_sub(1);
 
                 let (arg_position, current_arg) = if has_trailing_space {
@@ -85,13 +114,7 @@ impl HintContext {
                     };
                 };
 
-                // Some first args don't have further subargs (e.g., "scratchpad" for :open)
-                let first_arg = words.get(1).copied().unwrap_or("");
-                let max_args = if first_arg == "scratchpad" || first_arg == "sp" {
-                    1
-                } else {
-                    cmd.subargs.len()
-                };
+                let max_args = cmd.subargs.len();
 
                 if arg_position < max_args {
                     let subarg = &cmd.subargs[arg_position];
@@ -144,6 +167,20 @@ impl HintContext {
         }
     }
 
+    fn match_tags(prefix: &str, journal_tags: &[String]) -> Option<(String, Vec<String>)> {
+        let matches: Vec<String> = journal_tags
+            .iter()
+            .filter(|t| t.to_lowercase().starts_with(&prefix.to_lowercase()))
+            .cloned()
+            .collect();
+
+        if matches.is_empty() || (matches.len() == 1 && matches[0].eq_ignore_ascii_case(prefix)) {
+            None
+        } else {
+            Some((prefix.to_string(), matches))
+        }
+    }
+
     fn compute_tag_hints(input: &str, journal_tags: &[String]) -> Self {
         if input.ends_with(' ') {
             return Self::Inactive;
@@ -151,22 +188,10 @@ impl HintContext {
 
         let current_token = input.split_whitespace().last().unwrap_or("");
 
-        if let Some(tag_prefix) = current_token.strip_prefix('#') {
-            let matches: Vec<String> = journal_tags
-                .iter()
-                .filter(|t| t.to_lowercase().starts_with(&tag_prefix.to_lowercase()))
-                .cloned()
-                .collect();
-
-            if matches.is_empty()
-                || (matches.len() == 1 && matches[0].eq_ignore_ascii_case(tag_prefix))
-            {
-                return Self::Inactive;
-            }
-            return Self::Tags {
-                prefix: tag_prefix.to_string(),
-                matches,
-            };
+        if let Some(tag_prefix) = current_token.strip_prefix('#')
+            && let Some((prefix, matches)) = Self::match_tags(tag_prefix, journal_tags)
+        {
+            return Self::Tags { prefix, matches };
         }
 
         Self::Inactive
@@ -176,22 +201,63 @@ impl HintContext {
         Self::compute_tag_hints(input, journal_tags)
     }
 
-    fn compute_filter_hints(input: &str, journal_tags: &[String]) -> Self {
+    fn compute_filter_hints(
+        input: &str,
+        journal_tags: &[String],
+        saved_filters: &[String],
+    ) -> Self {
+        if input.is_empty() {
+            return Self::GuidanceMessage {
+                message: "Type to search, or use ! @ # $ not: for filters",
+            };
+        }
+
         if input.ends_with(' ') {
             return Self::Inactive;
         }
 
         let current_token = input.split_whitespace().last().unwrap_or("");
 
-        if current_token.starts_with('#') {
-            return Self::compute_tag_hints(input, journal_tags);
+        if let Some(neg_suffix) = current_token.strip_prefix("not:") {
+            let inner = Self::compute_filter_token(neg_suffix, journal_tags, saved_filters);
+            if matches!(inner, Self::Inactive) && neg_suffix.is_empty() {
+                return Self::Negation {
+                    inner: Box::new(Self::GuidanceMessage {
+                        message: "! @ # or text to negate",
+                    }),
+                };
+            }
+            if matches!(inner, Self::Inactive) {
+                return Self::Inactive;
+            }
+            return Self::Negation {
+                inner: Box::new(inner),
+            };
         }
 
-        if let Some(type_prefix) = current_token.strip_prefix('!') {
+        Self::compute_filter_token(current_token, journal_tags, saved_filters)
+    }
+
+    fn compute_filter_token(
+        token: &str,
+        journal_tags: &[String],
+        saved_filters: &[String],
+    ) -> Self {
+        if let Some(tag_prefix) = token.strip_prefix('#')
+            && let Some((prefix, matches)) = Self::match_tags(tag_prefix, journal_tags)
+        {
+            return Self::Tags { prefix, matches };
+        }
+
+        if let Some(type_prefix) = token.strip_prefix('!') {
             let matches: Vec<&'static FilterSyntax> = FILTER_SYNTAX
                 .iter()
                 .filter(|f| f.category == FilterCategory::EntryType)
-                .filter(|f| f.syntax[1..].starts_with(type_prefix))
+                .filter(|f| {
+                    f.syntax
+                        .get(1..)
+                        .is_some_and(|s| s.starts_with(type_prefix))
+                })
                 .collect();
 
             if matches.is_empty() {
@@ -203,14 +269,21 @@ impl HintContext {
             };
         }
 
-        if let Some(date_prefix) = current_token.strip_prefix('@') {
+        if let Some(date_prefix) = token.strip_prefix('@') {
+            if let Some(date_value) = date_prefix.strip_prefix("before:") {
+                return Self::compute_date_value_hints(date_value, "before");
+            }
+            if let Some(date_value) = date_prefix.strip_prefix("after:") {
+                return Self::compute_date_value_hints(date_value, "after");
+            }
+
             let matches: Vec<&'static FilterSyntax> = FILTER_SYNTAX
                 .iter()
                 .filter(|f| f.category == FilterCategory::DateOp)
                 .filter(|f| {
-                    let syntax_suffix = &f.syntax[1..];
-                    // Match if typing the operator OR typing the date argument
-                    syntax_suffix.starts_with(date_prefix) || date_prefix.starts_with(syntax_suffix)
+                    f.syntax
+                        .get(1..)
+                        .is_some_and(|s| s.starts_with(date_prefix))
                 })
                 .collect();
 
@@ -223,18 +296,20 @@ impl HintContext {
             };
         }
 
-        if let Some(neg_prefix) = current_token.strip_prefix("not:") {
-            let matches: Vec<&'static FilterSyntax> = FILTER_SYNTAX
+        if let Some(filter_prefix) = token.strip_prefix('$') {
+            let matches: Vec<String> = saved_filters
                 .iter()
-                .filter(|f| f.category == FilterCategory::Negation)
-                .filter(|f| f.syntax[4..].starts_with(neg_prefix))
+                .filter(|f| f.to_lowercase().starts_with(&filter_prefix.to_lowercase()))
+                .cloned()
                 .collect();
 
-            if matches.is_empty() {
+            if matches.is_empty()
+                || (matches.len() == 1 && matches[0].eq_ignore_ascii_case(filter_prefix))
+            {
                 return Self::Inactive;
             }
-            return Self::Negation {
-                prefix: neg_prefix.to_string(),
+            return Self::SavedFilters {
+                prefix: filter_prefix.to_string(),
                 matches,
             };
         }
@@ -242,33 +317,83 @@ impl HintContext {
         Self::Inactive
     }
 
+    fn is_valid_relative_days(rest: &str) -> bool {
+        if rest.is_empty() {
+            return true;
+        }
+        let (digits, suffix) = if let Some(d) = rest.strip_suffix('+') {
+            (d, true)
+        } else {
+            (rest, false)
+        };
+        if digits.is_empty() {
+            return suffix;
+        }
+        digits.len() <= 3 && digits.chars().all(|c| c.is_ascii_digit()) && !digits.starts_with('0')
+    }
+
+    fn compute_date_value_hints(value_prefix: &str, op: &'static str) -> Self {
+        let value_lower = value_prefix.to_lowercase();
+
+        if let Some(rest) = value_lower.strip_prefix('d')
+            && Self::is_valid_relative_days(rest)
+        {
+            return Self::DateValues {
+                prefix: value_prefix.to_string(),
+                op,
+                matches: vec![("d", "Relative days (d1, d7, d30). Append + for future.")],
+            };
+        }
+
+        let matches: Vec<(&'static str, &'static str)> = DATE_VALUES
+            .iter()
+            .filter(|(syntax, _)| syntax.starts_with(&value_lower))
+            .copied()
+            .collect();
+
+        if matches.is_empty() {
+            return Self::Inactive;
+        }
+
+        Self::DateValues {
+            prefix: value_prefix.to_string(),
+            op,
+            matches,
+        }
+    }
+
+    fn suffix_after(s: &str, prefix_len: usize) -> String {
+        s.get(prefix_len..).unwrap_or("").to_string()
+    }
+
     #[must_use]
     pub fn first_completion(&self) -> Option<String> {
         match self {
-            Self::Inactive => None,
-            Self::Tags { prefix, matches } => matches
-                .first()
-                .map(|tag| tag.get(prefix.len()..).unwrap_or("").to_string()),
+            Self::Inactive | Self::GuidanceMessage { .. } => None,
+            Self::Tags { prefix, matches } => {
+                matches.first().map(|t| Self::suffix_after(t, prefix.len()))
+            }
             Self::Commands { prefix, matches } => matches
                 .first()
-                .map(|cmd| cmd.name.get(prefix.len()..).unwrap_or("").to_string()),
+                .map(|c| Self::suffix_after(c.name, prefix.len())),
             Self::SubArgs {
+                prefix, matches, ..
+            } => matches.first().map(|o| Self::suffix_after(o, prefix.len())),
+            Self::FilterTypes { prefix, matches } => matches
+                .first()
+                .map(|f| Self::suffix_after(f.syntax, 1 + prefix.len())),
+            Self::DateOps { prefix, matches } => matches
+                .first()
+                .map(|f| Self::suffix_after(f.syntax, 1 + prefix.len())),
+            Self::DateValues {
                 prefix, matches, ..
             } => matches
                 .first()
-                .map(|opt| opt.get(prefix.len()..).unwrap_or("").to_string()),
-            Self::FilterTypes { prefix, matches } => matches.first().map(|f| {
-                let start = 1 + prefix.len();
-                f.syntax.get(start..).unwrap_or("").to_string()
-            }),
-            Self::DateOps { prefix, matches } => matches.first().map(|f| {
-                let start = 1 + prefix.len();
-                f.syntax.get(start..).unwrap_or("").to_string()
-            }),
-            Self::Negation { prefix, matches } => matches.first().map(|f| {
-                let start = 4 + prefix.len();
-                f.syntax.get(start..).unwrap_or("").to_string()
-            }),
+                .map(|(s, _)| Self::suffix_after(s, prefix.len())),
+            Self::SavedFilters { prefix, matches } => {
+                matches.first().map(|f| Self::suffix_after(f, prefix.len()))
+            }
+            Self::Negation { inner } => inner.first_completion(),
         }
     }
 

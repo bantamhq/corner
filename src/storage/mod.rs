@@ -27,8 +27,8 @@ pub use filter::{
     FAVORITE_TAG_REGEX, Filter, FilterType, LATER_DATE_REGEX, NATURAL_DATE_REGEX,
     SAVED_FILTER_REGEX, TAG_REGEX, collect_filtered_entries, collect_journal_tags,
     collect_later_entries_for_date, expand_favorite_tags, expand_saved_filters, extract_tags,
-    extract_target_date, normalize_natural_dates, parse_filter_query, parse_later_date,
-    parse_natural_date,
+    extract_target_date, normalize_natural_dates, parse_filter_date, parse_filter_query,
+    parse_later_date, parse_natural_date,
 };
 
 #[cfg(test)]
@@ -93,30 +93,57 @@ mod tests {
             NaiveDate::from_ymd_opt(2026, 1, 4)
         );
 
-        // relative days
+        // relative days (entry context = future)
         assert_eq!(
-            parse_natural_date("3d", today),
+            parse_natural_date("d3", today),
             NaiveDate::from_ymd_opt(2026, 1, 8)
         );
-        assert_eq!(
-            parse_natural_date("-3d", today),
-            NaiveDate::from_ymd_opt(2026, 1, 2)
-        );
 
-        // weekdays
+        // weekdays (entry context = next occurrence)
         assert_eq!(
-            parse_natural_date("next-monday", today),
-            NaiveDate::from_ymd_opt(2026, 1, 12)
+            parse_natural_date("mon", today),
+            NaiveDate::from_ymd_opt(2026, 1, 12) // Next Monday (today is Monday, so +7)
         );
         assert_eq!(
-            parse_natural_date("last-friday", today),
-            NaiveDate::from_ymd_opt(2026, 1, 2)
+            parse_natural_date("fri", today),
+            NaiveDate::from_ymd_opt(2026, 1, 9) // Next Friday
         );
 
         // fallback to standard format
         assert_eq!(
             parse_natural_date("1/15", today),
             NaiveDate::from_ymd_opt(2026, 1, 15)
+        );
+    }
+
+    #[test]
+    fn test_parse_filter_date() {
+        let today = NaiveDate::from_ymd_opt(2026, 1, 5).unwrap(); // Monday
+
+        // Filter context = past by default
+        assert_eq!(
+            parse_filter_date("d3", today),
+            NaiveDate::from_ymd_opt(2026, 1, 2) // 3 days ago
+        );
+        assert_eq!(
+            parse_filter_date("mon", today),
+            NaiveDate::from_ymd_opt(2025, 12, 29) // Last Monday
+        );
+
+        // Explicit future with + suffix
+        assert_eq!(
+            parse_filter_date("d3+", today),
+            NaiveDate::from_ymd_opt(2026, 1, 8) // 3 days from now
+        );
+        assert_eq!(
+            parse_filter_date("mon+", today),
+            NaiveDate::from_ymd_opt(2026, 1, 12) // Next Monday
+        );
+
+        // today/tomorrow/yesterday work the same
+        assert_eq!(
+            parse_filter_date("today", today),
+            NaiveDate::from_ymd_opt(2026, 1, 5)
         );
     }
 
@@ -134,12 +161,14 @@ mod tests {
             normalize_natural_dates("Call dentist @tomorrow", today),
             "Call dentist @01/06"
         );
+        // New d# syntax (entry context = future)
         assert_eq!(
-            normalize_natural_dates("Review @3d and @-3d", today),
-            "Review @01/08 and @01/02"
+            normalize_natural_dates("Review @d3", today),
+            "Review @01/08"
         );
+        // New weekday syntax (entry context = next occurrence)
         assert_eq!(
-            normalize_natural_dates("Meeting @next-monday", today),
+            normalize_natural_dates("Meeting @mon", today),
             "Meeting @01/12"
         );
     }

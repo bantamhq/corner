@@ -356,8 +356,7 @@ fn run_app<B: ratatui::backend::Backend>(
                     width: indicator_width,
                     height: 1,
                 };
-                let scroll_indicator =
-                    Paragraph::new(Span::styled(arrows, Style::default().dim()));
+                let scroll_indicator = Paragraph::new(Span::styled(arrows, Style::default().dim()));
                 f.render_widget(scroll_indicator, indicator_area);
             }
 

@@ -509,7 +509,10 @@ fn generate_filter_syntax_table(filters: &[FilterDef]) -> String {
         }
 
         let display = filter.display.as_deref().unwrap_or(&filter.syntax);
-        table.push_str(&format!("\n| `{}` | {} |", display, filter.short_description));
+        table.push_str(&format!(
+            "\n| `{}` | {} |",
+            display, filter.short_description
+        ));
     }
 
     // Add text search pattern

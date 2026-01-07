@@ -69,17 +69,15 @@ pub fn render_daily_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> {
         let prefix = later_entry.entry_type.prefix();
         let prefix_width = prefix.width();
         let (source_suffix, source_suffix_width) = format_date_suffix(later_entry.source_date);
-        let later_prefix_style = Style::default().fg(Color::Red);
 
         if is_editing {
             let available = width.saturating_sub(prefix_width + source_suffix_width);
             let wrapped = wrap_text(&text, available);
             for (i, line_text) in wrapped.iter().enumerate() {
                 if i == 0 {
-                    let first_char = prefix.chars().next().unwrap_or('-').to_string();
                     let rest_of_prefix: String = prefix.chars().skip(1).collect();
                     let spans = vec![
-                        Span::styled(first_char, later_prefix_style),
+                        Span::styled("↪", Style::default().fg(Color::Blue)),
                         Span::styled(rest_of_prefix, content_style),
                         Span::styled(line_text.clone(), content_style),
                         Span::styled(source_suffix.clone(), date_suffix_style(content_style)),
@@ -101,14 +99,7 @@ pub fn render_daily_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> {
 
             // Determine the indicator based on mode
             let visible_idx = visible_later_idx - 1; // Already incremented
-            let indicator = get_entry_indicator(
-                app,
-                is_selected,
-                visible_idx,
-                Color::Red,
-                &first_char,
-                later_prefix_style,
-            );
+            let indicator = get_later_entry_indicator(app, is_selected, visible_idx);
 
             let mut spans = vec![indicator, Span::styled(rest_of_prefix, content_style)];
             spans.extend(style_content(&display_text, content_style));
@@ -193,13 +184,42 @@ pub fn render_daily_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> {
         } else {
             "(No entries - press Enter to add)"
         };
-        lines.push(RatatuiLine::from(Span::styled(message, Style::default().dim())));
+        lines.push(RatatuiLine::from(Span::styled(
+            message,
+            Style::default().dim(),
+        )));
     }
 
     lines
 }
 
-/// Determine the indicator character for an entry based on mode and selection state
+/// Determine the indicator character for a later/projected entry
+fn get_later_entry_indicator(app: &App, is_cursor: bool, visible_idx: usize) -> Span<'static> {
+    // Check if in selection mode and this entry is selected
+    let is_selected_in_selection = if let InputMode::Selection(ref state) = app.input_mode {
+        state.is_selected(visible_idx)
+    } else {
+        false
+    };
+
+    if is_cursor {
+        if matches!(app.input_mode, InputMode::Selection(_)) {
+            if is_selected_in_selection {
+                Span::styled("◉", Style::default().fg(Color::Green))
+            } else {
+                Span::styled("↪", Style::default().fg(Color::Blue))
+            }
+        } else {
+            Span::styled("↪", Style::default().fg(Color::Blue))
+        }
+    } else if is_selected_in_selection {
+        Span::styled("○", Style::default().fg(Color::Green))
+    } else {
+        Span::styled("↪", Style::default().fg(Color::Red))
+    }
+}
+
+/// Determine the indicator character for a regular entry based on mode and selection state
 fn get_entry_indicator(
     app: &App,
     is_cursor: bool,

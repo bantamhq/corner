@@ -19,6 +19,7 @@ impl App {
         }
 
         self.input_mode = InputMode::QueryInput;
+        self.update_hints();
     }
 
     /// Switch to filter view with the given query.

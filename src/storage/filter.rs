@@ -42,9 +42,11 @@ pub static TAG_REGEX: LazyLock<Regex> =
 pub static LATER_DATE_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"@(\d{4}/\d{1,2}/\d{1,2}|\d{1,2}/\d{1,2}(?:/\d{2,4})?)").unwrap());
 
-/// Matches natural date patterns: @today, @tomorrow, @yesterday, @next-monday, @last-monday, @3d, @-3d
+/// Matches natural date patterns for entries (future by default):
+/// @today, @tomorrow, @yesterday, @d7 (7 days, max 999), @mon (next Monday)
 pub static NATURAL_DATE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)@(today|tomorrow|yesterday|(?:next|last)-(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)|-?[1-9]\d*d)").unwrap()
+    Regex::new(r"(?i)@(today|tomorrow|yesterday|d[1-9]\d{0,2}|mon|tue|wed|thu|fri|sat|sun)")
+        .unwrap()
 });
 
 /// Matches favorite tag shortcuts: #1 through #9 and #0
@@ -180,55 +182,65 @@ fn prev_weekday_from(today: NaiveDate, target: chrono::Weekday) -> Option<NaiveD
     today.checked_sub_days(Days::new(u64::from(days_back)))
 }
 
-/// Parses natural language date expressions: today, tomorrow, yesterday, next-monday, last-monday, 3d, -3d.
-/// Falls back to parse_later_date for standard formats.
-#[must_use]
-pub fn parse_natural_date(input: &str, today: NaiveDate) -> Option<NaiveDate> {
+fn parse_relative_date(input: &str, today: NaiveDate, default_future: bool) -> Option<NaiveDate> {
     let input_lower = input.to_lowercase();
 
     if input_lower == "today" {
         return Some(today);
     }
-
     if input_lower == "tomorrow" {
         return today.checked_add_days(Days::new(1));
     }
-
     if input_lower == "yesterday" {
         return today.checked_sub_days(Days::new(1));
     }
 
-    // Handle Xd (future) and -Xd (past) patterns
-    if let Some(days_str) = input_lower.strip_suffix('d') {
-        if let Some(neg_days_str) = days_str.strip_prefix('-') {
-            if let Ok(days) = neg_days_str.parse::<u64>()
-                && days > 0
-            {
-                return today.checked_sub_days(Days::new(days));
-            }
-        } else if let Ok(days) = days_str.parse::<u64>()
-            && days > 0
-        {
-            return today.checked_add_days(Days::new(days));
-        }
-    }
+    let (base, is_future) = if let Some(b) = input_lower.strip_suffix('+') {
+        (b, true)
+    } else {
+        (input_lower.as_str(), default_future)
+    };
 
-    if let Some(weekday_str) = input_lower.strip_prefix("next-")
-        && let Some(target_weekday) = parse_weekday(weekday_str)
+    if let Some(days_str) = base.strip_prefix('d')
+        && days_str.len() <= 3
+        && let Ok(days) = days_str.parse::<u64>()
+        && days > 0
     {
-        return next_weekday_from(today, target_weekday);
+        return if is_future {
+            today.checked_add_days(Days::new(days))
+        } else {
+            today.checked_sub_days(Days::new(days))
+        };
     }
 
-    if let Some(weekday_str) = input_lower.strip_prefix("last-")
-        && let Some(target_weekday) = parse_weekday(weekday_str)
-    {
-        return prev_weekday_from(today, target_weekday);
+    if let Some(target_weekday) = parse_weekday(base) {
+        return if is_future {
+            next_weekday_from(today, target_weekday)
+        } else {
+            prev_weekday_from(today, target_weekday)
+        };
     }
 
-    parse_later_date(input, today)
+    None
 }
 
-/// Replaces natural date patterns (@today, @tomorrow, @yesterday, @next-mon, @last-mon, @3d, @-3d) with @MM/DD format.
+/// Parses natural language date expressions for ENTRIES (future by default):
+/// today, tomorrow, yesterday, d7 (7 days from now), mon (next Monday).
+/// Falls back to parse_later_date for standard formats.
+#[must_use]
+pub fn parse_natural_date(input: &str, today: NaiveDate) -> Option<NaiveDate> {
+    parse_relative_date(input, today, true).or_else(|| parse_later_date(input, today))
+}
+
+/// Parses date expressions for FILTERS (past by default):
+/// today, tomorrow, yesterday, d7 (7 days ago), mon (last Monday).
+/// Append + for explicit future: d7+ (7 days from now), mon+ (next Monday).
+#[must_use]
+pub fn parse_filter_date(input: &str, today: NaiveDate) -> Option<NaiveDate> {
+    parse_relative_date(input, today, false).or_else(|| parse_later_date(input, today))
+}
+
+/// Replaces natural date patterns (@today, @tomorrow, @yesterday, @d7, @mon) with @MM/DD format.
 #[must_use]
 pub fn normalize_natural_dates(content: &str, today: NaiveDate) -> String {
     let mut result = content.to_string();
@@ -410,12 +422,14 @@ pub fn parse_filter_query(query: &str) -> Filter {
 
     for token in query.split_whitespace() {
         // Date filters: @before:DATE, @after:DATE, @overdue
+        // Dates default to past (d7 = 7 days ago, mon = last Monday)
+        // Append + for explicit future (d7+ = 7 days from now, mon+ = next Monday)
         if let Some(date_str) = token.strip_prefix("@before:") {
             if filter.before_date.is_some() {
                 filter
                     .invalid_tokens
                     .push("Multiple @before dates".to_string());
-            } else if let Some(date) = parse_natural_date(date_str, today) {
+            } else if let Some(date) = parse_filter_date(date_str, today) {
                 filter.before_date = Some(date);
             } else {
                 filter.invalid_tokens.push(token.to_string());
@@ -427,7 +441,7 @@ pub fn parse_filter_query(query: &str) -> Filter {
                 filter
                     .invalid_tokens
                     .push("Multiple @after dates".to_string());
-            } else if let Some(date) = parse_natural_date(date_str, today) {
+            } else if let Some(date) = parse_filter_date(date_str, today) {
                 filter.after_date = Some(date);
             } else {
                 filter.invalid_tokens.push(token.to_string());

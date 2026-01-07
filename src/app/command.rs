@@ -27,8 +27,14 @@ impl App {
                 self.save();
                 self.should_quit = true;
             }
-            "edit" => {
-                self.handle_edit_command(arg)?;
+            "config" => {
+                self.handle_config_command(arg)?;
+            }
+            "journal" => {
+                self.handle_journal_command(arg)?;
+            }
+            "scratchpad" | "sp" => {
+                self.handle_scratchpad_command()?;
             }
             _ => {
                 if !command.is_empty() {
@@ -40,32 +46,27 @@ impl App {
         Ok(())
     }
 
-    fn handle_edit_command(&mut self, arg: &str) -> io::Result<()> {
-        let parts: Vec<&str> = arg.split_whitespace().collect();
-        let target = parts.first().copied().unwrap_or("");
-        let scope = parts.get(1).copied();
-
-        let (path, is_config) = match target {
-            "config" => (self.resolve_config_path(scope), true),
-            "journal" => (self.resolve_journal_path(scope), false),
-            "scratchpad" | "sp" => (Ok(self.config.get_scratchpad_path()), false),
-            "" => {
-                self.set_status("Usage: :edit <config|journal|scratchpad>");
-                return Ok(());
-            }
-            _ => {
-                self.set_status(format!(
-                    "Unknown target: {target}. Use 'config', 'journal', or 'scratchpad'"
-                ));
-                return Ok(());
-            }
-        };
-
-        match path {
-            Ok(p) => self.open_in_editor(&p, is_config)?,
+    fn handle_config_command(&mut self, arg: &str) -> io::Result<()> {
+        let scope = if arg.is_empty() { None } else { Some(arg) };
+        match self.resolve_config_path(scope) {
+            Ok(path) => self.open_in_editor(&path, true)?,
             Err(msg) => self.set_status(msg),
         }
         Ok(())
+    }
+
+    fn handle_journal_command(&mut self, arg: &str) -> io::Result<()> {
+        let scope = if arg.is_empty() { None } else { Some(arg) };
+        match self.resolve_journal_path(scope) {
+            Ok(path) => self.open_in_editor(&path, false)?,
+            Err(msg) => self.set_status(msg),
+        }
+        Ok(())
+    }
+
+    fn handle_scratchpad_command(&mut self) -> io::Result<()> {
+        let path = self.config.get_scratchpad_path();
+        self.open_in_editor(&path, false)
     }
 
     fn resolve_config_path(&self, scope: Option<&str>) -> Result<PathBuf, String> {

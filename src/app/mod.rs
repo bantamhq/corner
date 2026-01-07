@@ -510,7 +510,13 @@ impl App {
             }
         };
 
-        self.hint_state = HintContext::compute(input, mode, &self.cached_journal_tags);
+        let saved_filters: Vec<String> = if mode == HintMode::Filter {
+            self.config.filters.keys().cloned().collect()
+        } else {
+            Vec::new()
+        };
+        self.hint_state =
+            HintContext::compute(input, mode, &self.cached_journal_tags, &saved_filters);
     }
 
     /// Clear any active hints.
@@ -575,19 +581,22 @@ impl App {
         let arg_part = parts.next();
 
         // Find matching command
-        let Some(cmd) = COMMANDS.iter().find(|c| c.name == cmd_part)
-        else {
+        let Some(cmd) = COMMANDS.iter().find(|c| c.name == cmd_part) else {
             // Unknown command - let execute_command show the error
             return true;
         };
 
-        // If command has no subargs, it's complete
         if cmd.subargs.is_empty() {
             return true;
         }
 
-        // Command has subargs - only incomplete if NO argument provided yet
-        // (invalid args should still execute to show error)
+        // Subargs are optional if args field starts with '['
+        let subargs_optional = cmd.args.is_some_and(|a| a.starts_with('['));
+        if subargs_optional {
+            return true;
+        }
+
+        // Invalid args should still execute to show error
         match arg_part {
             None | Some("") => false,
             Some(_) => true,

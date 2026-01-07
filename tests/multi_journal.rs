@@ -22,8 +22,7 @@ fn test_journal_isolation() {
     fs::write(&global_path, "# 2026/01/15\n- [ ] Global entry\n").unwrap();
     fs::write(&project_path, "# 2026/01/15\n- [ ] Project entry\n").unwrap();
 
-    let context =
-        storage::JournalContext::new(global_path, Some(project_path), JournalSlot::Hub);
+    let context = storage::JournalContext::new(global_path, Some(project_path), JournalSlot::Hub);
 
     let config = Config::default();
     let app = App::new_with_context(config, date, context).unwrap();
@@ -106,8 +105,7 @@ fn test_journal_toggle_key() {
     fs::write(&global_path, "# 2026/01/15\n- [ ] Global entry\n").unwrap();
     fs::write(&project_path, "# 2026/01/15\n- [ ] Project entry\n").unwrap();
 
-    let context =
-        storage::JournalContext::new(global_path, Some(project_path), JournalSlot::Hub);
+    let context = storage::JournalContext::new(global_path, Some(project_path), JournalSlot::Hub);
 
     let config = Config::default();
     let mut app = App::new_with_context(config, date, context).unwrap();
