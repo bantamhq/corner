@@ -463,10 +463,10 @@ pub fn handle_selection_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
             app.selection_move_up();
         }
         KeyCode::Char('g') => {
-            app.jump_to_first();
+            app.selection_jump_to_first();
         }
         KeyCode::Char('G') => {
-            app.jump_to_last();
+            app.selection_jump_to_last();
         }
         // Batch operations
         KeyCode::Char('d') => {

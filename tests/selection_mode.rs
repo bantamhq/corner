@@ -293,3 +293,30 @@ fn selection_mode_allows_navigation_keys() {
 
     assert!(matches!(ctx.app.input_mode, InputMode::Selection(_)));
 }
+
+#[test]
+fn selection_skips_projected_entries() {
+    let view_date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+    let content =
+        "# 2026/01/10\n- [ ] Later task @01/15\n# 2026/01/15\n- [ ] Local A\n- [ ] Local B\n";
+    let mut ctx = TestContext::with_journal_content(view_date, content);
+
+    assert!(ctx.screen_contains("Later task"));
+    assert!(ctx.screen_contains("Local A"));
+
+    ctx.press(KeyCode::Char('g'));
+    ctx.press(KeyCode::Char('v'));
+    assert!(matches!(ctx.app.input_mode, InputMode::Normal));
+
+    ctx.press(KeyCode::Char('j'));
+    ctx.press(KeyCode::Char('v'));
+    assert!(matches!(ctx.app.input_mode, InputMode::Selection(_)));
+
+    // g should jump to first LOCAL entry (index 1), not projected entry
+    ctx.press(KeyCode::Char('g'));
+    assert_eq!(ctx.selected_index(), 1);
+
+    // k should not move up into projected entries
+    ctx.press(KeyCode::Char('k'));
+    assert_eq!(ctx.selected_index(), 1);
+}

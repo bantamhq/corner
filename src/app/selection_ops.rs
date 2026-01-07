@@ -21,10 +21,13 @@ enum SelectedEntry<'a> {
 }
 
 impl App {
-    /// Enter selection mode at current cursor position
+    fn is_projected_index(&self, visible_idx: usize) -> bool {
+        matches!(&self.view, ViewMode::Daily(_)) && visible_idx < self.visible_projected_count()
+    }
+
     pub fn enter_selection_mode(&mut self) {
         let current = self.current_visible_index();
-        if current < self.visible_entry_count() {
+        if current < self.visible_entry_count() && !self.is_projected_index(current) {
             self.input_mode = InputMode::Selection(SelectionState::new(current));
         }
     }
@@ -34,27 +37,46 @@ impl App {
         self.input_mode = InputMode::Normal;
     }
 
-    /// Move cursor down in selection mode (without extending)
     pub fn selection_move_down(&mut self) {
         self.move_down();
     }
 
-    /// Move cursor up in selection mode (without extending)
     pub fn selection_move_up(&mut self) {
-        self.move_up();
-    }
-
-    /// Select range from anchor to current cursor (Shift+V)
-    pub fn selection_extend_to_cursor(&mut self) {
+        let projected_count = self.visible_projected_count();
         let current = self.current_visible_index();
-        if let InputMode::Selection(ref mut state) = self.input_mode {
-            state.extend_to(current);
+        if current > projected_count {
+            self.move_up();
         }
     }
 
-    /// Toggle selection on current entry (Space)
+    pub fn selection_jump_to_first(&mut self) {
+        let projected_count = self.visible_projected_count();
+        match &mut self.view {
+            ViewMode::Daily(state) => state.selected = projected_count,
+            ViewMode::Filter(state) => state.selected = 0,
+        }
+    }
+
+    pub fn selection_jump_to_last(&mut self) {
+        self.jump_to_last();
+    }
+
+    pub fn selection_extend_to_cursor(&mut self) {
+        let current = self.current_visible_index();
+        let projected_count = self.visible_projected_count();
+        if let InputMode::Selection(ref mut state) = self.input_mode {
+            state.extend_to(current);
+            if matches!(&self.view, ViewMode::Daily(_)) {
+                state.selected_indices.retain(|&idx| idx >= projected_count);
+            }
+        }
+    }
+
     pub fn selection_toggle_current(&mut self) {
         let current = self.current_visible_index();
+        if self.is_projected_index(current) {
+            return;
+        }
         if let InputMode::Selection(ref mut state) = self.input_mode {
             state.toggle(current);
         }
