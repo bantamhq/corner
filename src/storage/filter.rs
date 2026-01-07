@@ -7,8 +7,7 @@ use chrono::{Days, NaiveDate};
 use regex::Regex;
 
 use super::entries::{
-    Entry, EntryType, FilterResult, Line, ProjectedEntry, ProjectedKind, RecurringPattern,
-    parse_lines,
+    Entry, EntryType, Line, RawEntry, RecurringPattern, SourceType, parse_lines,
 };
 use super::persistence::{load_journal, parse_day_header};
 
@@ -345,6 +344,12 @@ pub fn parse_recurring_pattern(pattern_str: &str) -> Option<RecurringPattern> {
     }
 }
 
+/// Strips @every-* tags from content (e.g., for matching done-today entries).
+#[must_use]
+pub fn strip_recurring_tags(content: &str) -> String {
+    RECURRING_REGEX.replace_all(content, "").trim().to_string()
+}
+
 /// Extracts the recurring pattern from entry content if it contains an @every-* pattern.
 #[must_use]
 pub fn extract_recurring_pattern(content: &str) -> Option<RecurringPattern> {
@@ -404,10 +409,11 @@ fn extract_target_date_prefer_past(content: &str, today: NaiveDate) -> Option<Na
 
 /// Collects all projected entries (both @later and @recurring) for the target date.
 /// Entries from the target date itself are excluded (they're regular entries).
+/// Returns entries with appropriate SourceType (Later or Recurring).
 pub fn collect_projected_entries_for_date(
     target_date: NaiveDate,
     path: &Path,
-) -> io::Result<Vec<ProjectedEntry>> {
+) -> io::Result<Vec<Entry>> {
     let journal = load_journal(path)?;
     let mut entries = Vec::new();
     let mut current_date: Option<NaiveDate> = None;
@@ -428,28 +434,28 @@ pub fn collect_projected_entries_for_date(
             }
 
             let parsed = parse_lines(line);
-            if let Some(Line::Entry(entry)) = parsed.first() {
+            if let Some(Line::Entry(raw_entry)) = parsed.first() {
                 // Check for @later pattern (one-time date projection)
-                if let Some(entry_target) = extract_target_date(&entry.content, target_date)
+                if let Some(entry_target) = extract_target_date(&raw_entry.content, target_date)
                     && entry_target == target_date
                 {
-                    entries.push(ProjectedEntry {
+                    entries.push(Entry::from_raw(
+                        raw_entry,
                         source_date,
-                        line_index: line_index_in_day,
-                        entry: entry.clone(),
-                        kind: ProjectedKind::Later,
-                    });
+                        line_index_in_day,
+                        SourceType::Later,
+                    ));
                 }
                 // Check for @recurring pattern (repeating projection)
-                else if let Some(pattern) = extract_recurring_pattern(&entry.content)
+                else if let Some(pattern) = extract_recurring_pattern(&raw_entry.content)
                     && pattern.matches(target_date)
                 {
-                    entries.push(ProjectedEntry {
+                    entries.push(Entry::from_raw(
+                        raw_entry,
                         source_date,
-                        line_index: line_index_in_day,
-                        entry: entry.clone(),
-                        kind: ProjectedKind::Recurring,
-                    });
+                        line_index_in_day,
+                        SourceType::Recurring,
+                    ));
                 }
             }
             line_index_in_day += 1;
@@ -573,7 +579,9 @@ pub fn parse_filter_query(query: &str) -> Filter {
     filter
 }
 
-pub fn collect_filtered_entries(filter: &Filter, path: &Path) -> io::Result<Vec<FilterResult>> {
+/// Collects entries matching the filter criteria.
+/// Returns entries with SourceType::Local (filter results are from their source day).
+pub fn collect_filtered_entries(filter: &Filter, path: &Path) -> io::Result<Vec<Entry>> {
     if !filter.invalid_tokens.is_empty() {
         return Ok(Vec::new());
     }
@@ -607,10 +615,10 @@ pub fn collect_filtered_entries(filter: &Filter, path: &Path) -> io::Result<Vec<
             }
 
             let parsed = parse_lines(line);
-            if let Some(Line::Entry(entry)) = parsed.first() {
+            if let Some(Line::Entry(raw_entry)) = parsed.first() {
                 // Overdue filter: entry must have @date targeting before today
                 if filter.overdue {
-                    let target = extract_target_date_prefer_past(&entry.content, today);
+                    let target = extract_target_date_prefer_past(&raw_entry.content, today);
                     if target.is_none() || target.unwrap() >= today {
                         line_index_in_day += 1;
                         continue;
@@ -619,25 +627,26 @@ pub fn collect_filtered_entries(filter: &Filter, path: &Path) -> io::Result<Vec<
 
                 // Later filter: entry must have a @date pattern
                 if filter.later
-                    && !LATER_DATE_REGEX.is_match(&entry.content)
-                    && !NATURAL_DATE_REGEX.is_match(&entry.content)
+                    && !LATER_DATE_REGEX.is_match(&raw_entry.content)
+                    && !NATURAL_DATE_REGEX.is_match(&raw_entry.content)
                 {
                     line_index_in_day += 1;
                     continue;
                 }
 
                 // Recurring filter: entry must have an @every-* pattern
-                if filter.recurring && !RECURRING_REGEX.is_match(&entry.content) {
+                if filter.recurring && !RECURRING_REGEX.is_match(&raw_entry.content) {
                     line_index_in_day += 1;
                     continue;
                 }
 
-                if entry_matches_filter(entry, filter) {
-                    entries.push(FilterResult {
+                if entry_matches_filter(raw_entry, filter) {
+                    entries.push(Entry::from_raw(
+                        raw_entry,
                         source_date,
-                        line_index: line_index_in_day,
-                        entry: entry.clone(),
-                    });
+                        line_index_in_day,
+                        SourceType::Local,
+                    ));
                 }
             }
             line_index_in_day += 1;
@@ -656,7 +665,7 @@ fn entry_type_to_filter_type(entry_type: &EntryType) -> FilterType {
     }
 }
 
-fn entry_matches_filter(entry: &Entry, filter: &Filter) -> bool {
+fn entry_matches_filter(entry: &RawEntry, filter: &Filter) -> bool {
     let entry_filter_type = entry_type_to_filter_type(&entry.entry_type);
 
     if !filter.entry_types.is_empty() && !filter.entry_types.contains(&entry_filter_type) {

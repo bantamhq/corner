@@ -33,7 +33,7 @@ impl App {
             "journal" => {
                 self.handle_journal_command(arg)?;
             }
-            "scratchpad" | "sp" => {
+            "scratchpad" => {
                 self.handle_scratchpad_command()?;
             }
             _ => {

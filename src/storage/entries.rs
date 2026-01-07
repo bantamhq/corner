@@ -28,13 +28,26 @@ impl EntryType {
     }
 }
 
+/// Where an entry originates from relative to the viewed day.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourceType {
+    /// Entry belongs to the viewed day, editable
+    Local,
+    /// Projected via @date pattern, read-only
+    Later,
+    /// Projected via @every-* pattern, read-only
+    Recurring,
+}
+
+/// Raw entry as parsed from markdown, without location metadata.
+/// Used internally for parsing and serialization.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Entry {
+pub struct RawEntry {
     pub entry_type: EntryType,
     pub content: String,
 }
 
-impl Entry {
+impl RawEntry {
     #[must_use]
     pub fn new_task(content: &str) -> Self {
         Self {
@@ -54,36 +67,78 @@ impl Entry {
     }
 }
 
+/// Entry with full location and source metadata.
+/// This is the unified entry type used throughout the application.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Entry {
+    pub entry_type: EntryType,
+    pub content: String,
+    pub source_date: NaiveDate,
+    pub line_index: usize,
+    pub source_type: SourceType,
+}
+
+impl Entry {
+    /// Create an Entry from a RawEntry with location metadata.
+    #[must_use]
+    pub fn from_raw(
+        raw: &RawEntry,
+        source_date: NaiveDate,
+        line_index: usize,
+        source_type: SourceType,
+    ) -> Self {
+        Self {
+            entry_type: raw.entry_type.clone(),
+            content: raw.content.clone(),
+            source_date,
+            line_index,
+            source_type,
+        }
+    }
+
+    #[must_use]
+    pub fn new_task(content: &str, source_date: NaiveDate, line_index: usize) -> Self {
+        Self {
+            entry_type: EntryType::Task { completed: false },
+            content: content.to_string(),
+            source_date,
+            line_index,
+            source_type: SourceType::Local,
+        }
+    }
+
+    pub fn prefix(&self) -> &'static str {
+        self.entry_type.prefix()
+    }
+
+    pub fn toggle_complete(&mut self) {
+        if let EntryType::Task { completed } = &mut self.entry_type {
+            *completed = !*completed;
+        }
+    }
+
+    /// Convert back to RawEntry for serialization.
+    #[must_use]
+    pub fn to_raw(&self) -> RawEntry {
+        RawEntry {
+            entry_type: self.entry_type.clone(),
+            content: self.content.clone(),
+        }
+    }
+
+    /// Returns true if this entry can be edited/deleted.
+    #[must_use]
+    pub fn is_editable(&self) -> bool {
+        self.source_type == SourceType::Local
+    }
+}
+
+/// A line in the journal file - either a parsed entry or raw markdown.
+/// Uses RawEntry for parsing/serialization; Entry is derived with context.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Line {
-    Entry(Entry),
+    Entry(RawEntry),
     Raw(String),
-}
-
-/// Filter view entry: wraps Entry with location metadata for operations.
-#[derive(Debug, Clone)]
-pub struct FilterResult {
-    pub source_date: NaiveDate,
-    pub line_index: usize,
-    pub entry: Entry,
-}
-
-/// The kind of projected entry (determines display and toggle behavior).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ProjectedKind {
-    /// One-time projection via @MM/DD syntax
-    Later,
-    /// Repeating projection via @every-* syntax
-    Recurring,
-}
-
-/// Daily view projected entry: entry appearing on a different date than its source.
-#[derive(Debug, Clone)]
-pub struct ProjectedEntry {
-    pub source_date: NaiveDate,
-    pub line_index: usize,
-    pub entry: Entry,
-    pub kind: ProjectedKind,
 }
 
 /// Recurring pattern for @every-* syntax.
@@ -120,6 +175,7 @@ impl RecurringPattern {
 }
 
 /// Returns the last day of the month for the given date.
+#[must_use]
 fn last_day_of_month(date: NaiveDate) -> u32 {
     let (year, month) = (date.year(), date.month());
     let next_month = if month == 12 {
@@ -137,28 +193,28 @@ fn parse_line(line: &str) -> Line {
     let trimmed = line.trim_start();
 
     if let Some(content) = trimmed.strip_prefix("- [ ] ") {
-        return Line::Entry(Entry {
+        return Line::Entry(RawEntry {
             entry_type: EntryType::Task { completed: false },
             content: content.to_string(),
         });
     }
 
     if let Some(content) = trimmed.strip_prefix("- [x] ") {
-        return Line::Entry(Entry {
+        return Line::Entry(RawEntry {
             entry_type: EntryType::Task { completed: true },
             content: content.to_string(),
         });
     }
 
     if let Some(content) = trimmed.strip_prefix("* ") {
-        return Line::Entry(Entry {
+        return Line::Entry(RawEntry {
             entry_type: EntryType::Event,
             content: content.to_string(),
         });
     }
 
     if let Some(content) = trimmed.strip_prefix("- ") {
-        return Line::Entry(Entry {
+        return Line::Entry(RawEntry {
             entry_type: EntryType::Note,
             content: content.to_string(),
         });
@@ -174,7 +230,7 @@ pub fn parse_lines(content: &str) -> Vec<Line> {
 
 fn serialize_line(line: &Line) -> String {
     match line {
-        Line::Entry(entry) => format!("{}{}", entry.prefix(), entry.content),
+        Line::Entry(raw_entry) => format!("{}{}", raw_entry.prefix(), raw_entry.content),
         Line::Raw(s) => s.clone(),
     }
 }

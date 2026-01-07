@@ -1,7 +1,7 @@
 use chrono::Local;
 
 use crate::cursor::CursorBuffer;
-use crate::storage::{self, Entry, EntryType, Line};
+use crate::storage::{self, Entry, EntryType, Line, RawEntry, SourceType};
 
 use super::actions::{CreateEntry, CreateTarget, EditEntry, EditTarget};
 use super::{App, EditContext, EntryLocation, InputMode, InsertPosition, ViewMode};
@@ -39,7 +39,7 @@ impl App {
                     && let ViewMode::Filter(state) = &mut self.view
                     && let Some(filter_entry) = state.entries.get_mut(filter_index)
                 {
-                    filter_entry.entry.entry_type = new_type;
+                    filter_entry.entry_type = new_type;
                     if date == self.current_date {
                         let _ = self.reload_current_day();
                     }
@@ -140,11 +140,17 @@ impl App {
         // Create appropriate action
         if is_new_entry {
             // Get the full entry after saving
-            if let Line::Entry(entry) = &self.lines[line_idx] {
+            if let Line::Entry(raw_entry) = &self.lines[line_idx] {
+                let entry = Entry::from_raw(
+                    raw_entry,
+                    self.current_date,
+                    line_idx,
+                    SourceType::Local,
+                );
                 let target = CreateTarget {
                     date: self.current_date,
                     line_index: line_idx,
-                    entry: entry.clone(),
+                    entry,
                     is_filter_quick_add: false,
                 };
                 let action = CreateEntry::new(target);
@@ -187,11 +193,17 @@ impl App {
                     self.set_status(format!("Failed to save: {e}"));
                 }
                 Ok(true) if original_content != new_content => {
+                    let entry = Entry {
+                        entry_type: entry_type.clone(),
+                        content: original_content.clone(),
+                        source_date: date,
+                        line_index,
+                        source_type: SourceType::Local,
+                    };
                     let target = EditTarget {
                         location: EntryLocation::Filter {
                             index: filter_index,
-                            source_date: date,
-                            line_index,
+                            entry,
                         },
                         original_content,
                         new_content,
@@ -221,15 +233,22 @@ impl App {
         if !content.trim().is_empty()
             && let Ok(mut lines) = storage::load_day_lines(date, &path)
         {
-            let entry = Entry {
-                entry_type,
-                content,
-            };
             let line_index = lines.len();
-            lines.push(Line::Entry(entry.clone()));
+            let raw_entry = RawEntry {
+                entry_type: entry_type.clone(),
+                content: content.clone(),
+            };
+            lines.push(Line::Entry(raw_entry));
             let _ = storage::save_day_lines(date, &path, &lines);
 
             // Create action for the new entry
+            let entry = Entry {
+                entry_type,
+                content,
+                source_date: date,
+                line_index,
+                source_type: SourceType::Local,
+            };
             let target = CreateTarget {
                 date,
                 line_index,
@@ -285,14 +304,14 @@ impl App {
                     .map(|e| e.entry_type.clone())
                     .unwrap_or(EntryType::Task { completed: false });
 
-                let new_entry = Entry {
+                let new_raw_entry = RawEntry {
                     entry_type: match entry_type {
                         EntryType::Task { .. } => EntryType::Task { completed: false },
                         other => other,
                     },
                     content: String::new(),
                 };
-                self.add_entry_internal(new_entry, InsertPosition::Below);
+                self.add_entry_internal(new_raw_entry, InsertPosition::Below);
             }
             EditContext::FilterQuickAdd { date, entry_type } => {
                 self.original_edit_content = Some(String::new());
@@ -309,7 +328,7 @@ impl App {
         }
     }
 
-    pub(super) fn add_entry_internal(&mut self, entry: Entry, position: InsertPosition) {
+    pub(super) fn add_entry_internal(&mut self, entry: RawEntry, position: InsertPosition) {
         use super::SelectedItem;
 
         let insert_pos =
@@ -347,6 +366,6 @@ impl App {
     }
 
     pub fn new_task(&mut self, position: InsertPosition) {
-        self.add_entry_internal(Entry::new_task(""), position);
+        self.add_entry_internal(RawEntry::new_task(""), position);
     }
 }

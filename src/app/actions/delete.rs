@@ -5,7 +5,7 @@ use chrono::NaiveDate;
 
 use super::super::{App, DeleteTarget, Line, ViewMode};
 use super::types::{Action, ActionDescription};
-use crate::storage::{self, Entry, EntryType, FilterResult};
+use crate::storage::{self, Entry, EntryType};
 
 fn pluralize(count: usize) -> &'static str {
     if count == 1 { "entry" } else { "entries" }
@@ -37,13 +37,13 @@ impl Action for DeleteEntries {
         self.targets.sort_by(|a, b| {
             let idx_a = match a {
                 DeleteTarget::Daily { line_idx, .. } => *line_idx,
-                DeleteTarget::Projected { line_index, .. } => *line_index,
-                DeleteTarget::Filter { line_index, .. } => *line_index,
+                DeleteTarget::Projected(entry) => entry.line_index,
+                DeleteTarget::Filter { entry, .. } => entry.line_index,
             };
             let idx_b = match b {
                 DeleteTarget::Daily { line_idx, .. } => *line_idx,
-                DeleteTarget::Projected { line_index, .. } => *line_index,
-                DeleteTarget::Filter { line_index, .. } => *line_index,
+                DeleteTarget::Projected(entry) => entry.line_index,
+                DeleteTarget::Filter { entry, .. } => entry.line_index,
             };
             idx_b.cmp(&idx_a)
         });
@@ -109,7 +109,7 @@ impl Action for RestoreEntries {
                         entry: entry.clone(),
                     });
 
-                    app.lines.insert(insert_idx, Line::Entry(entry.clone()));
+                    app.lines.insert(insert_idx, Line::Entry(entry.to_raw()));
                     last_insert_idx = insert_idx;
                 }
 
@@ -149,24 +149,24 @@ impl Action for RestoreEntries {
                         for (i, (line_idx, entry)) in date_entries.into_iter().enumerate() {
                             let insert_idx = (line_idx + i).min(lines.len());
 
-                            let filter_result = FilterResult {
+                            // Create the restored entry with updated line_index
+                            let restored_entry = Entry {
+                                entry_type: entry.entry_type.clone(),
+                                content: entry.content.clone(),
                                 source_date: date,
                                 line_index: insert_idx,
-                                entry: entry.clone(),
+                                source_type: entry.source_type,
                             };
-                            lines.insert(insert_idx, Line::Entry(entry.clone()));
+                            lines.insert(insert_idx, Line::Entry(entry.to_raw()));
 
                             if let ViewMode::Filter(state) = &mut app.view {
                                 let filter_index = state.entries.len();
-                                state.entries.push(filter_result);
+                                state.entries.push(restored_entry.clone());
                                 state.selected = filter_index;
 
                                 delete_targets.push(DeleteTarget::Filter {
                                     index: filter_index,
-                                    source_date: date,
-                                    line_index: insert_idx,
-                                    entry_type: entry.entry_type.clone(),
-                                    content: entry.content.clone(),
+                                    entry: restored_entry,
                                 });
                             }
                         }
@@ -202,28 +202,13 @@ fn execute_delete_raw(
     let path = app.active_path().to_path_buf();
 
     match target {
-        DeleteTarget::Projected {
-            source_date,
-            line_index,
-            entry_type,
-            content,
-        } => {
-            storage::delete_entry(*source_date, &path, *line_index)?;
+        DeleteTarget::Projected(entry) => {
+            storage::delete_entry(entry.source_date, &path, entry.line_index)?;
 
-            if let ViewMode::Daily(state) = &mut app.view {
-                state.projected_entries =
-                    storage::collect_projected_entries_for_date(app.current_date, &path)?;
-            }
+            app.refresh_projected_entries();
             clamp_daily_selection(app);
 
-            Ok((
-                *source_date,
-                *line_index,
-                Entry {
-                    entry_type: entry_type.clone(),
-                    content: content.clone(),
-                },
-            ))
+            Ok((entry.source_date, entry.line_index, entry.clone()))
         }
         DeleteTarget::Daily { line_idx, entry } => {
             let result = (app.current_date, *line_idx, entry.clone());
@@ -231,23 +216,19 @@ fn execute_delete_raw(
             app.entry_indices = App::compute_entry_indices(&app.lines);
             clamp_daily_selection(app);
             app.save();
+            // Refresh projected entries in case we deleted a ↺ entry that was hiding a recurring
+            app.refresh_projected_entries();
             Ok(result)
         }
-        DeleteTarget::Filter {
-            index,
-            source_date,
-            line_index,
-            entry_type,
-            content,
-        } => {
-            storage::delete_entry(*source_date, &path, *line_index)?;
+        DeleteTarget::Filter { index, entry } => {
+            storage::delete_entry(entry.source_date, &path, entry.line_index)?;
 
             if let ViewMode::Filter(state) = &mut app.view {
                 state.entries.remove(*index);
 
                 for filter_entry in &mut state.entries {
-                    if filter_entry.source_date == *source_date
-                        && filter_entry.line_index > *line_index
+                    if filter_entry.source_date == entry.source_date
+                        && filter_entry.line_index > entry.line_index
                     {
                         filter_entry.line_index -= 1;
                     }
@@ -258,18 +239,11 @@ fn execute_delete_raw(
                 }
             }
 
-            if *source_date == app.current_date {
+            if entry.source_date == app.current_date {
                 app.reload_current_day()?;
             }
 
-            Ok((
-                *source_date,
-                *line_index,
-                Entry {
-                    entry_type: entry_type.clone(),
-                    content: content.clone(),
-                },
-            ))
+            Ok((entry.source_date, entry.line_index, entry.clone()))
         }
     }
 }

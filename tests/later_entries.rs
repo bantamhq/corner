@@ -172,3 +172,40 @@ fn test_overdue_filter() {
         "Undated entry should not appear in @overdue filter"
     );
 }
+
+/// LE-6: @later filter shows entries with @date patterns
+#[test]
+fn test_later_filter() {
+    let today = chrono::Local::now().date_naive();
+    let future_date = (today + chrono::Days::new(5))
+        .format("@%m/%d/%y")
+        .to_string();
+
+    let content = format!(
+        "# {}\n- [ ] Scheduled task {}\n- [ ] Regular task\n- [ ] Recurring task @every-day\n",
+        today.format("%Y/%m/%d"),
+        future_date
+    );
+    let mut ctx = TestContext::with_journal_content(today, &content);
+
+    // Filter for @later
+    ctx.press(KeyCode::Char('/'));
+    ctx.type_str("@later");
+    ctx.press(KeyCode::Enter);
+
+    // Later entry should appear
+    assert!(
+        ctx.screen_contains("Scheduled task"),
+        "Later entry should appear in @later filter"
+    );
+
+    // Regular and recurring entries should not appear
+    assert!(
+        !ctx.screen_contains("Regular task"),
+        "Regular entry should not appear in @later filter"
+    );
+    assert!(
+        !ctx.screen_contains("Recurring task"),
+        "Recurring entry should not appear in @later filter"
+    );
+}

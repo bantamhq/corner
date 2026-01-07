@@ -254,7 +254,7 @@ fn run_app<B: ratatui::backend::Backend>(
                             unreachable!()
                         };
                         state.entries.get(*filter_index).map(|filter_entry| {
-                            let prefix_width = filter_entry.entry.entry_type.prefix().len();
+                            let prefix_width = filter_entry.entry_type.prefix().len();
                             let text_width =
                                 content_width.saturating_sub(prefix_width + DATE_SUFFIX_WIDTH);
                             let (cursor_row, cursor_col) = cursor_position_in_wrap(

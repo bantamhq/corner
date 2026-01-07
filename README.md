@@ -70,7 +70,7 @@ That's enough to get started. The sections below go deeper.
 
 Your home base. Each day is a page in your journal. Navigate between days with `h` / `l` or `[` / `]`, or jump to any date with `\` to open the datepicker.
 
-Entries from other days that target today using `@date` syntax appear in a "Later" section at the top — tasks you scheduled forward will surface when the day comes.
+Entries from other days that target today appear at the top — one-time `@date` entries and recurring `@every-*` entries surface when the day comes.
 
 | Key | Action |
 |-----|--------|
@@ -105,6 +105,8 @@ Press `/` to search across your entire journal. Filter by entry type, tags, date
 | `#work` | Entries tagged #work |
 | `!tasks #work` | Incomplete tasks tagged #work |
 | `@after:yesterday @before:tomorrow` | Entries from today |
+| `@recurring` | All recurring entries |
+| `@later` | All entries with @date patterns |
 | `meeting #standup` | Entries containing "meeting" with #standup tag |
 | `not:#work` | Entries without #work tag |
 
@@ -168,6 +170,29 @@ Natural date shortcuts are converted when you save:
 - `@3d` (3 days from now), `@-3d` (3 days ago)
 
 The entry appears in the "Later" section when you view the target date.
+
+### Recurring Entries
+
+Use `@every-*` patterns for entries that repeat on a schedule:
+
+```markdown
+- [ ] Daily standup @every-day
+- [ ] Weekly review @every-monday
+- [ ] Pay rent @every-1
+```
+
+Available patterns:
+
+| Pattern | Recurrence |
+|---------|------------|
+| `@every-day` | Every day |
+| `@every-weekday` | Monday through Friday |
+| `@every-mon` through `@every-sun` | Weekly on that day |
+| `@every-1` through `@every-31` | Monthly on that date |
+
+Recurring entries appear on all matching days. When you complete one, a copy is marked done for today while the source entry stays open for future occurrences.
+
+To edit or delete a recurring entry, press `o` to jump to its source.
 
 ### Undo / Redo
 

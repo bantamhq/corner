@@ -110,42 +110,31 @@ fn set_entry_content_raw(app: &mut App, target: &EditTarget) -> io::Result<()> {
     let path = app.active_path().to_path_buf();
 
     match &target.location {
-        EntryLocation::Projected {
-            source_date,
-            line_index,
-            ..
-        } => {
-            storage::mutate_entry(*source_date, &path, *line_index, |entry| {
-                entry.content = target.original_content.clone();
+        EntryLocation::Projected(entry) => {
+            storage::mutate_entry(entry.source_date, &path, entry.line_index, |raw_entry| {
+                raw_entry.content = target.original_content.clone();
             })?;
 
-            if let ViewMode::Daily(state) = &mut app.view {
-                state.projected_entries =
-                    storage::collect_projected_entries_for_date(app.current_date, &path)?;
-            }
+            app.refresh_projected_entries();
         }
         EntryLocation::Daily { line_idx } => {
-            if let Line::Entry(entry) = &mut app.lines[*line_idx] {
-                entry.content = target.original_content.clone();
+            if let Line::Entry(raw_entry) = &mut app.lines[*line_idx] {
+                raw_entry.content = target.original_content.clone();
                 app.save();
             }
         }
-        EntryLocation::Filter {
-            index,
-            source_date,
-            line_index,
-        } => {
-            storage::mutate_entry(*source_date, &path, *line_index, |entry| {
-                entry.content = target.original_content.clone();
+        EntryLocation::Filter { index, entry } => {
+            storage::mutate_entry(entry.source_date, &path, entry.line_index, |raw_entry| {
+                raw_entry.content = target.original_content.clone();
             })?;
 
             if let ViewMode::Filter(state) = &mut app.view
                 && let Some(filter_entry) = state.entries.get_mut(*index)
             {
-                filter_entry.entry.content = target.original_content.clone();
+                filter_entry.content = target.original_content.clone();
             }
 
-            if *source_date == app.current_date {
+            if entry.source_date == app.current_date {
                 app.reload_current_day()?;
             }
         }

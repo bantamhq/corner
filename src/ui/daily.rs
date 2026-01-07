@@ -5,7 +5,7 @@ use ratatui::{
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, EditContext, InputMode, ViewMode};
-use crate::storage::{EntryType, Line, ProjectedKind};
+use crate::storage::{EntryType, Line, SourceType};
 
 use super::shared::{
     date_suffix_style, entry_style, format_date_suffix, style_content, truncate_with_tags,
@@ -43,7 +43,7 @@ pub fn render_daily_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> {
 
     for projected_entry in &state.projected_entries {
         let is_completed =
-            matches!(projected_entry.entry.entry_type, EntryType::Task { completed: true });
+            matches!(projected_entry.entry_type, EntryType::Task { completed: true });
         if app.hide_completed && is_completed {
             continue;
         }
@@ -51,9 +51,9 @@ pub fn render_daily_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> {
         let is_selected = visible_projected_idx == state.selected;
         visible_projected_idx += 1;
 
-        let content_style = entry_style(&projected_entry.entry.entry_type);
-        let text = projected_entry.entry.content.clone();
-        let prefix = projected_entry.entry.entry_type.prefix();
+        let content_style = entry_style(&projected_entry.entry_type);
+        let text = projected_entry.content.clone();
+        let prefix = projected_entry.entry_type.prefix();
         let prefix_width = prefix.width();
         let (source_suffix, source_suffix_width) = format_date_suffix(projected_entry.source_date);
 
@@ -62,7 +62,7 @@ pub fn render_daily_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> {
         let rest_of_prefix: String = prefix.chars().skip(1).collect();
 
         let visible_idx = visible_projected_idx - 1;
-        let indicator = get_projected_entry_indicator(app, is_selected, visible_idx, &projected_entry.kind);
+        let indicator = get_projected_entry_indicator(app, is_selected, visible_idx, &projected_entry.source_type);
 
         let mut spans = vec![indicator, Span::styled(rest_of_prefix, content_style)];
         spans.extend(style_content(&display_text, content_style));
@@ -160,7 +160,7 @@ fn get_projected_entry_indicator(
     app: &App,
     is_cursor: bool,
     visible_idx: usize,
-    kind: &ProjectedKind,
+    kind: &SourceType,
 ) -> Span<'static> {
     let is_selected_in_selection = if let InputMode::Selection(ref state) = app.input_mode {
         state.is_selected(visible_idx)
@@ -169,8 +169,9 @@ fn get_projected_entry_indicator(
     };
 
     let indicator = match kind {
-        ProjectedKind::Later => "↪",
-        ProjectedKind::Recurring => "↺",
+        SourceType::Later => "↪",
+        SourceType::Recurring => "↺",
+        SourceType::Local => unreachable!("projected entries are never Local"),
     };
 
     if is_cursor {

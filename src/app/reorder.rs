@@ -39,8 +39,8 @@ impl App {
         if !self.hide_completed {
             return true;
         }
-        if let Line::Entry(e) = &self.lines[line_idx] {
-            self.should_show_entry(e)
+        if let Line::Entry(raw_entry) = &self.lines[line_idx] {
+            self.should_show_raw_entry(raw_entry)
         } else {
             true
         }

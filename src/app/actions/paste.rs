@@ -113,7 +113,7 @@ impl Action for RepasteEntries {
 
         for (i, entry) in self.target.entries.iter().enumerate() {
             let insert_pos = (self.target.start_line_index + i).min(lines.len());
-            lines.insert(insert_pos, Line::Entry(entry.clone()));
+            lines.insert(insert_pos, Line::Entry(entry.to_raw()));
         }
 
         storage::save_day_lines(self.target.date, &path, &lines)?;

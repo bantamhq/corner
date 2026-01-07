@@ -124,7 +124,7 @@ impl Action for RecreateEntry {
 
         // Insert at original position (or end if position is beyond current length)
         let insert_pos = self.target.line_index.min(lines.len());
-        lines.insert(insert_pos, Line::Entry(self.target.entry.clone()));
+        lines.insert(insert_pos, Line::Entry(self.target.entry.to_raw()));
 
         storage::save_day_lines(self.target.date, &path, &lines)?;
 

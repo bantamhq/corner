@@ -23,8 +23,7 @@ use crate::config::Config;
 use crate::cursor::CursorBuffer;
 use crate::registry::COMMANDS;
 use crate::storage::{
-    self, DayInfo, Entry, EntryType, FilterResult, JournalContext, JournalSlot, Line,
-    ProjectedEntry,
+    self, DayInfo, Entry, EntryType, JournalContext, JournalSlot, Line, RawEntry,
 };
 
 pub const DAILY_HEADER_LINES: usize = 1;
@@ -37,12 +36,12 @@ pub struct DailyState {
     pub selected: usize,
     pub scroll_offset: usize,
     pub original_lines: Option<Vec<Line>>,
-    pub projected_entries: Vec<ProjectedEntry>,
+    pub projected_entries: Vec<Entry>,
 }
 
 impl DailyState {
     #[must_use]
-    pub fn new(entry_count: usize, projected_entries: Vec<ProjectedEntry>) -> Self {
+    pub fn new(entry_count: usize, projected_entries: Vec<Entry>) -> Self {
         let selected = if entry_count > 0 {
             projected_entries.len() + entry_count - 1
         } else if !projected_entries.is_empty() {
@@ -65,7 +64,7 @@ impl DailyState {
 pub struct FilterState {
     pub query: String,
     pub query_buffer: CursorBuffer,
-    pub entries: Vec<FilterResult>,
+    pub entries: Vec<Entry>,
     pub selected: usize,
     pub scroll_offset: usize,
 }
@@ -217,16 +216,16 @@ pub enum InsertPosition {
 pub enum SelectedItem<'a> {
     Projected {
         index: usize,
-        entry: &'a ProjectedEntry,
+        entry: &'a Entry,
     },
     Daily {
         index: usize,
         line_idx: usize,
-        entry: &'a Entry,
+        entry: &'a RawEntry,
     },
     Filter {
         index: usize,
-        entry: &'a FilterResult,
+        entry: &'a Entry,
     },
     None,
 }
@@ -285,6 +284,7 @@ impl App {
         let lines = storage::load_day_lines(date, &path)?;
         let entry_indices = Self::compute_entry_indices(&lines);
         let projected_entries = storage::collect_projected_entries_for_date(date, &path)?;
+        let projected_entries = navigation::filter_done_today_recurring(projected_entries, &lines);
         let in_git_repo = storage::find_git_root().is_some();
         let cached_journal_tags = storage::collect_journal_tags(&path).unwrap_or_default();
         let hide_completed = config.hide_completed;
@@ -349,7 +349,7 @@ impl App {
             .collect()
     }
 
-    pub(super) fn get_daily_entry(&self, entry_index: usize) -> Option<&Entry> {
+    pub(super) fn get_daily_entry(&self, entry_index: usize) -> Option<&RawEntry> {
         let line_idx = self.entry_indices.get(entry_index)?;
         if let Line::Entry(entry) = &self.lines[*line_idx] {
             Some(entry)
@@ -358,7 +358,7 @@ impl App {
         }
     }
 
-    pub(super) fn get_daily_entry_mut(&mut self, entry_index: usize) -> Option<&mut Entry> {
+    pub(super) fn get_daily_entry_mut(&mut self, entry_index: usize) -> Option<&mut RawEntry> {
         let line_idx = *self.entry_indices.get(entry_index)?;
         if let Line::Entry(entry) = &mut self.lines[line_idx] {
             Some(entry)

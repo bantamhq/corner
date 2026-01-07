@@ -38,19 +38,19 @@ pub fn render_filter_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> 
         let is_selected = idx == state.selected && !is_quick_adding;
         let is_editing_this = is_selected && is_editing;
 
-        let content_style = entry_style(&filter_entry.entry.entry_type);
+        let content_style = entry_style(&filter_entry.entry_type);
 
         let text = if is_editing_this {
             if let Some(ref buffer) = app.edit_buffer {
                 buffer.content().to_string()
             } else {
-                filter_entry.entry.content.clone()
+                filter_entry.content.clone()
             }
         } else {
-            filter_entry.entry.content.clone()
+            filter_entry.content.clone()
         };
 
-        let prefix = filter_entry.entry.entry_type.prefix();
+        let prefix = filter_entry.entry_type.prefix();
         let prefix_width = prefix.width();
 
         let (date_suffix, date_suffix_width) = format_date_suffix(filter_entry.source_date);
@@ -77,7 +77,7 @@ pub fn render_filter_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> 
                     }
                 }
             } else {
-                let sel_prefix = match &filter_entry.entry.entry_type {
+                let sel_prefix = match &filter_entry.entry_type {
                     EntryType::Task { completed: false } => " [ ] ",
                     EntryType::Task { completed: true } => " [x] ",
                     EntryType::Note => " ",

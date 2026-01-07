@@ -23,24 +23,13 @@ impl App {
     }
 
     pub fn confirm_datepicker(&mut self) -> io::Result<()> {
-        let target_date = match &self.input_mode {
-            InputMode::Datepicker(state) => state.selected,
-            _ => return Ok(()),
+        let InputMode::Datepicker(state) =
+            std::mem::replace(&mut self.input_mode, InputMode::Normal)
+        else {
+            return Ok(());
         };
 
-        // If in filter view, always switch to daily view (even if same date)
-        let in_filter_view = matches!(self.view, ViewMode::Filter(_));
-
-        self.input_mode = InputMode::Normal;
-
-        if in_filter_view && target_date == self.current_date {
-            self.save();
-            self.reset_daily_view(target_date)?;
-            self.last_daily_date = target_date;
-            return Ok(());
-        }
-
-        self.goto_day(target_date)
+        self.goto_day(state.selected)
     }
 
     pub fn datepicker_goto_today(&mut self) {
@@ -157,19 +146,16 @@ impl App {
     }
 }
 
-/// Returns the first and last day of the given month.
 fn month_date_range(year: i32, month: u32) -> (NaiveDate, NaiveDate) {
     let start = NaiveDate::from_ymd_opt(year, month, 1).unwrap();
     let end = first_of_next_month(year, month).pred_opt().unwrap();
     (start, end)
 }
 
-/// Returns the first day of the month containing the given date.
 fn first_of_month(year: i32, month: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(year, month, 1).unwrap()
 }
 
-/// Returns the first day of the month after the given year/month.
 fn first_of_next_month(year: i32, month: u32) -> NaiveDate {
     if month == 12 {
         NaiveDate::from_ymd_opt(year + 1, 1, 1).unwrap()
@@ -178,7 +164,6 @@ fn first_of_next_month(year: i32, month: u32) -> NaiveDate {
     }
 }
 
-/// Returns the number of days in the given month.
 fn days_in_month(year: i32, month: u32) -> u32 {
     first_of_next_month(year, month)
         .pred_opt()

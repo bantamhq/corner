@@ -1,53 +1,30 @@
 use std::io;
 
 use crate::cursor::CursorBuffer;
-use crate::storage::{self, Entry, EntryType, ProjectedKind, RECURRING_REGEX};
+use crate::storage::{self, Entry, EntryType, RawEntry, SourceType, strip_recurring_tags};
 
 use super::{App, EditContext, InputMode, Line, SelectedItem, ViewMode};
 
-/// Strips recurring pattern tags (@every-*) from content when materializing a recurring entry.
-fn strip_recurring_tag(content: &str) -> String {
-    RECURRING_REGEX.replace_all(content, " ").trim().to_string()
-}
-
-/// Target for delete operations (owns data extracted from SelectedItem)
+/// Target for delete operations - Entry carries all location info
 pub enum DeleteTarget {
-    Projected {
-        source_date: chrono::NaiveDate,
-        line_index: usize,
-        entry_type: EntryType,
-        content: String,
-    },
-    Daily {
-        line_idx: usize,
-        entry: Entry,
-    },
-    Filter {
-        index: usize,
-        source_date: chrono::NaiveDate,
-        line_index: usize,
-        entry_type: EntryType,
-        content: String,
-    },
+    /// Projected entry (Later/Recurring) - Entry has source_date, line_index, source_type
+    Projected(Entry),
+    /// Local entry in daily view - line_idx is index in self.lines
+    Daily { line_idx: usize, entry: Entry },
+    /// Entry in filter view - index is position in filter results
+    Filter { index: usize, entry: Entry },
 }
 
 /// Location of an entry for operations that just need to find it (toggle, tag removal).
 /// Shared between ToggleTarget and TagRemovalTarget since they have identical structure.
 #[derive(Clone)]
 pub enum EntryLocation {
-    Projected {
-        source_date: chrono::NaiveDate,
-        line_index: usize,
-        kind: ProjectedKind,
-    },
-    Daily {
-        line_idx: usize,
-    },
-    Filter {
-        index: usize,
-        source_date: chrono::NaiveDate,
-        line_index: usize,
-    },
+    /// Projected entry (Later/Recurring) - Entry has source_date, line_index, source_type
+    Projected(Entry),
+    /// Local entry in daily view - line_idx is index in self.lines
+    Daily { line_idx: usize },
+    /// Entry in filter view - index is position in filter results
+    Filter { index: usize, entry: Entry },
 }
 
 /// Target for toggle operations (type alias for semantic clarity)
@@ -75,25 +52,18 @@ impl App {
     /// Extract delete target from current selection
     pub fn extract_delete_target_from_current(&self) -> Option<DeleteTarget> {
         match self.get_selected_item() {
-            SelectedItem::Projected { entry, .. } => Some(DeleteTarget::Projected {
-                source_date: entry.source_date,
-                line_index: entry.line_index,
-                entry_type: entry.entry.entry_type.clone(),
-                content: entry.entry.content.clone(),
-            }),
+            SelectedItem::Projected { entry, .. } => Some(DeleteTarget::Projected(entry.clone())),
             SelectedItem::Daily {
-                line_idx, entry, ..
+                line_idx,
+                entry: raw_entry,
+                ..
             } => Some(DeleteTarget::Daily {
                 line_idx,
-                entry: entry.clone(),
+                entry: Entry::from_raw(raw_entry, self.current_date, line_idx, SourceType::Local),
             }),
-            SelectedItem::Filter { index, entry } => Some(DeleteTarget::Filter {
-                index,
-                source_date: entry.source_date,
-                line_index: entry.line_index,
-                entry_type: entry.entry.entry_type.clone(),
-                content: entry.entry.content.clone(),
-            }),
+            SelectedItem::Filter { index, entry } => {
+                Some(DeleteTarget::Filter { index, entry: entry.clone() })
+            }
             SelectedItem::None => None,
         }
     }
@@ -121,12 +91,8 @@ impl App {
     pub fn extract_toggle_target_from_current(&self) -> Option<ToggleTarget> {
         match self.get_selected_item() {
             SelectedItem::Projected { entry, .. } => {
-                if matches!(entry.entry.entry_type, EntryType::Task { .. }) {
-                    Some(ToggleTarget::Projected {
-                        source_date: entry.source_date,
-                        line_index: entry.line_index,
-                        kind: entry.kind,
-                    })
+                if matches!(entry.entry_type, EntryType::Task { .. }) {
+                    Some(ToggleTarget::Projected(entry.clone()))
                 } else {
                     None
                 }
@@ -141,12 +107,8 @@ impl App {
                 }
             }
             SelectedItem::Filter { index, entry } => {
-                if matches!(entry.entry.entry_type, EntryType::Task { .. }) {
-                    Some(ToggleTarget::Filter {
-                        index,
-                        source_date: entry.source_date,
-                        line_index: entry.line_index,
-                    })
+                if matches!(entry.entry_type, EntryType::Task { .. }) {
+                    Some(ToggleTarget::Filter { index, entry: entry.clone() })
                 } else {
                     None
                 }
@@ -159,56 +121,47 @@ impl App {
     pub fn execute_toggle(&mut self, target: ToggleTarget) -> io::Result<()> {
         let path = self.active_path().to_path_buf();
         match target {
-            ToggleTarget::Projected {
-                source_date,
-                line_index,
-                kind,
-            } => {
-                match kind {
-                    ProjectedKind::Later => {
-                        storage::toggle_entry_complete(source_date, &path, line_index)?;
+            ToggleTarget::Projected(entry) => {
+                match entry.source_type {
+                    SourceType::Later => {
+                        storage::toggle_entry_complete(entry.source_date, &path, entry.line_index)?;
                     }
-                    ProjectedKind::Recurring => {
+                    SourceType::Recurring => {
                         // Materialize: create completed copy on today instead of toggling source
-                        let content = storage::get_entry_content(source_date, &path, line_index)
-                            .map(|c| strip_recurring_tag(&c))
+                        // Add ↺ prefix for matching when hiding done-today recurring entries
+                        let content = storage::get_entry_content(entry.source_date, &path, entry.line_index)
+                            .map(|c| format!("↺ {}", strip_recurring_tags(&c)))
                             .unwrap_or_default();
 
-                        let entry = Entry {
+                        let raw_entry = RawEntry {
                             entry_type: EntryType::Task { completed: true },
                             content,
                         };
-                        self.lines.push(Line::Entry(entry));
+                        self.lines.push(Line::Entry(raw_entry));
                         self.entry_indices = Self::compute_entry_indices(&self.lines);
                         self.save();
                     }
+                    SourceType::Local => unreachable!("projected entries are never Local"),
                 }
-                if let ViewMode::Daily(state) = &mut self.view {
-                    state.projected_entries =
-                        storage::collect_projected_entries_for_date(self.current_date, &path)?;
-                }
+                self.refresh_projected_entries();
             }
             ToggleTarget::Daily { line_idx } => {
-                if let Line::Entry(entry) = &mut self.lines[line_idx] {
-                    entry.toggle_complete();
+                if let Line::Entry(raw_entry) = &mut self.lines[line_idx] {
+                    raw_entry.toggle_complete();
                     self.save();
                 }
             }
-            ToggleTarget::Filter {
-                index,
-                source_date,
-                line_index,
-            } => {
-                storage::toggle_entry_complete(source_date, &path, line_index)?;
+            ToggleTarget::Filter { index, entry } => {
+                storage::toggle_entry_complete(entry.source_date, &path, entry.line_index)?;
 
                 if let ViewMode::Filter(state) = &mut self.view {
                     let filter_entry = &mut state.entries[index];
-                    if let EntryType::Task { completed } = &mut filter_entry.entry.entry_type {
+                    if let EntryType::Task { completed } = &mut filter_entry.entry_type {
                         *completed = !*completed;
                     }
                 }
 
-                if source_date == self.current_date {
+                if entry.source_date == self.current_date {
                     self.reload_current_day()?;
                 }
             }
@@ -242,7 +195,7 @@ impl App {
                     line_index: entry.line_index,
                     filter_index: index,
                 },
-                entry.entry.content.clone(),
+                entry.content.clone(),
             ),
             SelectedItem::None => return,
         };
@@ -256,13 +209,13 @@ impl App {
     pub fn extract_yank_target_from_current(&self) -> Option<YankTarget> {
         let content = match self.get_selected_item() {
             SelectedItem::Projected { entry, .. } => {
-                format!("{}{}", entry.entry.entry_type.prefix(), entry.entry.content)
+                format!("{}{}", entry.entry_type.prefix(), entry.content)
             }
             SelectedItem::Daily { entry, .. } => {
                 format!("{}{}", entry.prefix(), entry.content)
             }
             SelectedItem::Filter { entry, .. } => {
-                format!("{}{}", entry.entry.entry_type.prefix(), entry.entry.content)
+                format!("{}{}", entry.entry_type.prefix(), entry.content)
             }
             SelectedItem::None => return None,
         };
@@ -303,17 +256,13 @@ impl App {
     /// Extract tag removal target from current selection
     pub fn extract_tag_removal_target_from_current(&self) -> Option<TagRemovalTarget> {
         match self.get_selected_item() {
-            SelectedItem::Projected { entry, .. } => Some(TagRemovalTarget::Projected {
-                source_date: entry.source_date,
-                line_index: entry.line_index,
-                kind: entry.kind,
-            }),
+            SelectedItem::Projected { entry, .. } => {
+                Some(TagRemovalTarget::Projected(entry.clone()))
+            }
             SelectedItem::Daily { line_idx, .. } => Some(TagRemovalTarget::Daily { line_idx }),
-            SelectedItem::Filter { index, entry } => Some(TagRemovalTarget::Filter {
-                index,
-                source_date: entry.source_date,
-                line_index: entry.line_index,
-            }),
+            SelectedItem::Filter { index, entry } => {
+                Some(TagRemovalTarget::Filter { index, entry: entry.clone() })
+            }
             SelectedItem::None => None,
         }
     }
@@ -322,12 +271,8 @@ impl App {
     pub fn extract_cycle_target_from_current(&self) -> Option<super::actions::CycleTarget> {
         match self.get_selected_item() {
             SelectedItem::Projected { entry, .. } => Some(super::actions::CycleTarget {
-                location: EntryLocation::Projected {
-                    source_date: entry.source_date,
-                    line_index: entry.line_index,
-                    kind: entry.kind,
-                },
-                original_type: entry.entry.entry_type.clone(),
+                location: EntryLocation::Projected(entry.clone()),
+                original_type: entry.entry_type.clone(),
             }),
             SelectedItem::Daily {
                 line_idx, entry, ..
@@ -336,12 +281,8 @@ impl App {
                 original_type: entry.entry_type.clone(),
             }),
             SelectedItem::Filter { index, entry } => Some(super::actions::CycleTarget {
-                location: EntryLocation::Filter {
-                    index,
-                    source_date: entry.source_date,
-                    line_index: entry.line_index,
-                },
-                original_type: entry.entry.entry_type.clone(),
+                location: EntryLocation::Filter { index, entry: entry.clone() },
+                original_type: entry.entry_type.clone(),
             }),
             SelectedItem::None => None,
         }
@@ -351,12 +292,8 @@ impl App {
     pub fn extract_tag_target_from_current(&self) -> Option<super::actions::TagTarget> {
         match self.get_selected_item() {
             SelectedItem::Projected { entry, .. } => Some(super::actions::TagTarget {
-                location: EntryLocation::Projected {
-                    source_date: entry.source_date,
-                    line_index: entry.line_index,
-                    kind: entry.kind,
-                },
-                original_content: entry.entry.content.clone(),
+                location: EntryLocation::Projected(entry.clone()),
+                original_content: entry.content.clone(),
             }),
             SelectedItem::Daily {
                 line_idx, entry, ..
@@ -365,12 +302,8 @@ impl App {
                 original_content: entry.content.clone(),
             }),
             SelectedItem::Filter { index, entry } => Some(super::actions::TagTarget {
-                location: EntryLocation::Filter {
-                    index,
-                    source_date: entry.source_date,
-                    line_index: entry.line_index,
-                },
-                original_content: entry.entry.content.clone(),
+                location: EntryLocation::Filter { index, entry: entry.clone() },
+                original_content: entry.content.clone(),
             }),
             SelectedItem::None => None,
         }
@@ -451,8 +384,8 @@ impl App {
             }
         };
 
-        let entries = Self::parse_paste_text(&text);
-        if entries.is_empty() {
+        let raw_entries = Self::parse_paste_raw(&text);
+        if raw_entries.is_empty() {
             self.set_status("Nothing to paste");
             return Ok(());
         }
@@ -471,9 +404,18 @@ impl App {
         } else {
             insert_after + 1
         };
-        for (i, entry) in entries.iter().enumerate() {
-            lines.insert(insert_pos + i, Line::Entry(entry.clone()));
-        }
+
+        // Insert raw entries into lines and build full entries for action
+        let entries: Vec<Entry> = raw_entries
+            .iter()
+            .enumerate()
+            .map(|(i, raw)| {
+                let line_idx = insert_pos + i;
+                lines.insert(line_idx, Line::Entry(raw.clone()));
+                Entry::from_raw(raw, date, line_idx, SourceType::Local)
+            })
+            .collect();
+
         storage::save_day_lines(date, &path, &lines)?;
 
         if date == self.current_date {
@@ -492,44 +434,44 @@ impl App {
         self.execute_action(Box::new(action))
     }
 
-    fn parse_paste_text(text: &str) -> Vec<Entry> {
+    fn parse_paste_raw(text: &str) -> Vec<RawEntry> {
         text.lines()
             .filter(|line| !line.trim().is_empty())
-            .map(Self::parse_line_to_entry)
+            .map(Self::parse_line_to_raw_entry)
             .collect()
     }
 
-    /// Parse a single line into an Entry, stripping markdown prefixes.
-    fn parse_line_to_entry(line: &str) -> Entry {
+    /// Parse a single line into a RawEntry, stripping markdown prefixes.
+    fn parse_line_to_raw_entry(line: &str) -> RawEntry {
         let trimmed = line.trim_start();
 
         // strip_prefix returns text AFTER the prefix (no duplication)
         if let Some(content) = trimmed.strip_prefix("- [ ] ") {
-            return Entry {
+            return RawEntry {
                 entry_type: EntryType::Task { completed: false },
                 content: content.to_string(),
             };
         }
         if let Some(content) = trimmed.strip_prefix("- [x] ") {
-            return Entry {
+            return RawEntry {
                 entry_type: EntryType::Task { completed: true },
                 content: content.to_string(),
             };
         }
         if let Some(content) = trimmed.strip_prefix("* ") {
-            return Entry {
+            return RawEntry {
                 entry_type: EntryType::Event,
                 content: content.to_string(),
             };
         }
         if let Some(content) = trimmed.strip_prefix("- ") {
-            return Entry {
+            return RawEntry {
                 entry_type: EntryType::Note,
                 content: content.to_string(),
             };
         }
         // No prefix → Note with full line as content
-        Entry {
+        RawEntry {
             entry_type: EntryType::Note,
             content: trimmed.to_string(),
         }

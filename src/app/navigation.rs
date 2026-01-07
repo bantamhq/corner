@@ -2,22 +2,47 @@ use std::io;
 
 use chrono::{Days, Local, NaiveDate};
 
-use crate::storage::{self, Entry, EntryType, Line, ProjectedEntry};
+use crate::storage::{self, Entry, EntryType, Line, RawEntry, SourceType, strip_recurring_tags};
 
 use super::{App, DailyState, InputMode, SelectedItem, ViewMode};
 
+/// Filter out recurring entries that have been "done today" (have a matching ↺ entry).
+pub(super) fn filter_done_today_recurring(projected: Vec<Entry>, lines: &[Line]) -> Vec<Entry> {
+    // Collect local entry contents for matching
+    let local_contents: Vec<&str> = lines
+        .iter()
+        .filter_map(|line| match line {
+            Line::Entry(raw) => Some(raw.content.as_str()),
+            _ => None,
+        })
+        .collect();
+
+    projected
+        .into_iter()
+        .filter(|entry| {
+            // Only filter recurring entries
+            if entry.source_type != SourceType::Recurring {
+                return true;
+            }
+
+            // Check if a matching ↺ entry exists in local entries
+            let expected_content = format!("↺ {}", strip_recurring_tags(&entry.content));
+            !local_contents.iter().any(|&c| c == expected_content)
+        })
+        .collect()
+}
+
 impl App {
+    /// Helper to check if a raw entry should be shown given hide_completed setting.
+    #[must_use]
+    pub fn should_show_raw_entry(&self, entry: &RawEntry) -> bool {
+        !self.hide_completed || !matches!(entry.entry_type, EntryType::Task { completed: true })
+    }
+
     /// Helper to check if an entry should be shown given hide_completed setting.
     #[must_use]
     pub fn should_show_entry(&self, entry: &Entry) -> bool {
         !self.hide_completed || !matches!(entry.entry_type, EntryType::Task { completed: true })
-    }
-
-    /// Helper to check if a projected entry should be shown.
-    #[must_use]
-    pub fn should_show_projected(&self, entry: &ProjectedEntry) -> bool {
-        !self.hide_completed
-            || !matches!(entry.entry.entry_type, EntryType::Task { completed: true })
     }
 
     #[must_use]
@@ -45,7 +70,7 @@ impl App {
             state
                 .projected_entries
                 .iter()
-                .filter(|e| self.should_show_projected(e))
+                .filter(|e| self.should_show_entry(e))
                 .count()
         } else {
             state.projected_entries.len()
@@ -61,8 +86,8 @@ impl App {
         self.entry_indices[..entry_index]
             .iter()
             .filter(|&&i| {
-                if let Line::Entry(entry) = &self.lines[i] {
-                    self.should_show_entry(entry)
+                if let Line::Entry(raw_entry) = &self.lines[i] {
+                    self.should_show_raw_entry(raw_entry)
                 } else {
                     true
                 }
@@ -79,7 +104,7 @@ impl App {
         if self.hide_completed {
             state.projected_entries[..projected_index]
                 .iter()
-                .filter(|e| self.should_show_projected(e))
+                .filter(|e| self.should_show_entry(e))
                 .count()
         } else {
             projected_index
@@ -164,7 +189,7 @@ impl App {
                 let mut visible_idx = 0;
 
                 for (actual_idx, projected_entry) in state.projected_entries.iter().enumerate() {
-                    if !self.should_show_projected(projected_entry) {
+                    if !self.should_show_entry(projected_entry) {
                         continue;
                     }
                     if visible_idx == state.selected {
@@ -177,15 +202,15 @@ impl App {
                 }
 
                 for (actual_idx, &line_idx) in self.entry_indices.iter().enumerate() {
-                    if let Line::Entry(entry) = &self.lines[line_idx] {
-                        if !self.should_show_entry(entry) {
+                    if let Line::Entry(raw_entry) = &self.lines[line_idx] {
+                        if !self.should_show_raw_entry(raw_entry) {
                             continue;
                         }
                         if visible_idx == state.selected {
                             return SelectedItem::Daily {
                                 index: actual_idx,
                                 line_idx,
-                                entry,
+                                entry: raw_entry,
                             };
                         }
                         visible_idx += 1;
@@ -216,14 +241,14 @@ impl App {
                 let visible_projected = state
                     .projected_entries
                     .iter()
-                    .filter(|e| self.should_show_projected(e))
+                    .filter(|e| self.should_show_entry(e))
                     .count();
                 let visible_regular = self
                     .entry_indices
                     .iter()
                     .filter(|&&i| {
-                        if let Line::Entry(entry) = &self.lines[i] {
-                            self.should_show_entry(entry)
+                        if let Line::Entry(raw_entry) = &self.lines[i] {
+                            self.should_show_raw_entry(raw_entry)
                         } else {
                             true
                         }
@@ -243,14 +268,14 @@ impl App {
         let hidden_projected = state
             .projected_entries
             .iter()
-            .filter(|e| matches!(e.entry.entry_type, EntryType::Task { completed: true }))
+            .filter(|e| matches!(e.entry_type, EntryType::Task { completed: true }))
             .count();
         let hidden_regular = self
             .entry_indices
             .iter()
             .filter(|&&i| {
-                if let Line::Entry(entry) = &self.lines[i] {
-                    matches!(entry.entry_type, EntryType::Task { completed: true })
+                if let Line::Entry(raw_entry) = &self.lines[i] {
+                    matches!(raw_entry.entry_type, EntryType::Task { completed: true })
                 } else {
                     false
                 }
@@ -270,7 +295,7 @@ impl App {
             state
                 .projected_entries
                 .iter()
-                .filter(|e| self.should_show_projected(e))
+                .filter(|e| self.should_show_entry(e))
                 .count()
         } else {
             state.projected_entries.len()
@@ -280,8 +305,8 @@ impl App {
             .iter()
             .filter(|&&i| {
                 if self.hide_completed {
-                    if let Line::Entry(entry) = &self.lines[i] {
-                        self.should_show_entry(entry)
+                    if let Line::Entry(raw_entry) = &self.lines[i] {
+                        self.should_show_raw_entry(raw_entry)
                     } else {
                         true
                     }
@@ -295,12 +320,23 @@ impl App {
     }
 
     /// Load a day's data into self, returning projected entries for view construction.
-    pub(super) fn load_day(&mut self, date: NaiveDate) -> io::Result<Vec<ProjectedEntry>> {
+    pub(super) fn load_day(&mut self, date: NaiveDate) -> io::Result<Vec<Entry>> {
         self.current_date = date;
         let path = self.active_path().to_path_buf();
         self.lines = storage::load_day_lines(date, &path)?;
         self.entry_indices = Self::compute_entry_indices(&self.lines);
         storage::collect_projected_entries_for_date(date, &path)
+    }
+
+    /// Refresh projected entries in daily view, filtering out done-today recurring entries.
+    pub fn refresh_projected_entries(&mut self) {
+        let projected =
+            storage::collect_projected_entries_for_date(self.current_date, self.active_path())
+                .unwrap_or_default();
+        let projected = filter_done_today_recurring(projected, &self.lines);
+        if let ViewMode::Daily(state) = &mut self.view {
+            state.projected_entries = projected;
+        }
     }
 
     /// Shared cleanup for all view switches - resets input mode and clears undo/redo.
@@ -312,6 +348,7 @@ impl App {
     /// Load a day and reset to daily view with proper selection clamping.
     pub(super) fn reset_daily_view(&mut self, date: NaiveDate) -> io::Result<()> {
         let projected_entries = self.load_day(date)?;
+        let projected_entries = filter_done_today_recurring(projected_entries, &self.lines);
         self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), projected_entries));
         if self.hide_completed {
             self.clamp_selection_to_visible();
@@ -325,6 +362,7 @@ impl App {
         let projected_entries =
             storage::collect_projected_entries_for_date(self.current_date, self.active_path())
                 .unwrap_or_default();
+        let projected_entries = filter_done_today_recurring(projected_entries, &self.lines);
         self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), projected_entries));
         if self.hide_completed {
             self.clamp_selection_to_visible();
@@ -333,7 +371,8 @@ impl App {
     }
 
     pub fn goto_day(&mut self, date: NaiveDate) -> io::Result<()> {
-        if date == self.current_date {
+        let in_filter = matches!(self.view, ViewMode::Filter(_));
+        if date == self.current_date && !in_filter {
             return Ok(());
         }
 

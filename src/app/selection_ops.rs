@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::storage::{Entry, EntryType, FilterResult, ProjectedEntry};
+use crate::storage::{Entry, EntryType, RawEntry, SourceType};
 
 use super::{
     App, DeleteTarget, InputMode, Line, SelectionState, TagRemovalTarget, ToggleTarget, ViewMode,
@@ -9,14 +9,14 @@ use super::{
 
 /// Represents an entry at a selected visible index, used for batch operations.
 enum SelectedEntry<'a> {
-    Projected(&'a ProjectedEntry),
+    Projected(&'a Entry),
     Daily {
         line_idx: usize,
-        entry: &'a Entry,
+        entry: &'a RawEntry,
     },
     Filter {
         index: usize,
-        entry: &'a FilterResult,
+        entry: &'a Entry,
     },
 }
 
@@ -69,14 +69,14 @@ impl App {
     }
 
     /// Get projected entry at visible index
-    fn get_projected_at_visible_index(&self, visible_idx: usize) -> Option<&ProjectedEntry> {
+    fn get_projected_at_visible_index(&self, visible_idx: usize) -> Option<&Entry> {
         let ViewMode::Daily(state) = &self.view else {
             return None;
         };
 
         let mut current_visible = 0;
         for projected in &state.projected_entries {
-            if !self.should_show_projected(projected) {
+            if !self.should_show_entry(projected) {
                 continue;
             }
             if current_visible == visible_idx {
@@ -91,15 +91,15 @@ impl App {
     fn get_daily_at_visible_entry_index(
         &self,
         visible_entry_idx: usize,
-    ) -> Option<(usize, &Entry)> {
+    ) -> Option<(usize, &RawEntry)> {
         let mut current_visible = 0;
         for &line_idx in &self.entry_indices {
-            if let Line::Entry(entry) = &self.lines[line_idx] {
-                if !self.should_show_entry(entry) {
+            if let Line::Entry(raw_entry) = &self.lines[line_idx] {
+                if !self.should_show_raw_entry(raw_entry) {
                     continue;
                 }
                 if current_visible == visible_entry_idx {
-                    return Some((line_idx, entry));
+                    return Some((line_idx, raw_entry));
                 }
                 current_visible += 1;
             }
@@ -151,24 +151,16 @@ impl App {
 
     /// Collect delete targets for all selected entries
     fn collect_delete_targets_from_selected(&self) -> Vec<DeleteTarget> {
+        let current_date = self.current_date;
         self.collect_targets_from_selected(|entry| match entry {
-            SelectedEntry::Projected(projected) => Some(DeleteTarget::Projected {
-                source_date: projected.source_date,
-                line_index: projected.line_index,
-                entry_type: projected.entry.entry_type.clone(),
-                content: projected.entry.content.clone(),
-            }),
+            SelectedEntry::Projected(projected) => Some(DeleteTarget::Projected(projected.clone())),
             SelectedEntry::Daily { line_idx, entry } => Some(DeleteTarget::Daily {
                 line_idx,
-                entry: entry.clone(),
+                entry: Entry::from_raw(entry, current_date, line_idx, SourceType::Local),
             }),
-            SelectedEntry::Filter { index, entry } => Some(DeleteTarget::Filter {
-                index,
-                source_date: entry.source_date,
-                line_index: entry.line_index,
-                entry_type: entry.entry.entry_type.clone(),
-                content: entry.entry.content.clone(),
-            }),
+            SelectedEntry::Filter { index, entry } => {
+                Some(DeleteTarget::Filter { index, entry: entry.clone() })
+            }
         })
     }
 
@@ -180,22 +172,14 @@ impl App {
             }
 
             match entry {
-                SelectedEntry::Projected(projected) if is_task(&projected.entry.entry_type) => {
-                    Some(ToggleTarget::Projected {
-                        source_date: projected.source_date,
-                        line_index: projected.line_index,
-                        kind: projected.kind,
-                    })
+                SelectedEntry::Projected(projected) if is_task(&projected.entry_type) => {
+                    Some(ToggleTarget::Projected(projected.clone()))
                 }
                 SelectedEntry::Daily { line_idx, entry } if is_task(&entry.entry_type) => {
                     Some(ToggleTarget::Daily { line_idx })
                 }
-                SelectedEntry::Filter { index, entry } if is_task(&entry.entry.entry_type) => {
-                    Some(ToggleTarget::Filter {
-                        index,
-                        source_date: entry.source_date,
-                        line_index: entry.line_index,
-                    })
+                SelectedEntry::Filter { index, entry } if is_task(&entry.entry_type) => {
+                    Some(ToggleTarget::Filter { index, entry: entry.clone() })
                 }
                 _ => None,
             }
@@ -209,15 +193,15 @@ impl App {
                 SelectedEntry::Projected(projected) => {
                     format!(
                         "{}{}",
-                        projected.entry.entry_type.prefix(),
-                        projected.entry.content
+                        projected.entry_type.prefix(),
+                        projected.content
                     )
                 }
                 SelectedEntry::Daily { entry, .. } => {
                     format!("{}{}", entry.prefix(), entry.content)
                 }
                 SelectedEntry::Filter { entry, .. } => {
-                    format!("{}{}", entry.entry.entry_type.prefix(), entry.entry.content)
+                    format!("{}{}", entry.entry_type.prefix(), entry.content)
                 }
             };
             Some(YankTarget { content })
@@ -228,24 +212,16 @@ impl App {
     fn collect_cycle_targets_from_selected(&self) -> Vec<super::actions::CycleTarget> {
         self.collect_targets_from_selected(|entry| match entry {
             SelectedEntry::Projected(projected) => Some(super::actions::CycleTarget {
-                location: TagRemovalTarget::Projected {
-                    source_date: projected.source_date,
-                    line_index: projected.line_index,
-                    kind: projected.kind,
-                },
-                original_type: projected.entry.entry_type.clone(),
+                location: TagRemovalTarget::Projected(projected.clone()),
+                original_type: projected.entry_type.clone(),
             }),
             SelectedEntry::Daily { line_idx, entry } => Some(super::actions::CycleTarget {
                 location: TagRemovalTarget::Daily { line_idx },
                 original_type: entry.entry_type.clone(),
             }),
             SelectedEntry::Filter { index, entry } => Some(super::actions::CycleTarget {
-                location: TagRemovalTarget::Filter {
-                    index,
-                    source_date: entry.source_date,
-                    line_index: entry.line_index,
-                },
-                original_type: entry.entry.entry_type.clone(),
+                location: TagRemovalTarget::Filter { index, entry: entry.clone() },
+                original_type: entry.entry_type.clone(),
             }),
         })
     }
@@ -254,24 +230,16 @@ impl App {
     fn collect_tag_targets_from_selected(&self) -> Vec<super::actions::TagTarget> {
         self.collect_targets_from_selected(|entry| match entry {
             SelectedEntry::Projected(projected) => Some(super::actions::TagTarget {
-                location: TagRemovalTarget::Projected {
-                    source_date: projected.source_date,
-                    line_index: projected.line_index,
-                    kind: projected.kind,
-                },
-                original_content: projected.entry.content.clone(),
+                location: TagRemovalTarget::Projected(projected.clone()),
+                original_content: projected.content.clone(),
             }),
             SelectedEntry::Daily { line_idx, entry } => Some(super::actions::TagTarget {
                 location: TagRemovalTarget::Daily { line_idx },
                 original_content: entry.content.clone(),
             }),
             SelectedEntry::Filter { index, entry } => Some(super::actions::TagTarget {
-                location: TagRemovalTarget::Filter {
-                    index,
-                    source_date: entry.source_date,
-                    line_index: entry.line_index,
-                },
-                original_content: entry.entry.content.clone(),
+                location: TagRemovalTarget::Filter { index, entry: entry.clone() },
+                original_content: entry.content.clone(),
             }),
         })
     }

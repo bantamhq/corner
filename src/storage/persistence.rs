@@ -13,7 +13,7 @@ pub struct DayInfo {
     pub has_events: bool,
 }
 
-use super::entries::{Entry, EntryType, Line, parse_lines, serialize_lines};
+use super::entries::{EntryType, Line, RawEntry, parse_lines, serialize_lines};
 
 pub fn load_day_lines(date: NaiveDate, path: &Path) -> io::Result<Vec<Line>> {
     let content = load_day(date, path)?;
@@ -34,7 +34,7 @@ pub fn mutate_entry<F, R>(
     f: F,
 ) -> io::Result<Option<R>>
 where
-    F: FnOnce(&mut Entry) -> R,
+    F: FnOnce(&mut RawEntry) -> R,
 {
     let mut lines = load_day_lines(date, path)?;
     let result = lines.get_mut(line_index).and_then(|line| match line {

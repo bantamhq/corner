@@ -105,47 +105,39 @@ fn execute_cycle_raw(app: &mut App, location: &EntryLocation) -> io::Result<Opti
     let path = app.active_path().to_path_buf();
 
     match location {
-        EntryLocation::Projected {
-            source_date,
-            line_index,
-            ..
-        } => {
-            let new_type = storage::cycle_entry_type(*source_date, &path, *line_index)?;
+        EntryLocation::Projected(entry) => {
+            let new_type = storage::cycle_entry_type(entry.source_date, &path, entry.line_index)?;
             if let Some(ref new_type) = new_type
                 && let ViewMode::Daily(state) = &mut app.view
                 && let Some(projected_entry) = state
                     .projected_entries
                     .iter_mut()
-                    .find(|e| e.source_date == *source_date && e.line_index == *line_index)
+                    .find(|e| e.source_date == entry.source_date && e.line_index == entry.line_index)
             {
-                projected_entry.entry.entry_type = new_type.clone();
+                projected_entry.entry_type = new_type.clone();
             }
             Ok(new_type)
         }
         EntryLocation::Daily { line_idx } => {
-            if let Line::Entry(entry) = &mut app.lines[*line_idx] {
-                let new_type = entry.entry_type.cycle();
-                entry.entry_type = new_type.clone();
+            if let Line::Entry(raw_entry) = &mut app.lines[*line_idx] {
+                let new_type = raw_entry.entry_type.cycle();
+                raw_entry.entry_type = new_type.clone();
                 app.save();
                 Ok(Some(new_type))
             } else {
                 Ok(None)
             }
         }
-        EntryLocation::Filter {
-            index,
-            source_date,
-            line_index,
-        } => {
-            let new_type = storage::cycle_entry_type(*source_date, &path, *line_index)?;
+        EntryLocation::Filter { index, entry } => {
+            let new_type = storage::cycle_entry_type(entry.source_date, &path, entry.line_index)?;
             if let Some(ref new_type) = new_type {
                 if let ViewMode::Filter(state) = &mut app.view
                     && let Some(filter_entry) = state.entries.get_mut(*index)
                 {
-                    filter_entry.entry.entry_type = new_type.clone();
+                    filter_entry.entry_type = new_type.clone();
                 }
 
-                if *source_date == app.current_date {
+                if entry.source_date == app.current_date {
                     app.reload_current_day()?;
                 }
             }
@@ -163,44 +155,36 @@ fn set_entry_type_raw(
     let path = app.active_path().to_path_buf();
 
     match location {
-        EntryLocation::Projected {
-            source_date,
-            line_index,
-            ..
-        } => {
-            storage::mutate_entry(*source_date, &path, *line_index, |entry| {
-                entry.entry_type = entry_type.clone();
+        EntryLocation::Projected(entry) => {
+            storage::mutate_entry(entry.source_date, &path, entry.line_index, |raw_entry| {
+                raw_entry.entry_type = entry_type.clone();
             })?;
             if let ViewMode::Daily(state) = &mut app.view
                 && let Some(projected_entry) = state
                     .projected_entries
                     .iter_mut()
-                    .find(|e| e.source_date == *source_date && e.line_index == *line_index)
+                    .find(|e| e.source_date == entry.source_date && e.line_index == entry.line_index)
             {
-                projected_entry.entry.entry_type = entry_type.clone();
+                projected_entry.entry_type = entry_type.clone();
             }
         }
         EntryLocation::Daily { line_idx } => {
-            if let Line::Entry(entry) = &mut app.lines[*line_idx] {
-                entry.entry_type = entry_type.clone();
+            if let Line::Entry(raw_entry) = &mut app.lines[*line_idx] {
+                raw_entry.entry_type = entry_type.clone();
                 app.save();
             }
         }
-        EntryLocation::Filter {
-            index,
-            source_date,
-            line_index,
-        } => {
-            storage::mutate_entry(*source_date, &path, *line_index, |entry| {
-                entry.entry_type = entry_type.clone();
+        EntryLocation::Filter { index, entry } => {
+            storage::mutate_entry(entry.source_date, &path, entry.line_index, |raw_entry| {
+                raw_entry.entry_type = entry_type.clone();
             })?;
             if let ViewMode::Filter(state) = &mut app.view
                 && let Some(filter_entry) = state.entries.get_mut(*index)
             {
-                filter_entry.entry.entry_type = entry_type.clone();
+                filter_entry.entry_type = entry_type.clone();
             }
 
-            if *source_date == app.current_date {
+            if entry.source_date == app.current_date {
                 app.reload_current_day()?;
             }
         }

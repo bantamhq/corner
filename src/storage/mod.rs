@@ -11,8 +11,7 @@ pub use context::{
 
 // Re-export entry types
 pub use entries::{
-    Entry, EntryType, FilterResult, Line, ProjectedEntry, ProjectedKind, RecurringPattern,
-    parse_lines, serialize_lines,
+    Entry, EntryType, Line, RawEntry, RecurringPattern, SourceType, parse_lines, serialize_lines,
 };
 
 // Re-export persistence functions and types
@@ -30,7 +29,7 @@ pub use filter::{
     collect_projected_entries_for_date, expand_favorite_tags, expand_saved_filters,
     extract_recurring_pattern, extract_tags, extract_target_date, normalize_natural_dates,
     parse_filter_date, parse_filter_query, parse_later_date, parse_natural_date,
-    parse_recurring_pattern,
+    parse_recurring_pattern, strip_recurring_tags,
 };
 
 #[cfg(test)]
