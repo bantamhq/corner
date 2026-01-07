@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{
         Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode,
@@ -102,24 +101,25 @@ impl App {
     }
 
     fn open_in_editor(&mut self, path: &std::path::Path, is_config: bool) -> io::Result<()> {
-        let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+        let editor = std::env::var("VISUAL")
+            .or_else(|_| std::env::var("EDITOR"))
+            .unwrap_or_else(|_| "vi".to_string());
+
+        let mut parts = editor.split_whitespace();
+        let program = parts.next().unwrap_or("vi");
+        let editor_args: Vec<&str> = parts.collect();
 
         self.save();
 
         // Suspend TUI
         disable_raw_mode()?;
-        execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
+        execute!(io::stdout(), LeaveAlternateScreen)?;
 
-        let status = Command::new(&editor).arg(path).status();
+        let status = Command::new(program).args(&editor_args).arg(path).status();
 
         // Restore TUI
         enable_raw_mode()?;
-        execute!(
-            io::stdout(),
-            EnterAlternateScreen,
-            EnableMouseCapture,
-            Clear(ClearType::All)
-        )?;
+        execute!(io::stdout(), EnterAlternateScreen, Clear(ClearType::All))?;
         io::stdout().flush()?;
 
         self.needs_redraw = true;

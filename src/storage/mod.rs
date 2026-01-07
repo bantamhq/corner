@@ -11,7 +11,8 @@ pub use context::{
 
 // Re-export entry types
 pub use entries::{
-    Entry, EntryType, Line, RawEntry, RecurringPattern, SourceType, parse_lines, serialize_lines,
+    Entry, EntryType, Line, RawEntry, RecurringPattern, SourceType, parse_lines, parse_to_raw_entry,
+    serialize_lines,
 };
 
 // Re-export persistence functions and types
@@ -38,7 +39,7 @@ mod tests {
     use chrono::NaiveDate;
 
     #[test]
-    fn test_round_trip_parsing() {
+    fn round_trip_preserves_line_content() {
         let original = "- [ ] Task one\n- [x] Task done\n- A note\n* An event\nRaw line";
         let lines = parse_lines(original);
         let serialized = serialize_lines(&lines);
@@ -46,7 +47,7 @@ mod tests {
     }
 
     #[test]
-    fn test_round_trip_with_blank_lines() {
+    fn round_trip_preserves_blank_lines() {
         let original = "- [ ] Task\n\n- Note after blank";
         let lines = parse_lines(original);
         let serialized = serialize_lines(&lines);
@@ -54,7 +55,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_day_content_multiple_days() {
+    fn extract_day_content_separates_days() {
         let journal = "# 2024/01/15\n- Task 1\n\n# 2024/01/16\n- Task 2\n";
 
         let date1 = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
@@ -65,7 +66,7 @@ mod tests {
     }
 
     #[test]
-    fn test_update_day_content_preserves_other_days() {
+    fn update_day_content_preserves_other_days() {
         let journal =
             "# 2024/01/14\n- Day 14\n\n# 2024/01/15\n- Old task\n\n# 2024/01/16\n- Day 16\n";
         let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
@@ -77,10 +78,9 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_natural_date_all_formats() {
-        let today = NaiveDate::from_ymd_opt(2026, 1, 5).unwrap(); // Monday
+    fn parse_natural_date_handles_all_formats() {
+        let today = NaiveDate::from_ymd_opt(2026, 1, 5).unwrap();
 
-        // today/tomorrow/yesterday
         assert_eq!(
             parse_natural_date("today", today),
             NaiveDate::from_ymd_opt(2026, 1, 5)
@@ -94,23 +94,20 @@ mod tests {
             NaiveDate::from_ymd_opt(2026, 1, 4)
         );
 
-        // relative days (entry context = future)
         assert_eq!(
             parse_natural_date("d3", today),
             NaiveDate::from_ymd_opt(2026, 1, 8)
         );
 
-        // weekdays (entry context = next occurrence)
         assert_eq!(
             parse_natural_date("mon", today),
-            NaiveDate::from_ymd_opt(2026, 1, 12) // Next Monday (today is Monday, so +7)
+            NaiveDate::from_ymd_opt(2026, 1, 12)
         );
         assert_eq!(
             parse_natural_date("fri", today),
-            NaiveDate::from_ymd_opt(2026, 1, 9) // Next Friday
+            NaiveDate::from_ymd_opt(2026, 1, 9)
         );
 
-        // fallback to standard format
         assert_eq!(
             parse_natural_date("1/15", today),
             NaiveDate::from_ymd_opt(2026, 1, 15)
@@ -118,30 +115,27 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_filter_date() {
-        let today = NaiveDate::from_ymd_opt(2026, 1, 5).unwrap(); // Monday
+    fn parse_filter_date_handles_relative_dates() {
+        let today = NaiveDate::from_ymd_opt(2026, 1, 5).unwrap();
 
-        // Filter context = past by default
         assert_eq!(
             parse_filter_date("d3", today),
-            NaiveDate::from_ymd_opt(2026, 1, 2) // 3 days ago
+            NaiveDate::from_ymd_opt(2026, 1, 2)
         );
         assert_eq!(
             parse_filter_date("mon", today),
-            NaiveDate::from_ymd_opt(2025, 12, 29) // Last Monday
+            NaiveDate::from_ymd_opt(2025, 12, 29)
         );
 
-        // Explicit future with + suffix
         assert_eq!(
             parse_filter_date("d3+", today),
-            NaiveDate::from_ymd_opt(2026, 1, 8) // 3 days from now
+            NaiveDate::from_ymd_opt(2026, 1, 8)
         );
         assert_eq!(
             parse_filter_date("mon+", today),
-            NaiveDate::from_ymd_opt(2026, 1, 12) // Next Monday
+            NaiveDate::from_ymd_opt(2026, 1, 12)
         );
 
-        // today/tomorrow/yesterday work the same
         assert_eq!(
             parse_filter_date("today", today),
             NaiveDate::from_ymd_opt(2026, 1, 5)
@@ -149,7 +143,7 @@ mod tests {
     }
 
     #[test]
-    fn test_normalize_natural_dates() {
+    fn normalize_converts_natural_to_mm_dd() {
         let today = NaiveDate::from_ymd_opt(2026, 1, 5).unwrap();
 
         // @today includes year to avoid "always future" misinterpretation
@@ -175,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_combined() {
+    fn filter_query_combines_types_tags_dates() {
         let filter = parse_filter_query("!tasks #work @after:1/1 @before:1/31");
         assert_eq!(filter.entry_types, vec![FilterType::Task]);
         assert_eq!(filter.tags, vec!["work"]);
@@ -190,7 +184,7 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_date_today() {
+    fn filter_date_today_parses_to_current_date() {
         // @before:today and @after:today should parse to today's date
         let today = chrono::Local::now().date_naive();
 
@@ -204,7 +198,7 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_invalid_tokens() {
+    fn invalid_tokens_captured_in_filter() {
         assert!(!parse_filter_query("!tas").invalid_tokens.is_empty());
         assert!(
             !parse_filter_query("@before:1/1 @before:1/15")

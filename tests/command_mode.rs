@@ -5,16 +5,14 @@ use helpers::TestContext;
 
 use caliber::app::InputMode;
 
-/// CM-1: :open without args shows usage
 #[test]
-fn test_open_command_usage() {
+fn open_command_allows_continued_editing() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char(':'));
     ctx.type_str("open");
     ctx.press(KeyCode::Enter);
 
-    // App should remain functional
     ctx.press(KeyCode::Enter);
     ctx.type_str("Test after open");
     ctx.press(KeyCode::Enter);
@@ -22,16 +20,14 @@ fn test_open_command_usage() {
     assert!(ctx.screen_contains("Test after open"));
 }
 
-/// CM-2: :open with invalid target shows error
 #[test]
-fn test_open_command_invalid_target() {
+fn open_command_handles_invalid_target() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char(':'));
     ctx.type_str("open invalid");
     ctx.press(KeyCode::Enter);
 
-    // App should remain functional
     ctx.press(KeyCode::Enter);
     ctx.type_str("Test after invalid open");
     ctx.press(KeyCode::Enter);
@@ -39,97 +35,62 @@ fn test_open_command_invalid_target() {
     assert!(ctx.screen_contains("Test after invalid open"));
 }
 
-/// CM-3: Invalid command shows error but app remains functional
 #[test]
-fn test_invalid_command() {
+fn invalid_command_returns_to_normal_mode() {
     let mut ctx = TestContext::new();
 
-    // Enter command mode
     ctx.press(KeyCode::Char(':'));
     ctx.type_str("invalidcommand");
     ctx.press(KeyCode::Enter);
 
-    // App should still be functional - can navigate
     ctx.press(KeyCode::Char('j'));
     ctx.press(KeyCode::Char('k'));
 
-    // Can still create entries
     ctx.press(KeyCode::Enter);
     ctx.type_str("Test after invalid command");
     ctx.press(KeyCode::Enter);
 
-    assert!(
-        ctx.screen_contains("Test after invalid command"),
-        "App should still be functional after invalid command"
-    );
+    assert!(ctx.screen_contains("Test after invalid command"));
 }
 
-/// CM-3: Command mode escape returns to normal mode
 #[test]
-fn test_command_mode_escape() {
+fn escape_exits_command_mode() {
     let mut ctx = TestContext::new();
 
-    // Enter command mode
     ctx.press(KeyCode::Char(':'));
-    assert!(
-        matches!(ctx.app.input_mode, InputMode::Command),
-        "Should be in command mode"
-    );
+    assert!(matches!(ctx.app.input_mode, InputMode::Command));
 
-    // Type partial command
     ctx.type_str("goto");
 
-    // Escape should cancel
     ctx.press(KeyCode::Esc);
-    assert!(
-        matches!(ctx.app.input_mode, InputMode::Normal),
-        "Should return to normal mode after Esc"
-    );
+    assert!(matches!(ctx.app.input_mode, InputMode::Normal));
 }
 
-/// HO-1: Help overlay display and navigation
 #[test]
-fn test_help_overlay_display() {
+fn question_mark_toggles_help_overlay() {
     let mut ctx = TestContext::new();
 
-    // Press ? to show help
     ctx.press(KeyCode::Char('?'));
-    assert!(ctx.app.show_help, "Help overlay should be visible");
+    assert!(ctx.app.show_help);
 
-    // Help content should contain key bindings
-    // (Note: We can't easily check the rendered help content without the terminal,
-    // but we verify the state is correct)
-
-    // Press ? again to close
     ctx.press(KeyCode::Char('?'));
-    assert!(!ctx.app.show_help, "Help overlay should be hidden");
+    assert!(!ctx.app.show_help);
 }
 
-/// HO-1: Help overlay scrolling
 #[test]
-fn test_help_overlay_scroll() {
+fn help_overlay_scrolls_with_j_k() {
     let mut ctx = TestContext::new();
 
-    // Show help
     ctx.press(KeyCode::Char('?'));
-    assert!(ctx.app.show_help, "Help should be visible");
+    assert!(ctx.app.show_help);
 
-    // Scroll down with j
     let initial_offset = ctx.app.help_scroll;
     ctx.press(KeyCode::Char('j'));
-    assert!(
-        ctx.app.help_scroll > initial_offset,
-        "Help should scroll down with j"
-    );
+    assert!(ctx.app.help_scroll > initial_offset);
 
-    // Scroll up with k
     ctx.press(KeyCode::Char('k'));
-    assert_eq!(
-        ctx.app.help_scroll, initial_offset,
-        "Help should scroll up with k"
-    );
+    assert_eq!(ctx.app.help_scroll, initial_offset);
 
-    // Close with Esc
     ctx.press(KeyCode::Esc);
-    assert!(!ctx.app.show_help, "Help should close with Esc");
+    assert!(!ctx.app.show_help);
 }

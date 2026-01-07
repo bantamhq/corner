@@ -1,7 +1,9 @@
 use std::io;
 
 use crate::cursor::CursorBuffer;
-use crate::storage::{self, Entry, EntryType, RawEntry, SourceType, strip_recurring_tags};
+use crate::storage::{
+    self, Entry, EntryType, RawEntry, SourceType, parse_to_raw_entry, strip_recurring_tags,
+};
 
 use super::{App, EditContext, InputMode, Line, SelectedItem, ViewMode};
 
@@ -437,44 +439,8 @@ impl App {
     fn parse_paste_raw(text: &str) -> Vec<RawEntry> {
         text.lines()
             .filter(|line| !line.trim().is_empty())
-            .map(Self::parse_line_to_raw_entry)
+            .map(parse_to_raw_entry)
             .collect()
-    }
-
-    /// Parse a single line into a RawEntry, stripping markdown prefixes.
-    fn parse_line_to_raw_entry(line: &str) -> RawEntry {
-        let trimmed = line.trim_start();
-
-        // strip_prefix returns text AFTER the prefix (no duplication)
-        if let Some(content) = trimmed.strip_prefix("- [ ] ") {
-            return RawEntry {
-                entry_type: EntryType::Task { completed: false },
-                content: content.to_string(),
-            };
-        }
-        if let Some(content) = trimmed.strip_prefix("- [x] ") {
-            return RawEntry {
-                entry_type: EntryType::Task { completed: true },
-                content: content.to_string(),
-            };
-        }
-        if let Some(content) = trimmed.strip_prefix("* ") {
-            return RawEntry {
-                entry_type: EntryType::Event,
-                content: content.to_string(),
-            };
-        }
-        if let Some(content) = trimmed.strip_prefix("- ") {
-            return RawEntry {
-                entry_type: EntryType::Note,
-                content: content.to_string(),
-            };
-        }
-        // No prefix → Note with full line as content
-        RawEntry {
-            entry_type: EntryType::Note,
-            content: trimmed.to_string(),
-        }
     }
 
     pub(super) fn delete_at_index_daily(&mut self, entry_index: usize) {

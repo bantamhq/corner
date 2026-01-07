@@ -99,7 +99,7 @@ fn build_help_lines() -> Vec<RatatuiLine<'static>> {
     }
     lines.push(help_line(
         "DATE:",
-        "MM/DD, today, tomorrow, yesterday, next-mon, last-fri, 3d, -3d",
+        "MM/DD, today, tomorrow, yesterday, mon, d7 (+ for future)",
         key_style,
         desc_style,
     ));

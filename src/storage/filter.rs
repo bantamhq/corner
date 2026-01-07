@@ -254,47 +254,36 @@ pub fn parse_filter_date(input: &str, today: NaiveDate) -> Option<NaiveDate> {
 /// Replaces natural date patterns (@today, @tomorrow, @yesterday, @d7, @mon) with @MM/DD format.
 #[must_use]
 pub fn normalize_natural_dates(content: &str, today: NaiveDate) -> String {
-    let mut result = content.to_string();
-
-    for cap in NATURAL_DATE_REGEX.captures_iter(content) {
-        if let Some(m) = cap.get(0) {
-            let natural_str = &cap[1];
-            if let Some(date) = parse_natural_date(natural_str, today) {
-                // Only @today needs the year to avoid "always future" misinterpretation
-                let normalized = if natural_str.eq_ignore_ascii_case("today") {
-                    format!(
-                        "@{}/{}/{}",
-                        date.format("%m"),
-                        date.format("%d"),
-                        date.format("%y")
-                    )
-                } else {
-                    format!("@{}/{}", date.format("%m"), date.format("%d"))
-                };
-                result = result.replacen(m.as_str(), &normalized, 1);
-            }
-        }
-    }
-
-    result
+    NATURAL_DATE_REGEX
+        .replace_all(content, |caps: &regex::Captures| {
+            let natural_str = &caps[1];
+            parse_natural_date(natural_str, today).map_or_else(
+                || caps[0].to_string(),
+                |date| {
+                    if natural_str.eq_ignore_ascii_case("today") {
+                        format!("@{}/{}/{}", date.format("%m"), date.format("%d"), date.format("%y"))
+                    } else {
+                        format!("@{}/{}", date.format("%m"), date.format("%d"))
+                    }
+                },
+            )
+        })
+        .into_owned()
 }
 
 /// Replaces favorite tag shortcuts (#0 through #9) with actual tags from config.
 /// Tags that don't exist in config are left unchanged.
 #[must_use]
 pub fn expand_favorite_tags(content: &str, favorite_tags: &HashMap<String, String>) -> String {
-    let mut result = content.to_string();
-
-    for cap in FAVORITE_TAG_REGEX.captures_iter(content) {
-        if let Some(m) = cap.get(0) {
-            let digit = &cap[1];
-            if let Some(tag) = favorite_tags.get(digit).filter(|s| !s.is_empty()) {
-                result = result.replacen(m.as_str(), &format!("#{tag}"), 1);
-            }
-        }
-    }
-
-    result
+    FAVORITE_TAG_REGEX
+        .replace_all(content, |caps: &regex::Captures| {
+            let digit = &caps[1];
+            favorite_tags
+                .get(digit)
+                .filter(|s| !s.is_empty())
+                .map_or_else(|| caps[0].to_string(), |tag| format!("#{tag}"))
+        })
+        .into_owned()
 }
 
 /// Expands saved filter shortcuts ($name) with their definitions from config.
@@ -304,21 +293,23 @@ pub fn expand_saved_filters(
     query: &str,
     filters: &HashMap<String, String>,
 ) -> (String, Vec<String>) {
-    let mut result = query.to_string();
-    let mut unknown = Vec::new();
+    use std::cell::RefCell;
 
-    for cap in SAVED_FILTER_REGEX.captures_iter(query) {
-        if let Some(m) = cap.get(0) {
-            let name = &cap[1];
-            if let Some(expansion) = filters.get(name) {
-                result = result.replacen(m.as_str(), expansion, 1);
-            } else {
-                unknown.push(m.as_str().to_string());
-            }
-        }
-    }
+    let unknown = RefCell::new(Vec::new());
+    let result = SAVED_FILTER_REGEX
+        .replace_all(query, |caps: &regex::Captures| {
+            let name = &caps[1];
+            filters.get(name).map_or_else(
+                || {
+                    unknown.borrow_mut().push(caps[0].to_string());
+                    caps[0].to_string()
+                },
+                |expansion| expansion.clone(),
+            )
+        })
+        .into_owned();
 
-    (result, unknown)
+    (result, unknown.into_inner())
 }
 
 /// Parses an @every-* pattern string (without the @every- prefix) into a RecurringPattern.
@@ -435,8 +426,7 @@ pub fn collect_projected_entries_for_date(
 
             let parsed = parse_lines(line);
             if let Some(Line::Entry(raw_entry)) = parsed.first() {
-                // Check for @later pattern (one-time date projection)
-                if let Some(entry_target) = extract_target_date(&raw_entry.content, target_date)
+                if let Some(entry_target) = extract_target_date(&raw_entry.content, source_date)
                     && entry_target == target_date
                 {
                     entries.push(Entry::from_raw(
@@ -521,8 +511,7 @@ pub fn parse_filter_query(query: &str) -> Filter {
             filter.recurring = true;
             continue;
         }
-        // Any other @command is invalid
-        if token.starts_with('@') && token.contains(':') {
+        if token.starts_with('@') {
             filter.invalid_tokens.push(token.to_string());
             continue;
         }

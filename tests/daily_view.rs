@@ -5,415 +5,257 @@ use chrono::NaiveDate;
 use crossterm::event::KeyCode;
 use helpers::TestContext;
 
-/// DV-1: Entry creation positions (o adds below current)
 #[test]
-fn test_entry_creation_below() {
+fn o_key_creates_entry_below_current() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let content = "# 2026/01/15\n- [ ] First\n- [ ] Second\n";
     let mut ctx = TestContext::with_journal_content(date, content);
 
-    // Jump to first entry
     ctx.press(KeyCode::Char('g'));
-
-    // 'o' adds below current
     ctx.press(KeyCode::Char('o'));
     ctx.type_str("Below first");
     ctx.press(KeyCode::Enter);
 
-    // Check order in journal
     let journal = ctx.read_journal();
     let first_pos = journal.find("First").unwrap();
     let below_pos = journal.find("Below first").unwrap();
     let second_pos = journal.find("Second").unwrap();
 
-    assert!(
-        first_pos < below_pos && below_pos < second_pos,
-        "Entry added with 'o' should be between First and Second"
-    );
+    assert!(first_pos < below_pos && below_pos < second_pos);
 }
 
-/// DV-1: Entry creation with O (above current)
 #[test]
-fn test_entry_creation_above() {
+fn shift_o_creates_entry_above_current() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let content = "# 2026/01/15\n- [ ] First\n- [ ] Second\n";
     let mut ctx = TestContext::with_journal_content(date, content);
 
-    // Jump to second entry
     ctx.press(KeyCode::Char('G'));
-
-    // 'O' adds above current
     ctx.press(KeyCode::Char('O'));
     ctx.type_str("Above second");
     ctx.press(KeyCode::Enter);
 
-    // Check order
     let journal = ctx.read_journal();
     let first_pos = journal.find("First").unwrap();
     let above_pos = journal.find("Above second").unwrap();
     let second_pos = journal.find("Second").unwrap();
 
-    assert!(
-        first_pos < above_pos && above_pos < second_pos,
-        "Entry added with 'O' should be between First and Second"
-    );
+    assert!(first_pos < above_pos && above_pos < second_pos);
 }
 
-/// DV-3: Delete and undo (with selection sync verification - catches Bug 4)
 #[test]
-fn test_delete_and_undo() {
+fn delete_removes_entry_and_undo_restores() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let content = "# 2026/01/15\n- [ ] Entry A\n- [ ] Entry B\n- [ ] Entry C\n";
     let mut ctx = TestContext::with_journal_content(date, content);
 
-    // Go to first, then move to middle entry (Entry B)
-    ctx.press(KeyCode::Char('g')); // Go to first (Entry A)
-    assert_eq!(ctx.selected_index(), 0, "Should be at Entry A");
-    ctx.press(KeyCode::Char('j')); // Move to Entry B
-    assert_eq!(ctx.selected_index(), 1, "Should be at Entry B");
+    ctx.press(KeyCode::Char('g'));
+    assert_eq!(ctx.selected_index(), 0);
+    ctx.press(KeyCode::Char('j'));
+    assert_eq!(ctx.selected_index(), 1);
 
-    // Delete
     ctx.press(KeyCode::Char('d'));
-    assert!(!ctx.screen_contains("Entry B"), "Entry B should be deleted");
-    assert!(ctx.screen_contains("Entry A"), "Entry A should remain");
-    assert!(ctx.screen_contains("Entry C"), "Entry C should remain");
+    assert!(!ctx.screen_contains("Entry B"));
+    assert!(ctx.screen_contains("Entry A"));
+    assert!(ctx.screen_contains("Entry C"));
 
-    // Verify selection is still valid after delete
-    assert!(
-        ctx.selected_index() < ctx.entry_count(),
-        "Selection should be valid after delete"
-    );
-    // After deleting middle entry, selection should stay at index 1 (now Entry C)
-    assert_eq!(
-        ctx.selected_index(),
-        1,
-        "Selection should move to next entry after delete"
-    );
+    assert!(ctx.selected_index() < ctx.entry_count());
+    assert_eq!(ctx.selected_index(), 1);
 
-    // Undo
     ctx.press(KeyCode::Char('u'));
-    assert!(ctx.screen_contains("Entry B"), "Entry B should be restored");
+    assert!(ctx.screen_contains("Entry B"));
 }
 
-/// DV-4: Reorder mode
 #[test]
-fn test_reorder_mode() {
+fn reorder_mode_moves_entry_with_j_k() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let content = "# 2026/01/15\n- [ ] A\n- [ ] B\n- [ ] C\n";
     let mut ctx = TestContext::with_journal_content(date, content);
 
-    // Select A, enter reorder
     ctx.press(KeyCode::Char('g'));
     ctx.press(KeyCode::Char('r'));
-
-    // Move A down
     ctx.press(KeyCode::Char('j'));
-
-    // Confirm
     ctx.press(KeyCode::Enter);
 
-    // Verify order in journal: B, A, C
     let journal = ctx.read_journal();
     let b_pos = journal.find(" B").unwrap();
     let a_pos = journal.find(" A").unwrap();
     let c_pos = journal.find(" C").unwrap();
-    assert!(
-        b_pos < a_pos && a_pos < c_pos,
-        "Order should be B, A, C after reorder"
-    );
+    assert!(b_pos < a_pos && a_pos < c_pos);
 }
 
-/// DV-5: Reorder cancel
 #[test]
-fn test_reorder_cancel() {
+fn escape_cancels_reorder_without_saving() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let content = "# 2026/01/15\n- [ ] A\n- [ ] B\n- [ ] C\n";
     let mut ctx = TestContext::with_journal_content(date, content);
 
-    // Select A, enter reorder
     ctx.press(KeyCode::Char('g'));
     ctx.press(KeyCode::Char('r'));
-
-    // Move A down
     ctx.press(KeyCode::Char('j'));
-
-    // Cancel
     ctx.press(KeyCode::Esc);
 
-    // Verify original order in journal: A, B, C
     let journal = ctx.read_journal();
     let a_pos = journal.find(" A").unwrap();
     let b_pos = journal.find(" B").unwrap();
     let c_pos = journal.find(" C").unwrap();
-    assert!(
-        a_pos < b_pos && b_pos < c_pos,
-        "Order should be A, B, C after cancel"
-    );
+    assert!(a_pos < b_pos && b_pos < c_pos);
 }
 
-/// DV-6: Hide completed toggle
 #[test]
-fn test_hide_completed() {
+fn z_key_toggles_completed_visibility() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let content = "# 2026/01/15\n- [ ] Incomplete\n- [x] Completed\n";
     let mut ctx = TestContext::with_journal_content(date, content);
 
-    // Both visible initially
-    assert!(
-        ctx.screen_contains("Incomplete"),
-        "Incomplete should be visible initially"
-    );
-    assert!(
-        ctx.screen_contains("Completed"),
-        "Completed should be visible initially"
-    );
+    assert!(ctx.screen_contains("Incomplete"));
+    assert!(ctx.screen_contains("Completed"));
 
-    // Toggle hide
     ctx.press(KeyCode::Char('z'));
-    assert!(
-        ctx.screen_contains("Incomplete"),
-        "Incomplete should remain visible"
-    );
-    assert!(
-        !ctx.screen_contains("Completed"),
-        "Completed should be hidden"
-    );
+    assert!(ctx.screen_contains("Incomplete"));
+    assert!(!ctx.screen_contains("Completed"));
 
-    // Toggle back
     ctx.press(KeyCode::Char('z'));
-    assert!(
-        ctx.screen_contains("Completed"),
-        "Completed should be visible again"
-    );
+    assert!(ctx.screen_contains("Completed"));
 }
 
-/// DV-7: Sort entries
 #[test]
-fn test_sort_entries() {
+fn s_key_sorts_entries_by_type() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
-    // Mixed order: incomplete, note, completed
-    // Default sort order: completed, events, notes, uncompleted
     let content = "# 2026/01/15\n- [ ] Incomplete task\n- A note\n- [x] Completed task\n";
     let mut ctx = TestContext::with_journal_content(date, content);
 
-    // Sort
     ctx.press(KeyCode::Char('s'));
 
-    // Verify sorted per default: completed, notes, incomplete
     let journal = ctx.read_journal();
     let completed_pos = journal.find("Completed task").unwrap();
     let note_pos = journal.find("A note").unwrap();
     let incomplete_pos = journal.find("Incomplete task").unwrap();
-    assert!(
-        completed_pos < note_pos && note_pos < incomplete_pos,
-        "Default sort: completed tasks, then notes, then incomplete tasks"
-    );
+    assert!(completed_pos < note_pos && note_pos < incomplete_pos);
 }
 
-/// CP-4: Toggle task completion
 #[test]
-fn test_toggle_completion() {
+fn c_key_toggles_task_completion() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let content = "# 2026/01/15\n- [ ] My task\n";
     let mut ctx = TestContext::with_journal_content(date, content);
 
-    // Toggle to complete
     ctx.press(KeyCode::Char('c'));
-    assert!(
-        ctx.screen_contains("[x]"),
-        "Task should show completed marker"
-    );
+    assert!(ctx.screen_contains("[x]"));
 
-    // Toggle back
     ctx.press(KeyCode::Char('c'));
-    assert!(
-        ctx.screen_contains("[ ]"),
-        "Task should show incomplete marker"
-    );
+    assert!(ctx.screen_contains("[ ]"));
 
-    // Verify persistence of final state
     let journal = ctx.read_journal();
-    assert!(
-        journal.contains("- [ ] My task"),
-        "Final state should be incomplete"
-    );
+    assert!(journal.contains("- [ ] My task"));
 }
 
-/// Test selection sync after deleting last entry
 #[test]
-fn test_selection_after_delete_last() {
+fn delete_last_entry_selects_previous() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let content = "# 2026/01/15\n- [ ] A\n- [ ] B\n- [ ] C\n";
     let mut ctx = TestContext::with_journal_content(date, content);
 
-    ctx.press(KeyCode::Char('G')); // Go to last (C)
-    assert_eq!(ctx.selected_index(), 2, "Should be at last entry");
+    ctx.press(KeyCode::Char('G'));
+    assert_eq!(ctx.selected_index(), 2);
 
-    ctx.press(KeyCode::Char('d')); // Delete C
-    assert_eq!(
-        ctx.selected_index(),
-        1,
-        "Selection should move to new last entry"
-    );
-    assert!(ctx.screen_contains("B"), "Entry B should now be last");
-    assert!(!ctx.screen_contains(" C"), "Entry C should be deleted");
+    ctx.press(KeyCode::Char('d'));
+    assert_eq!(ctx.selected_index(), 1);
+    assert!(ctx.screen_contains("B"));
+    assert!(!ctx.screen_contains(" C"));
 }
 
-/// Test selection sync after deleting middle entry
 #[test]
-fn test_selection_after_delete_middle() {
+fn delete_middle_entry_keeps_selection_index() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let content = "# 2026/01/15\n- [ ] A\n- [ ] B\n- [ ] C\n";
     let mut ctx = TestContext::with_journal_content(date, content);
 
-    ctx.press(KeyCode::Char('g')); // Go to first
-    ctx.press(KeyCode::Char('j')); // Move to B
-    assert_eq!(ctx.selected_index(), 1, "Should be at middle entry B");
+    ctx.press(KeyCode::Char('g'));
+    ctx.press(KeyCode::Char('j'));
+    assert_eq!(ctx.selected_index(), 1);
 
-    ctx.press(KeyCode::Char('d')); // Delete B
-    assert!(
-        ctx.selected_index() < ctx.entry_count(),
-        "Selection must be within valid range"
-    );
-    // Selection should be on C (now at index 1 in remaining [A, C])
-    assert_eq!(
-        ctx.selected_index(),
-        1,
-        "Selection should stay at same index (now C)"
-    );
+    ctx.press(KeyCode::Char('d'));
+    assert!(ctx.selected_index() < ctx.entry_count());
+    assert_eq!(ctx.selected_index(), 1);
 }
 
-/// DV-8: Scroll behavior with many entries
 #[test]
-fn test_scroll_behavior() {
+fn navigation_scrolls_to_keep_selection_visible() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
-    // Create 30 entries (more than fit on typical screen)
     let mut content = "# 2026/01/15\n".to_string();
     for i in 1..=30 {
         content.push_str(&format!("- [ ] Entry {}\n", i));
     }
     let mut ctx = TestContext::with_journal_content(date, &content);
 
-    // Jump to last entry
     ctx.press(KeyCode::Char('G'));
-    assert_eq!(
-        ctx.selected_index(),
-        29,
-        "Should be at last entry (index 29)"
-    );
-    assert!(
-        ctx.screen_contains("Entry 30"),
-        "Last entry should be visible"
-    );
+    assert_eq!(ctx.selected_index(), 29);
+    assert!(ctx.screen_contains("Entry 30"));
 
-    // Navigate up one at a time
     ctx.press(KeyCode::Char('k'));
-    assert_eq!(ctx.selected_index(), 28, "Should be at entry 29");
+    assert_eq!(ctx.selected_index(), 28);
 
-    // Jump to top
     ctx.press(KeyCode::Char('g'));
-    assert_eq!(ctx.selected_index(), 0, "Should be at first entry");
-    assert!(
-        ctx.screen_contains("Entry 1"),
-        "First entry should be visible"
-    );
+    assert_eq!(ctx.selected_index(), 0);
+    assert!(ctx.screen_contains("Entry 1"));
 }
 
-/// DV-9: Yank entry
 #[test]
-fn test_yank_entry() {
+fn y_key_copies_entry_content() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let content = "# 2026/01/15\n- [ ] Yank this content\n";
     let mut ctx = TestContext::with_journal_content(date, content);
 
-    // Yank the entry
     ctx.press(KeyCode::Char('y'));
 
-    // Verify status message appears (the app should show "Yanked" or similar)
-    // Note: The actual clipboard operation can't be tested, but we verify the action completes
-    // and the entry is still there
-    assert!(
-        ctx.screen_contains("Yank this content"),
-        "Entry should still be visible after yank"
-    );
+    assert!(ctx.screen_contains("Yank this content"));
 }
 
-/// DV-10: Reorder mode with hidden completed entries
 #[test]
-fn test_reorder_with_hidden_completed() {
+fn reorder_skips_hidden_completed_entries() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
-    // Mix of completed and incomplete: A (incomplete), B (completed), C (incomplete)
     let content = "# 2026/01/15\n- [ ] A\n- [x] B\n- [ ] C\n";
     let mut ctx = TestContext::with_journal_content(date, content);
 
-    // Hide completed entries
     ctx.press(KeyCode::Char('z'));
 
-    // Verify B is hidden, only A and C visible
-    assert!(ctx.screen_contains(" A"), "A should be visible");
-    assert!(!ctx.screen_contains("[x] B"), "B should be hidden");
-    assert!(ctx.screen_contains(" C"), "C should be visible");
+    assert!(ctx.screen_contains(" A"));
+    assert!(!ctx.screen_contains("[x] B"));
+    assert!(ctx.screen_contains(" C"));
 
-    // Select A, enter reorder
     ctx.press(KeyCode::Char('g'));
     ctx.press(KeyCode::Char('r'));
-
-    // Move A down (should skip hidden B and go to C)
     ctx.press(KeyCode::Char('j'));
-
-    // Confirm reorder
     ctx.press(KeyCode::Enter);
 
-    // Verify order in journal: B (still in place), C, A
-    // The hidden completed entry B should remain in its position
     let journal = ctx.read_journal();
     let _b_pos = journal.find("[x] B").unwrap();
     let c_pos = journal.find("[ ] C").unwrap();
     let a_pos = journal.find("[ ] A").unwrap();
 
-    // After reordering visible entries: C should come before A
-    // B stays between them or maintains relative position
-    assert!(
-        c_pos < a_pos,
-        "C should be before A after reorder: journal={}",
-        journal
-    );
+    assert!(c_pos < a_pos);
 }
 
-/// DV-11: Custom header date format config
 #[test]
-fn test_header_date_format_config() {
+fn config_header_date_format_customizes_display() {
     let mut config = Config::default();
     config.header_date_format = "%A, %B %d".to_string();
     let date = NaiveDate::from_ymd_opt(2026, 1, 4).unwrap();
     let ctx = TestContext::with_config_and_content(date, "", config);
 
-    // January 4, 2026 is a Sunday
-    assert!(
-        ctx.screen_contains("Sunday, January 04"),
-        "Header should use custom date format"
-    );
+    assert!(ctx.screen_contains("Sunday, January 04"));
 }
 
-/// DV-12: hide_completed config on startup
 #[test]
-fn test_hide_completed_config() {
+fn config_hide_completed_hides_on_startup() {
     let mut config = Config::default();
     config.hide_completed = true;
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let content = "# 2026/01/15\n- [ ] Incomplete\n- [x] Complete\n";
     let ctx = TestContext::with_config_and_content(date, content, config);
 
-    assert!(
-        ctx.screen_contains("Incomplete"),
-        "Incomplete task should be visible"
-    );
-    assert!(
-        !ctx.screen_contains("Complete"),
-        "Completed task should be hidden on startup"
-    );
-    assert!(
-        ctx.screen_contains("Hiding 1 completed"),
-        "Should show hidden count"
-    );
+    assert!(ctx.screen_contains("Incomplete"));
+    assert!(!ctx.screen_contains("Complete"));
+    assert!(ctx.screen_contains("Hiding 1 completed"));
 }

@@ -189,38 +189,52 @@ fn last_day_of_month(date: NaiveDate) -> u32 {
         .unwrap_or(28)
 }
 
-fn parse_line(line: &str) -> Line {
+/// Parses a line into a RawEntry, treating unparsed lines as notes.
+#[must_use]
+pub fn parse_to_raw_entry(line: &str) -> RawEntry {
     let trimmed = line.trim_start();
 
     if let Some(content) = trimmed.strip_prefix("- [ ] ") {
-        return Line::Entry(RawEntry {
+        return RawEntry {
             entry_type: EntryType::Task { completed: false },
             content: content.to_string(),
-        });
+        };
     }
-
     if let Some(content) = trimmed.strip_prefix("- [x] ") {
-        return Line::Entry(RawEntry {
+        return RawEntry {
             entry_type: EntryType::Task { completed: true },
             content: content.to_string(),
-        });
+        };
     }
-
     if let Some(content) = trimmed.strip_prefix("* ") {
-        return Line::Entry(RawEntry {
+        return RawEntry {
             entry_type: EntryType::Event,
             content: content.to_string(),
-        });
+        };
     }
-
     if let Some(content) = trimmed.strip_prefix("- ") {
-        return Line::Entry(RawEntry {
+        return RawEntry {
             entry_type: EntryType::Note,
             content: content.to_string(),
-        });
+        };
     }
+    RawEntry {
+        entry_type: EntryType::Note,
+        content: trimmed.to_string(),
+    }
+}
 
-    Line::Raw(line.to_string())
+fn parse_line(line: &str) -> Line {
+    let trimmed = line.trim_start();
+    if trimmed.starts_with("- [ ] ")
+        || trimmed.starts_with("- [x] ")
+        || trimmed.starts_with("* ")
+        || trimmed.starts_with("- ")
+    {
+        Line::Entry(parse_to_raw_entry(line))
+    } else {
+        Line::Raw(line.to_string())
+    }
 }
 
 #[must_use]

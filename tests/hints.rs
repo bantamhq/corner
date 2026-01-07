@@ -7,24 +7,19 @@ use helpers::TestContext;
 
 use caliber::config::Config;
 
-/// HI-1: Command hint completion workflow
-/// Type partial command, accept hint, verify buffer contains completed command with trailing space
 #[test]
-fn test_command_hint_completion() {
+fn command_hint_completes_with_right_arrow() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char(':'));
     ctx.type_str("qu");
     ctx.press(KeyCode::Right);
 
-    // Completion adds trailing space to enable further input
     assert_eq!(ctx.app.command_buffer.content(), "quit ");
 }
 
-/// HI-2: Tag hint completion workflow
-/// Create entry with tag, start new entry, complete tag, save, verify persisted
 #[test]
-fn test_tag_hint_completion() {
+fn tag_hint_completes_with_right_arrow() {
     let content = "# 2026/01/15\n- [ ] Task with #feature tag\n";
     let date = chrono::NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let mut ctx = TestContext::with_journal_content(date, content);
@@ -38,10 +33,8 @@ fn test_tag_hint_completion() {
     assert!(ctx.read_journal().contains("New task #feature"));
 }
 
-/// HI-3: Filter type hint completion workflow
-/// Complete filter syntax and verify filter executes
 #[test]
-fn test_filter_type_hint_completion() {
+fn filter_type_hint_completes_with_right_arrow() {
     let content = "# 2026/01/15\n- [ ] Incomplete task\n- [x] Completed task\n- A note\n";
     let date = chrono::NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let mut ctx = TestContext::with_journal_content(date, content);
@@ -55,23 +48,19 @@ fn test_filter_type_hint_completion() {
     assert!(!ctx.screen_contains("A note"));
 }
 
-/// HI-4: Date operation hint completion
 #[test]
-fn test_date_op_hint_completion() {
+fn date_op_hint_completes_with_right_arrow() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char('/'));
     ctx.type_str("@be");
     ctx.press(KeyCode::Right);
 
-    // In QueryInput mode from Daily view, buffer is command_buffer
-    // No trailing space since colon expects continuation (date input)
     assert_eq!(ctx.app.command_buffer.content(), "@before:");
 }
 
-/// HI-5: Negation hint completion
 #[test]
-fn test_negation_hint_completion() {
+fn negation_hint_completes_with_right_arrow() {
     let content = "# 2026/01/15\n- [ ] Task with #feature tag\n";
     let date = chrono::NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let mut ctx = TestContext::with_journal_content(date, content);
@@ -81,13 +70,11 @@ fn test_negation_hint_completion() {
     ctx.press(KeyCode::Right);
 
     let query = ctx.app.command_buffer.content();
-    // Should complete the tag after not:#
     assert_eq!(query, "not:#feature ");
 }
 
-/// HI-6: Tag hints work with multi-word input
 #[test]
-fn test_tag_hints_in_multiword_context() {
+fn tag_hints_complete_in_multiword_context() {
     let content = "# 2026/01/15\n- [ ] Task with #work tag\n";
     let date = chrono::NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let mut ctx = TestContext::with_journal_content(date, content);
@@ -100,16 +87,14 @@ fn test_tag_hints_in_multiword_context() {
     assert!(ctx.screen_contains("Meeting notes #work"));
 }
 
-/// HI-7: Hints dismiss on exact match (no completion available)
 #[test]
-fn test_exact_match_no_completion() {
+fn exact_match_skips_completion() {
     let content = "# 2026/01/15\n- [ ] Task with #bug tag\n";
     let date = chrono::NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let mut ctx = TestContext::with_journal_content(date, content);
 
     ctx.press(KeyCode::Enter);
     ctx.type_str("#bug");
-    // Right arrow should move cursor, not complete (since exact match)
     ctx.press(KeyCode::Right);
 
     let buffer = ctx
@@ -124,9 +109,8 @@ fn test_exact_match_no_completion() {
     );
 }
 
-/// HI-8: Escape clears command mode and hints
 #[test]
-fn test_escape_clears_command_mode() {
+fn escape_clears_command_buffer_and_exits() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char(':'));
@@ -140,9 +124,8 @@ fn test_escape_clears_command_mode() {
     ));
 }
 
-/// HI-8b: Escape exits query input immediately (single press, even with content)
 #[test]
-fn test_escape_exits_query_input() {
+fn escape_exits_query_input_mode() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char('/'));
@@ -155,9 +138,8 @@ fn test_escape_exits_query_input() {
     ));
 }
 
-/// HI-9: Tags are collected from journal on load
 #[test]
-fn test_tags_collected_from_journal() {
+fn tags_collect_from_journal_for_hints() {
     let content = "# 2026/01/15\n- [ ] #alpha task\n- [ ] #beta task\n- [ ] #alpha again\n";
     let date = chrono::NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let mut ctx = TestContext::with_journal_content(date, content);
@@ -167,13 +149,11 @@ fn test_tags_collected_from_journal() {
     ctx.press(KeyCode::Right);
     ctx.press(KeyCode::Enter);
 
-    // Should complete to #alpha (first alphabetically)
     assert!(ctx.screen_contains("#alpha"));
 }
 
-/// HI-10: Saved filter hint completion
 #[test]
-fn test_saved_filter_hint_completion() {
+fn saved_filter_hint_completes_with_right_arrow() {
     let date = chrono::NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
     let mut config = Config::default();
     config.filters = HashMap::from([
@@ -190,9 +170,8 @@ fn test_saved_filter_hint_completion() {
     assert_eq!(ctx.app.command_buffer.content(), "$work ");
 }
 
-/// HI-11: Date value hints after @before:
 #[test]
-fn test_date_value_hints() {
+fn date_value_hints_show_after_colon() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char('/'));
@@ -202,9 +181,8 @@ fn test_date_value_hints() {
     assert!(ctx.app.command_buffer.content().starts_with("@before:d"));
 }
 
-/// HI-12: Empty filter shows guidance (not completable)
 #[test]
-fn test_empty_filter_shows_guidance() {
+fn empty_filter_shows_guidance_message() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char('/'));
@@ -218,9 +196,8 @@ fn test_empty_filter_shows_guidance() {
     assert!(ctx.app.command_buffer.is_empty());
 }
 
-/// HI-13: Command with optional subargs is considered complete
 #[test]
-fn test_optional_subargs_command_complete() {
+fn optional_subargs_mark_command_complete() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char(':'));
@@ -229,9 +206,8 @@ fn test_optional_subargs_command_complete() {
     assert!(ctx.app.command_is_complete());
 }
 
-/// HI-14: Date value hints show for relative days with + suffix
 #[test]
-fn test_date_value_hints_with_future_suffix() {
+fn date_value_hints_recognize_future_suffix() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char('/'));
@@ -243,9 +219,8 @@ fn test_date_value_hints_with_future_suffix() {
     ));
 }
 
-/// HI-15: Relative days limited to 3 digits
 #[test]
-fn test_relative_days_three_digit_limit() {
+fn relative_days_limit_to_three_digits() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char('/'));

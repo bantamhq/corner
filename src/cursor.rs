@@ -302,9 +302,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_multibyte_emoji() {
+    fn emoji_traverses_as_single_character() {
         let mut buf = CursorBuffer::new("a🎉b".to_string());
-        // "a🎉b" has 3 characters but 6 bytes (a=1, 🎉=4, b=1)
         assert_eq!(buf.cursor_char_pos(), 3);
 
         buf.move_left();
@@ -318,9 +317,9 @@ mod tests {
     }
 
     #[test]
-    fn test_cursor_byte_pos_with_multibyte() {
+    fn byte_pos_handles_multibyte_characters() {
         let buf = CursorBuffer::new("a🎉".to_string());
-        assert_eq!(buf.cursor_byte_pos(), 5); // 1 + 4 bytes
+        assert_eq!(buf.cursor_byte_pos(), 5);
 
         let mut buf2 = CursorBuffer::new("a🎉".to_string());
         buf2.move_left();
@@ -331,7 +330,7 @@ mod tests {
     }
 
     #[test]
-    fn test_japanese_characters() {
+    fn japanese_characters_insert_correctly() {
         let mut buf = CursorBuffer::new("日本語".to_string());
         assert_eq!(buf.cursor_char_pos(), 3);
 
@@ -343,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_emoji() {
+    fn delete_removes_whole_emoji() {
         let mut buf = CursorBuffer::new("a🎉b".to_string());
         buf.move_left();
         buf.delete_char_before();
@@ -351,7 +350,7 @@ mod tests {
     }
 
     #[test]
-    fn test_move_word_boundaries() {
+    fn word_movement_stops_at_boundaries() {
         let mut buf = CursorBuffer::new("hello world test".to_string());
 
         buf.move_word_left();
