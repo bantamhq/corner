@@ -4,6 +4,7 @@ mod filter;
 mod footer;
 mod help;
 mod hints;
+mod popup_interface;
 mod project_picker;
 mod scroll;
 mod shared;

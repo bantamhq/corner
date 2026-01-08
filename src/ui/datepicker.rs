@@ -4,12 +4,16 @@ use ratatui::{
     Frame,
     layout::Rect,
     style::{Color, Style, Stylize},
-    text::Span,
-    widgets::{Block, Borders, Clear},
+    text::{Line, Span},
+    widgets::Paragraph,
 };
 use time::{Date, Month};
 
 use crate::app::DatepickerState;
+
+use super::popup_interface::{PopupLayout, render_popup_frame, render_query_input};
+
+const CALENDAR_WIDTH: u16 = 22;
 
 /// Convert chrono NaiveDate to time::Date (required by ratatui calendar)
 fn to_time_date(date: NaiveDate) -> Date {
@@ -21,37 +25,16 @@ fn to_time_date(date: NaiveDate) -> Date {
     .unwrap()
 }
 
-/// Create a fixed-size centered rect
-fn centered_fixed_rect(width: u16, height: u16, area: Rect) -> Rect {
-    let x = area.x + (area.width.saturating_sub(width)) / 2;
-    let y = area.y + (area.height.saturating_sub(height)) / 2;
-
-    Rect {
-        x,
-        y,
-        width: width.min(area.width),
-        height: height.min(area.height),
-    }
-}
-
 pub fn render_datepicker(f: &mut Frame, state: &DatepickerState, area: Rect) {
-    // Fixed size popup - calendar is 20 chars wide (Su Mo Tu We Th Fr Sa)
-    let popup_width: u16 = 24;
-    let popup_height: u16 = 10;
+    let layout = PopupLayout::new(area);
 
-    let popup_area = centered_fixed_rect(popup_width, popup_height, area);
+    if layout.is_too_small() {
+        return;
+    }
 
-    f.render_widget(Clear, popup_area);
-
-    let title = state.display_month.format(" %B %Y ").to_string();
-
-    let block = Block::default()
-        .title(Span::styled(title, Style::new().fg(Color::Cyan)))
-        .borders(Borders::ALL)
-        .border_style(Style::new().fg(Color::Cyan));
-
-    let inner_area = block.inner(popup_area);
-    f.render_widget(block, popup_area);
+    let title = state.display_month.format("%B %Y").to_string();
+    render_popup_frame(f, &layout, &title);
+    render_query_input(f, &layout, &state.query, state.input_focused);
 
     let today = Local::now().date_naive();
     let mut events = CalendarEventStore::default();
@@ -96,10 +79,33 @@ pub fn render_datepicker(f: &mut Frame, state: &DatepickerState, area: Rect) {
     };
     events.add(to_time_date(state.selected), selected_style);
 
-    // Render calendar - default is dimmed Gray for empty days
+    let calendar_area = Rect {
+        x: layout.content_area.x,
+        y: layout.content_area.y,
+        width: CALENDAR_WIDTH.min(layout.content_area.width),
+        height: layout.content_area.height.saturating_sub(1),
+    };
+
     let calendar = Monthly::new(to_time_date(state.display_month), events)
         .show_weekdays_header(Style::new().fg(Color::Gray).dim().bold())
         .default_style(Style::new().fg(Color::Gray).dim());
 
-    f.render_widget(calendar, inner_area);
+    f.render_widget(calendar, calendar_area);
+
+    let legend_area = Rect {
+        x: layout.content_area.x,
+        y: layout.query_area.y.saturating_sub(1),
+        width: layout.content_area.width,
+        height: 1,
+    };
+
+    let dim = Style::new().dim();
+    let legend_line = Line::from(vec![
+        Span::styled("● ", Style::new().fg(Color::Yellow)),
+        Span::styled("open tasks  ", dim),
+        Span::styled("● ", Style::new().fg(Color::Magenta)),
+        Span::styled("events", dim),
+    ]);
+
+    f.render_widget(Paragraph::new(legend_line), legend_area);
 }

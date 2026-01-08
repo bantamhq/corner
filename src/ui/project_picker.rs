@@ -3,67 +3,26 @@ use ratatui::{
     layout::Rect,
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::Paragraph,
 };
 
 use crate::app::ProjectPickerState;
 
-fn centered_fixed_rect(width: u16, height: u16, area: Rect) -> Rect {
-    let x = area.x + (area.width.saturating_sub(width)) / 2;
-    let y = area.y + (area.height.saturating_sub(height)) / 2;
-
-    Rect {
-        x,
-        y,
-        width: width.min(area.width),
-        height: height.min(area.height),
-    }
-}
+use super::popup_interface::{PopupLayout, render_popup_frame, render_query_input};
 
 pub fn render_project_picker(f: &mut Frame, state: &ProjectPickerState, area: Rect) {
-    let popup_width = 50.min(area.width.saturating_sub(4));
-    let popup_height = 12.min(area.height.saturating_sub(4));
+    let layout = PopupLayout::new(area);
 
-    let popup_area = centered_fixed_rect(popup_width, popup_height, area);
-
-    f.render_widget(Clear, popup_area);
-
-    let block = Block::default()
-        .title(Span::styled(" Projects ", Style::new().fg(Color::Cyan)))
-        .borders(Borders::ALL)
-        .border_style(Style::new().fg(Color::Cyan));
-
-    let inner = block.inner(popup_area);
-    f.render_widget(block, popup_area);
-
-    if inner.height < 3 {
+    if layout.is_too_small() {
         return;
     }
 
-    // List area at top
-    let list_area = Rect {
-        x: inner.x,
-        y: inner.y,
-        width: inner.width,
-        height: inner.height.saturating_sub(2),
-    };
-
-    // Query input at bottom
-    let query_area = Rect {
-        x: inner.x,
-        y: inner.y + inner.height.saturating_sub(1),
-        width: inner.width,
-        height: 1,
-    };
-    let query_line = Line::from(vec![
-        Span::styled("> ", Style::new().fg(Color::Cyan)),
-        Span::styled(state.query.content().to_string(), Style::new().fg(Color::Cyan)),
-    ]);
-    f.render_widget(Paragraph::new(query_line), query_area);
+    render_popup_frame(f, &layout, "Projects");
+    render_query_input(f, &layout, &state.query, true);
 
     let mut lines = Vec::new();
     for (i, &project_idx) in state.filtered_indices.iter().enumerate() {
-        if i >= list_area.height as usize {
+        if i >= layout.content_area.height as usize {
             break;
         }
 
@@ -80,14 +39,10 @@ pub fn render_project_picker(f: &mut Frame, state: &ProjectPickerState, area: Re
             Style::new().fg(Color::Yellow).dim()
         };
 
-        let mut spans = vec![
+        let spans = vec![
             Span::styled(format!("{} ", indicator), Style::new().fg(Color::Cyan)),
             Span::styled(project.name.clone(), name_style),
         ];
-
-        if !project.available {
-            spans.push(Span::styled(" (unavailable)", Style::new().fg(Color::Red).dim()));
-        }
 
         lines.push(Line::from(spans));
     }
@@ -110,8 +65,5 @@ pub fn render_project_picker(f: &mut Frame, state: &ProjectPickerState, area: Re
         }
     }
 
-    f.render_widget(Paragraph::new(lines), list_area);
-
-    let cursor_x = query_area.x + 2 + state.query.cursor_display_pos() as u16;
-    f.set_cursor_position((cursor_x, query_area.y));
+    f.render_widget(Paragraph::new(lines), layout.content_area);
 }

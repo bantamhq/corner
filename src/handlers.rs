@@ -484,9 +484,45 @@ pub fn handle_selection_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
 }
 
 pub fn handle_datepicker_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
-    let spec = KeySpec::from_event(&key);
-    if let Some(action) = app.keymap.get(KeyContext::Datepicker, &spec) {
-        dispatch_action(app, action)?;
+    if app.datepicker_input_focused() {
+        // Input is focused - handle text editing
+        match key.code {
+            KeyCode::Enter => {
+                app.datepicker_submit_input()?;
+            }
+            KeyCode::Tab | KeyCode::Esc => {
+                app.datepicker_toggle_focus();
+            }
+            KeyCode::Backspace => {
+                app.datepicker_input_backspace();
+            }
+            KeyCode::Delete => {
+                app.datepicker_input_delete();
+            }
+            KeyCode::Left => {
+                app.datepicker_input_move_left();
+            }
+            KeyCode::Right => {
+                app.datepicker_input_move_right();
+            }
+            KeyCode::Char(c) => {
+                app.datepicker_input_char(c);
+            }
+            _ => {}
+        }
+    } else {
+        // Calendar is focused - use keymap, but Tab toggles to input
+        match key.code {
+            KeyCode::Tab => {
+                app.datepicker_toggle_focus();
+            }
+            _ => {
+                let spec = KeySpec::from_event(&key);
+                if let Some(action) = app.keymap.get(KeyContext::Datepicker, &spec) {
+                    dispatch_action(app, action)?;
+                }
+            }
+        }
     }
     Ok(())
 }

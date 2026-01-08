@@ -146,6 +146,10 @@ pub struct DatepickerState {
     pub display_month: NaiveDate,
     /// Cached day info for the display month
     pub day_cache: HashMap<NaiveDate, DayInfo>,
+    /// Query input for quick date entry
+    pub query: CursorBuffer,
+    /// Whether the input field is focused (vs calendar)
+    pub input_focused: bool,
 }
 
 impl DatepickerState {
@@ -155,6 +159,8 @@ impl DatepickerState {
             selected: date,
             display_month: NaiveDate::from_ymd_opt(date.year(), date.month(), 1).unwrap(),
             day_cache: HashMap::new(),
+            query: CursorBuffer::empty(),
+            input_focused: false,
         }
     }
 }

@@ -122,6 +122,78 @@ impl App {
         self.refresh_datepicker_cache();
     }
 
+    pub fn datepicker_toggle_focus(&mut self) {
+        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+            return;
+        };
+        state.input_focused = !state.input_focused;
+    }
+
+    pub fn datepicker_submit_input(&mut self) -> io::Result<()> {
+        let input = {
+            let InputMode::Datepicker(ref state) = self.input_mode else {
+                return Ok(());
+            };
+            state.query.content().trim().to_string()
+        };
+
+        if input.is_empty() {
+            return Ok(());
+        }
+
+        let today = Local::now().date_naive();
+        if let Some(date) = storage::parse_natural_date(&input, today) {
+            self.input_mode = InputMode::Normal;
+            self.goto_day(date)?;
+        } else {
+            self.set_status(format!("Invalid date: {input}"));
+        }
+
+        Ok(())
+    }
+
+    pub fn datepicker_input_char(&mut self, c: char) {
+        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+            return;
+        };
+        state.query.insert_char(c);
+    }
+
+    pub fn datepicker_input_backspace(&mut self) {
+        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+            return;
+        };
+        state.query.delete_char_before();
+    }
+
+    pub fn datepicker_input_delete(&mut self) {
+        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+            return;
+        };
+        state.query.delete_char_after();
+    }
+
+    pub fn datepicker_input_move_left(&mut self) {
+        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+            return;
+        };
+        state.query.move_left();
+    }
+
+    pub fn datepicker_input_move_right(&mut self) {
+        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+            return;
+        };
+        state.query.move_right();
+    }
+
+    pub fn datepicker_input_focused(&self) -> bool {
+        let InputMode::Datepicker(ref state) = self.input_mode else {
+            return false;
+        };
+        state.input_focused
+    }
+
     fn load_month_cache(
         &self,
         month: NaiveDate,
