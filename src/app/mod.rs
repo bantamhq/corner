@@ -653,12 +653,6 @@ impl App {
         true
     }
 
-    /// Check if the current command buffer is ready to execute.
-    #[must_use]
-    pub fn command_is_complete(&self) -> bool {
-        true
-    }
-
     /// Get the content of the current prompt buffer (if in prompt mode)
     #[must_use]
     pub fn prompt_content(&self) -> Option<&str> {

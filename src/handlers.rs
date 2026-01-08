@@ -192,20 +192,18 @@ pub fn handle_help_key(app: &mut App, key: KeyEvent) {
     }
 }
 
+/// Handle keyboard input in prompt mode (command `:` or filter `/`).
+///
+/// Autocomplete behavior differs by key:
+/// - Enter: autocomplete, then submit (unless input ends with `:`)
+/// - Right: autocomplete, then add space (unless input ends with `:`)
 pub fn handle_prompt_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
     let is_command = matches!(app.input_mode, InputMode::Prompt(PromptContext::Command { .. }));
 
     match key.code {
         KeyCode::Enter => {
-            let did_autocomplete =
-                !matches!(app.hint_state, HintContext::Inactive) && app.accept_hint();
-
-            if did_autocomplete && !app.command_is_complete() {
-                if !app.input_needs_continuation()
-                    && let Some(buffer) = app.prompt_buffer_mut()
-                {
-                    buffer.insert_char(' ');
-                }
+            app.accept_hint();
+            if app.input_needs_continuation() {
                 app.update_hints();
             } else {
                 app.clear_hints();

@@ -61,6 +61,21 @@ fn date_op_hint_completes_with_right_arrow() {
 }
 
 #[test]
+fn date_op_hint_completes_with_enter_but_does_not_submit() {
+    let mut ctx = TestContext::new();
+
+    ctx.press(KeyCode::Char('/'));
+    ctx.type_str("@be");
+    ctx.press(KeyCode::Enter);
+
+    assert_eq!(ctx.app.prompt_content(), Some("@before:"));
+    assert!(matches!(
+        ctx.app.input_mode,
+        caliber::app::InputMode::Prompt(_)
+    ));
+}
+
+#[test]
 fn negation_hint_completes_with_right_arrow() {
     let content = "# 2026/01/15\n- [ ] Task with #feature tag\n";
     let date = chrono::NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
@@ -198,13 +213,13 @@ fn empty_filter_shows_guidance_message() {
 }
 
 #[test]
-fn optional_subargs_mark_command_complete() {
+fn command_without_colon_does_not_need_continuation() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char(':'));
     ctx.type_str("config");
 
-    assert!(ctx.app.command_is_complete());
+    assert!(!ctx.app.input_needs_continuation());
 }
 
 #[test]
