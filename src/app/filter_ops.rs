@@ -5,20 +5,11 @@ use chrono::Local;
 use crate::cursor::CursorBuffer;
 use crate::storage::{self, EntryType};
 
-use super::{App, EditContext, FILTER_HEADER_LINES, FilterState, InputMode, ViewMode};
+use super::{App, EditContext, FILTER_HEADER_LINES, FilterState, InputMode, PromptContext, ViewMode};
 
 impl App {
     pub fn enter_filter_input(&mut self) {
-        match &mut self.view {
-            ViewMode::Filter(state) => {
-                state.query_buffer.set_content(&state.query);
-            }
-            ViewMode::Daily(_) => {
-                self.command_buffer.clear();
-            }
-        }
-
-        self.input_mode = InputMode::QueryInput;
+        self.enter_filter_mode();
         self.update_hints();
     }
 
@@ -49,25 +40,18 @@ impl App {
         Ok(())
     }
 
-    /// Extracts the query from the appropriate buffer based on current view.
+    /// Extracts the query from the prompt buffer.
     fn extract_query_buffer(&mut self) -> String {
-        match &mut self.view {
-            ViewMode::Filter(state) => {
-                let q = state.query_buffer.content().to_string();
-                state.query_buffer.clear();
-                q
-            }
-            ViewMode::Daily(_) => {
-                let q = self.command_buffer.content().to_string();
-                self.command_buffer.clear();
-                q
-            }
+        match &self.input_mode {
+            InputMode::Prompt(PromptContext::Filter { buffer }) => buffer.content().to_string(),
+            _ => String::new(),
         }
     }
 
     pub fn execute_filter(&mut self) -> io::Result<()> {
         self.save();
         let query = self.extract_query_buffer();
+        self.input_mode = InputMode::Normal;
         self.reset_filter_view(query)
     }
 
@@ -77,14 +61,6 @@ impl App {
     }
 
     pub fn cancel_filter_input(&mut self) {
-        match &mut self.view {
-            ViewMode::Filter(state) => {
-                state.query_buffer.clear();
-            }
-            ViewMode::Daily(_) => {
-                self.command_buffer.clear();
-            }
-        }
         self.input_mode = InputMode::Normal;
     }
 

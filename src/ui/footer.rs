@@ -4,29 +4,20 @@ use ratatui::{
     text::{Line as RatatuiLine, Span},
 };
 
-use crate::app::{App, InputMode, ViewMode};
+use crate::app::{App, InputMode, InterfaceContext, PromptContext, ViewMode};
 use crate::dispatch::Keymap;
 use crate::registry::{FooterMode, KeyAction, KeyContext, footer_actions};
 
 pub fn render_footer(app: &App) -> RatatuiLine<'static> {
     match (&app.view, &app.input_mode) {
-        (_, InputMode::Command) => RatatuiLine::from(vec![
-            Span::styled(":", Style::default().fg(Color::Cyan)),
-            Span::styled(
-                app.command_buffer.content().to_string(),
-                Style::default().fg(Color::Cyan),
-            ),
+        (_, InputMode::Prompt(PromptContext::Command { buffer })) => RatatuiLine::from(vec![
+            Span::styled(":", Style::default().fg(Color::Blue)),
+            Span::raw(buffer.content().to_string()),
         ]),
-        (_, InputMode::QueryInput) => {
-            let buffer = match &app.view {
-                ViewMode::Filter(state) => state.query_buffer.content(),
-                ViewMode::Daily(_) => app.command_buffer.content(),
-            };
-            RatatuiLine::from(vec![
-                Span::styled("/", Style::default().fg(Color::Magenta)),
-                Span::raw(buffer.to_string()),
-            ])
-        }
+        (_, InputMode::Prompt(PromptContext::Filter { buffer })) => RatatuiLine::from(vec![
+            Span::styled("/", Style::default().fg(Color::Magenta)),
+            Span::raw(buffer.content().to_string()),
+        ]),
         (_, InputMode::Edit(_)) => {
             build_footer_line(" EDIT ", Color::Green, FooterMode::Edit, &app.keymap)
         }
@@ -52,18 +43,17 @@ pub fn render_footer(app: &App) -> RatatuiLine<'static> {
                 &app.keymap,
             )
         }
-        (_, InputMode::Datepicker(_)) => {
-            build_footer_line(" DATE ", Color::Cyan, FooterMode::Datepicker, &app.keymap)
+        (_, InputMode::Interface(InterfaceContext::Date(_))) => {
+            build_footer_line(" DATE ", Color::Blue, FooterMode::DateInterface, &app.keymap)
         }
-        (_, InputMode::ProjectPicker(_)) => RatatuiLine::from(vec![
+        (_, InputMode::Interface(InterfaceContext::Project(_))) => {
+            build_footer_line(" PROJECT ", Color::Blue, FooterMode::ProjectInterface, &app.keymap)
+        }
+        (_, InputMode::Interface(InterfaceContext::Tag(_))) => RatatuiLine::from(vec![
             Span::styled(
-                " PROJECTS ",
-                Style::default().fg(Color::Black).bg(Color::Cyan),
+                " TAG ",
+                Style::default().fg(Color::Black).bg(Color::Blue),
             ),
-            Span::styled("  Enter", Style::default().fg(Color::Gray)),
-            Span::styled(" Select  ", Style::default().dim()),
-            Span::styled("Esc", Style::default().fg(Color::Gray)),
-            Span::styled(" Close", Style::default().dim()),
         ]),
         (ViewMode::Daily(_), InputMode::Normal) => {
             build_footer_line(" DAILY ", Color::Cyan, FooterMode::NormalDaily, &app.keymap)
@@ -84,7 +74,8 @@ fn footer_mode_to_context(mode: FooterMode) -> KeyContext {
         FooterMode::Edit => KeyContext::Edit,
         FooterMode::Reorder => KeyContext::Reorder,
         FooterMode::Selection => KeyContext::Selection,
-        FooterMode::Datepicker => KeyContext::Datepicker,
+        FooterMode::DateInterface => KeyContext::DateInterface,
+        FooterMode::ProjectInterface => KeyContext::ProjectInterface,
     }
 }
 

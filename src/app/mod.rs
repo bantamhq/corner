@@ -1,6 +1,6 @@
 pub mod actions;
 mod command;
-mod datepicker;
+mod date_interface;
 mod edit_mode;
 mod entry_ops;
 mod filter_ops;
@@ -137,9 +137,9 @@ impl SelectionState {
     }
 }
 
-/// State for the datepicker popup
+/// State for the date interface popup
 #[derive(Clone, Debug)]
-pub struct DatepickerState {
+pub struct DateInterfaceState {
     /// Currently selected date
     pub selected: NaiveDate,
     /// First day of the displayed month
@@ -152,7 +152,7 @@ pub struct DatepickerState {
     pub input_focused: bool,
 }
 
-impl DatepickerState {
+impl DateInterfaceState {
     #[must_use]
     pub fn new(date: NaiveDate) -> Self {
         Self {
@@ -166,20 +166,20 @@ impl DatepickerState {
 }
 
 #[derive(Clone, Debug)]
-pub struct ProjectPickerState {
+pub struct ProjectInterfaceState {
     pub query: CursorBuffer,
     pub filtered_indices: Vec<usize>,
     pub selected: usize,
     pub projects: Vec<storage::ProjectInfo>,
 }
 
-impl Default for ProjectPickerState {
+impl Default for ProjectInterfaceState {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ProjectPickerState {
+impl ProjectInterfaceState {
     #[must_use]
     pub fn new() -> Self {
         let registry = storage::ProjectRegistry::load();
@@ -221,6 +221,22 @@ impl ProjectPickerState {
     }
 }
 
+/// State for the tag interface popup (stub for future implementation)
+#[derive(Clone, Debug)]
+pub struct TagInterfaceState {
+    pub query: CursorBuffer,
+    pub selected: usize,
+}
+
+impl Default for TagInterfaceState {
+    fn default() -> Self {
+        Self {
+            query: CursorBuffer::empty(),
+            selected: 0,
+        }
+    }
+}
+
 /// Which view is currently active and its state
 #[derive(Clone)]
 pub enum ViewMode {
@@ -254,18 +270,31 @@ pub enum ConfirmContext {
     AddToGitignore,
 }
 
+/// Context for prompt input modes (owns its buffer)
+#[derive(Clone, Debug)]
+pub enum PromptContext {
+    Command { buffer: CursorBuffer },
+    Filter { buffer: CursorBuffer },
+}
+
+/// Context for interface overlays
+#[derive(Clone, Debug)]
+pub enum InterfaceContext {
+    Date(DateInterfaceState),
+    Project(ProjectInterfaceState),
+    Tag(TagInterfaceState),
+}
+
 /// What keyboard handler to use
 #[derive(Clone, Debug)]
 pub enum InputMode {
     Normal,
     Edit(EditContext),
-    Command,
     Reorder,
-    QueryInput,
-    Confirm(ConfirmContext),
     Selection(SelectionState),
-    Datepicker(DatepickerState),
-    ProjectPicker(ProjectPickerState),
+    Confirm(ConfirmContext),
+    Prompt(PromptContext),
+    Interface(InterfaceContext),
 }
 
 /// Where to insert a new entry
@@ -301,7 +330,6 @@ pub struct App {
     pub view: ViewMode,
     pub input_mode: InputMode,
     pub edit_buffer: Option<CursorBuffer>,
-    pub command_buffer: CursorBuffer,
     pub should_quit: bool,
     pub needs_redraw: bool,
     pub status_message: Option<String>,
@@ -365,7 +393,6 @@ impl App {
             entry_indices,
             input_mode: InputMode::Normal,
             edit_buffer: None,
-            command_buffer: CursorBuffer::empty(),
             should_quit: false,
             needs_redraw: false,
             status_message: None,
@@ -438,10 +465,6 @@ impl App {
 
     pub fn set_status(&mut self, msg: impl Into<String>) {
         self.status_message = Some(msg.into());
-    }
-
-    pub fn open_project_picker(&mut self) {
-        self.input_mode = InputMode::ProjectPicker(ProjectPickerState::new());
     }
 
     pub fn execute_action(&mut self, action: Box<dyn actions::Action>) -> io::Result<()> {
@@ -557,13 +580,11 @@ impl App {
     /// Update hints based on current input buffer and mode.
     pub fn update_hints(&mut self) {
         let (input, mode) = match &self.input_mode {
-            InputMode::Command => (self.command_buffer.content(), HintMode::Command),
-            InputMode::QueryInput => {
-                let buffer = match &self.view {
-                    ViewMode::Filter(state) => state.query_buffer.content(),
-                    ViewMode::Daily(_) => self.command_buffer.content(),
-                };
-                (buffer, HintMode::Filter)
+            InputMode::Prompt(PromptContext::Command { buffer }) => {
+                (buffer.content(), HintMode::Command)
+            }
+            InputMode::Prompt(PromptContext::Filter { buffer }) => {
+                (buffer.content(), HintMode::Filter)
             }
             InputMode::Edit(_) => {
                 if let Some(ref buffer) = self.edit_buffer {
@@ -607,24 +628,17 @@ impl App {
             return false;
         }
 
-        match &self.input_mode {
-            InputMode::Command => {
+        match &mut self.input_mode {
+            InputMode::Prompt(PromptContext::Command { buffer }) => {
                 for c in completion.chars() {
-                    self.command_buffer.insert_char(c);
+                    buffer.insert_char(c);
                 }
             }
-            InputMode::QueryInput => match &mut self.view {
-                ViewMode::Filter(state) => {
-                    for c in completion.chars() {
-                        state.query_buffer.insert_char(c);
-                    }
+            InputMode::Prompt(PromptContext::Filter { buffer }) => {
+                for c in completion.chars() {
+                    buffer.insert_char(c);
                 }
-                ViewMode::Daily(_) => {
-                    for c in completion.chars() {
-                        self.command_buffer.insert_char(c);
-                    }
-                }
-            },
+            }
             InputMode::Edit(_) => {
                 if let Some(ref mut buffer) = self.edit_buffer {
                     for c in completion.chars() {
@@ -645,42 +659,113 @@ impl App {
         true
     }
 
+    /// Get the content of the current prompt buffer (if in prompt mode)
     #[must_use]
-    pub fn query_content(&self) -> &str {
-        match &self.view {
-            ViewMode::Filter(state) => state.query_buffer.content(),
-            ViewMode::Daily(_) => self.command_buffer.content(),
+    pub fn prompt_content(&self) -> Option<&str> {
+        match &self.input_mode {
+            InputMode::Prompt(PromptContext::Command { buffer }) => Some(buffer.content()),
+            InputMode::Prompt(PromptContext::Filter { buffer }) => Some(buffer.content()),
+            _ => None,
         }
     }
 
+    /// Check if the current prompt buffer is empty
     #[must_use]
-    pub fn query_is_empty(&self) -> bool {
-        match &self.view {
-            ViewMode::Filter(state) => state.query_buffer.is_empty(),
-            ViewMode::Daily(_) => self.command_buffer.is_empty(),
+    pub fn prompt_is_empty(&self) -> bool {
+        match &self.input_mode {
+            InputMode::Prompt(PromptContext::Command { buffer }) => buffer.is_empty(),
+            InputMode::Prompt(PromptContext::Filter { buffer }) => buffer.is_empty(),
+            _ => true,
         }
     }
 
-    pub fn query_insert_char(&mut self, c: char) {
-        match &mut self.view {
-            ViewMode::Filter(state) => state.query_buffer.insert_char(c),
-            ViewMode::Daily(_) => self.command_buffer.insert_char(c),
-        }
-    }
-
-    pub fn query_buffer_mut(&mut self) -> &mut CursorBuffer {
-        match &mut self.view {
-            ViewMode::Filter(state) => &mut state.query_buffer,
-            ViewMode::Daily(_) => &mut self.command_buffer,
+    /// Get a mutable reference to the current prompt buffer (if in prompt mode)
+    pub fn prompt_buffer_mut(&mut self) -> Option<&mut CursorBuffer> {
+        match &mut self.input_mode {
+            InputMode::Prompt(PromptContext::Command { buffer }) => Some(buffer),
+            InputMode::Prompt(PromptContext::Filter { buffer }) => Some(buffer),
+            _ => None,
         }
     }
 
     #[must_use]
     pub fn input_needs_continuation(&self) -> bool {
-        match &self.input_mode {
-            InputMode::Command => self.command_buffer.content().ends_with(':'),
-            InputMode::QueryInput => self.query_content().ends_with(':'),
-            _ => false,
+        self.prompt_content()
+            .map(|c| c.ends_with(':'))
+            .unwrap_or(false)
+    }
+
+    /// Enter command prompt mode
+    pub fn enter_command_mode(&mut self) {
+        self.input_mode = InputMode::Prompt(PromptContext::Command {
+            buffer: CursorBuffer::empty(),
+        });
+    }
+
+    /// Enter filter prompt mode
+    pub fn enter_filter_mode(&mut self) {
+        let buffer = match &self.view {
+            ViewMode::Filter(state) => state.query_buffer.clone(),
+            ViewMode::Daily(_) => CursorBuffer::empty(),
+        };
+        self.input_mode = InputMode::Prompt(PromptContext::Filter { buffer });
+    }
+
+    /// Exit prompt mode and return to normal
+    pub fn exit_prompt(&mut self) {
+        self.input_mode = InputMode::Normal;
+    }
+
+    /// Open the project interface
+    pub fn open_project_interface(&mut self) {
+        self.input_mode =
+            InputMode::Interface(InterfaceContext::Project(ProjectInterfaceState::new()));
+    }
+
+    /// Move selection up in project interface
+    pub fn project_interface_move_up(&mut self) {
+        let InputMode::Interface(InterfaceContext::Project(ref mut state)) = self.input_mode else {
+            return;
+        };
+        state.selected = state.selected.saturating_sub(1);
+    }
+
+    /// Move selection down in project interface
+    pub fn project_interface_move_down(&mut self) {
+        let InputMode::Interface(InterfaceContext::Project(ref mut state)) = self.input_mode else {
+            return;
+        };
+        if state.selected + 1 < state.filtered_indices.len() {
+            state.selected += 1;
         }
+    }
+
+    /// Select the current project in the interface
+    pub fn project_interface_select(&mut self) -> std::io::Result<()> {
+        let project_info = {
+            let InputMode::Interface(InterfaceContext::Project(ref state)) = self.input_mode else {
+                return Ok(());
+            };
+            state.selected_project().map(|p| (p.id.clone(), p.available))
+        };
+
+        match project_info {
+            Some((id, true)) => {
+                self.input_mode = InputMode::Normal;
+                self.switch_to_registered_project(&id)?;
+            }
+            Some((id, false)) => {
+                self.set_status(format!("Project '{}' is unavailable", id));
+            }
+            None => {
+                self.input_mode = InputMode::Normal;
+            }
+        }
+        Ok(())
+    }
+
+    /// Close the current interface and return to normal
+    pub fn close_interface(&mut self) {
+        self.input_mode = InputMode::Normal;
     }
 }

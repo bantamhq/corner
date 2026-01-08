@@ -76,18 +76,18 @@ pub fn render_popup_frame(f: &mut Frame, layout: &PopupLayout, title: &str) {
     f.render_widget(Clear, layout.popup_area);
 
     let block = Block::default()
-        .title(Span::styled(format!(" {title} "), Style::new().fg(Color::Cyan)))
+        .title(Span::styled(format!(" {title} "), Style::new().fg(Color::Blue)))
         .borders(Borders::ALL)
-        .border_style(Style::new().fg(Color::Cyan));
+        .border_style(Style::new().fg(Color::Blue));
 
     f.render_widget(block, layout.popup_area);
 }
 
 pub fn render_query_input(f: &mut Frame, layout: &PopupLayout, query: &CursorBuffer, focused: bool) {
     let style = if focused {
-        Style::new().fg(Color::Cyan)
+        Style::new().fg(Color::Blue)
     } else {
-        Style::new().fg(Color::Cyan).dim()
+        Style::new().fg(Color::Blue).dim()
     };
 
     let query_line = Line::from(vec![

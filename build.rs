@@ -85,7 +85,8 @@ const VALID_CONTEXTS: &[&str] = &[
     "reorder",
     "selection",
     "help",
-    "datepicker",
+    "date_interface",
+    "project_interface",
 ];
 
 const VALID_HELP_SECTIONS: &[&str] = &[
@@ -95,6 +96,7 @@ const VALID_HELP_SECTIONS: &[&str] = &[
     "reorder",
     "selection",
     "date",
+    "project",
     "commands",
     "filters",
     "help",
@@ -106,7 +108,8 @@ const VALID_FOOTER_MODES: &[&str] = &[
     "edit",
     "reorder",
     "selection",
-    "datepicker",
+    "date_interface",
+    "project_interface",
 ];
 
 const VALID_DATE_SCOPES: &[&str] = &["entry", "filter"];
@@ -729,6 +732,7 @@ fn generate_readme(
     let reorder_table = generate_keys_table_by_section(actions, "reorder");
     let edit_table = generate_keys_table_by_section(actions, "edit");
     let date_table = generate_keys_table_by_section(actions, "date");
+    let project_table = generate_keys_table_by_section(actions, "project");
     let selection_table = generate_keys_table_by_section(actions, "selection");
     let filter_table = generate_keys_table_by_section(actions, "filter");
     let commands_table = generate_commands_table(commands);
@@ -739,6 +743,7 @@ fn generate_readme(
         .replace("<!-- GENERATED:REORDER_KEYS -->", &reorder_table)
         .replace("<!-- GENERATED:EDIT_KEYS -->", &edit_table)
         .replace("<!-- GENERATED:DATE_KEYS -->", &date_table)
+        .replace("<!-- GENERATED:PROJECT_KEYS -->", &project_table)
         .replace("<!-- GENERATED:SELECTION_KEYS -->", &selection_table)
         .replace("<!-- GENERATED:FILTER_KEYS -->", &filter_table)
         .replace("<!-- GENERATED:COMMANDS -->", &commands_table)

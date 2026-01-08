@@ -18,7 +18,7 @@ use unicode_width::UnicodeWidthStr;
 
 use caliber::app::{
     App, ConfirmContext, DAILY_HEADER_LINES, DATE_SUFFIX_WIDTH, EditContext, FILTER_HEADER_LINES,
-    InputMode, ViewMode,
+    InputMode, InterfaceContext, PromptContext, ViewMode,
 };
 use caliber::config::{self, Config, resolve_path};
 use caliber::cursor::cursor_position_in_wrap;
@@ -376,25 +376,15 @@ fn run_app<B: ratatui::backend::Backend>(
             ));
             f.render_widget(indicator_widget, indicator_area);
 
-            match &app.input_mode {
-                InputMode::Command => {
-                    let prefix_width = 1;
-                    let cursor_x =
-                        chunks[1].x + prefix_width + app.command_buffer.cursor_display_pos() as u16;
-                    let cursor_y = chunks[1].y;
-                    f.set_cursor_position((cursor_x, cursor_y));
-                }
-                InputMode::QueryInput => {
-                    let prefix_width = 1;
-                    let cursor_pos = match &app.view {
-                        ViewMode::Filter(state) => state.query_buffer.cursor_display_pos(),
-                        ViewMode::Daily(_) => app.command_buffer.cursor_display_pos(),
-                    };
-                    let cursor_x = chunks[1].x + prefix_width + cursor_pos as u16;
-                    let cursor_y = chunks[1].y;
-                    f.set_cursor_position((cursor_x, cursor_y));
-                }
-                _ => {}
+            if let InputMode::Prompt(ref ctx) = app.input_mode {
+                let prefix_width = 1;
+                let cursor_pos = match ctx {
+                    PromptContext::Command { buffer } => buffer.cursor_display_pos(),
+                    PromptContext::Filter { buffer } => buffer.cursor_display_pos(),
+                };
+                let cursor_x = chunks[1].x + prefix_width + cursor_pos as u16;
+                let cursor_y = chunks[1].y;
+                f.set_cursor_position((cursor_x, cursor_y));
             }
 
             if app.show_help {
@@ -490,12 +480,12 @@ fn run_app<B: ratatui::backend::Backend>(
                 f.render_widget(paragraph, inner_area);
             }
 
-            if let InputMode::Datepicker(ref state) = app.input_mode {
-                ui::render_datepicker(f, state, size);
-            }
-
-            if let InputMode::ProjectPicker(ref state) = app.input_mode {
-                ui::render_project_picker(f, state, size);
+            if let InputMode::Interface(ref ctx) = app.input_mode {
+                match ctx {
+                    InterfaceContext::Date(state) => ui::render_date_interface(f, state, size),
+                    InterfaceContext::Project(state) => ui::render_project_interface(f, state, size),
+                    InterfaceContext::Tag(_) => {} // Stub for future implementation
+                }
             }
         })?;
 
@@ -508,17 +498,13 @@ fn run_app<B: ratatui::backend::Backend>(
                 handlers::handle_help_key(&mut app, key);
             } else {
                 match &app.input_mode {
-                    InputMode::Command => handlers::handle_command_key(&mut app, key)?,
+                    InputMode::Prompt(_) => handlers::handle_prompt_key(&mut app, key)?,
                     InputMode::Normal => handlers::handle_normal_key(&mut app, key)?,
                     InputMode::Edit(_) => handlers::handle_edit_key(&mut app, key),
-                    InputMode::QueryInput => handlers::handle_query_input_key(&mut app, key)?,
                     InputMode::Reorder => handlers::handle_reorder_key(&mut app, key),
                     InputMode::Confirm(_) => handlers::handle_confirm_key(&mut app, key.code)?,
                     InputMode::Selection(_) => handlers::handle_selection_key(&mut app, key)?,
-                    InputMode::Datepicker(_) => handlers::handle_datepicker_key(&mut app, key)?,
-                    InputMode::ProjectPicker(_) => {
-                        handlers::handle_project_picker_key(&mut app, key)?
-                    }
+                    InputMode::Interface(_) => handlers::handle_interface_key(&mut app, key)?,
                 }
             }
         }

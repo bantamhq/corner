@@ -9,9 +9,9 @@ use ratatui::{
 };
 use time::{Date, Month};
 
-use crate::app::DatepickerState;
+use crate::app::DateInterfaceState;
 
-use super::popup_interface::{PopupLayout, render_popup_frame, render_query_input};
+use super::interface_popup::{PopupLayout, render_popup_frame, render_query_input};
 
 const CALENDAR_WIDTH: u16 = 22;
 
@@ -25,7 +25,7 @@ fn to_time_date(date: NaiveDate) -> Date {
     .unwrap()
 }
 
-pub fn render_datepicker(f: &mut Frame, state: &DatepickerState, area: Rect) {
+pub fn render_date_interface(f: &mut Frame, state: &DateInterfaceState, area: Rect) {
     let layout = PopupLayout::new(area);
 
     if layout.is_too_small() {

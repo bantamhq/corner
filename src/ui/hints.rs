@@ -87,7 +87,7 @@ fn build_hint_lines(hint_state: &HintContext, width: usize, max_rows: usize) -> 
 
     let hint_color = match effective {
         HintContext::Tags { .. } => Color::Yellow,
-        HintContext::Commands { .. } => Color::Cyan,
+        HintContext::Commands { .. } => Color::Blue,
         HintContext::FilterTypes { .. }
         | HintContext::DateOps { .. }
         | HintContext::DateValues { .. }

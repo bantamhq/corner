@@ -2,10 +2,10 @@
 # Each entry defines a command with its subargs and help text variants
 
 [[command]]
-name = "projects"
-help = "Open project manager"
-readme = "Open project manager"
-completion_hint = "Open project manager"
+name = "project"
+help = "Open project interface"
+readme = "Open project interface"
+completion_hint = "Open project interface"
 
 [[command]]
 name = "scratchpad"

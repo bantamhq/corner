@@ -259,3 +259,53 @@ fn config_hide_completed_hides_on_startup() {
     assert!(!ctx.screen_contains("Complete"));
     assert!(ctx.screen_contains("Hiding 1 completed"));
 }
+
+#[test]
+fn backslash_opens_and_closes_date_interface() {
+    use caliber::app::InputMode;
+
+    let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+    let mut ctx = TestContext::with_date(date);
+
+    // Opens date interface
+    ctx.press(KeyCode::Char('\\'));
+    assert!(matches!(ctx.app.input_mode, InputMode::Interface(_)));
+
+    // Toggle closes it
+    ctx.press(KeyCode::Char('\\'));
+    assert!(matches!(ctx.app.input_mode, InputMode::Normal));
+}
+
+#[test]
+fn date_interface_navigation_changes_selected_date() {
+    use caliber::app::{InputMode, InterfaceContext};
+
+    let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+    let mut ctx = TestContext::with_date(date);
+
+    ctx.press(KeyCode::Char('\\'));
+
+    // Navigate right one day
+    ctx.press(KeyCode::Char('l'));
+
+    if let InputMode::Interface(InterfaceContext::Date(ref state)) = ctx.app.input_mode {
+        assert_eq!(state.selected, NaiveDate::from_ymd_opt(2026, 1, 16).unwrap());
+    } else {
+        panic!("Expected date interface mode");
+    }
+}
+
+#[test]
+fn date_interface_enter_navigates_to_selected_date() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+    let mut ctx = TestContext::with_date(date);
+
+    ctx.press(KeyCode::Char('\\'));
+    // Navigate forward 5 days
+    for _ in 0..5 {
+        ctx.press(KeyCode::Char('l'));
+    }
+    ctx.press(KeyCode::Enter);
+
+    assert_eq!(ctx.app.current_date, NaiveDate::from_ymd_opt(2026, 1, 20).unwrap());
+}

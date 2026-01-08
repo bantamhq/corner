@@ -3,7 +3,8 @@ use std::io;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{
-    App, ConfirmContext, HintContext, InputMode, InsertPosition, SelectedItem, ViewMode,
+    App, ConfirmContext, HintContext, InputMode, InsertPosition, InterfaceContext, PromptContext,
+    SelectedItem, ViewMode,
 };
 use crate::cursor::CursorBuffer;
 use crate::dispatch::KeySpec;
@@ -67,11 +68,11 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
         }
         EnterFilterMode => app.enter_filter_input(),
         EnterCommandMode => {
-            app.input_mode = InputMode::Command;
+            app.enter_command_mode();
             app.update_hints();
         }
-        OpenDatepicker => app.open_datepicker(),
-        OpenProjectPicker => app.open_project_picker(),
+        OpenDateInterface => app.open_date_interface(),
+        OpenProjectInterface => app.open_project_interface(),
         NewEntryBottom => app.new_task(InsertPosition::Bottom),
         NewEntryBelow => {
             if let SelectedItem::Projected { entry, .. } = app.get_selected_item() {
@@ -155,25 +156,31 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
             app.show_help = false;
             app.help_scroll = 0;
         }
-        DatepickerMoveLeft => app.datepicker_move(-1, 0),
-        DatepickerMoveRight => app.datepicker_move(1, 0),
-        DatepickerMoveUp => app.datepicker_move(0, -1),
-        DatepickerMoveDown => app.datepicker_move(0, 1),
-        DatepickerPrevMonth => app.datepicker_prev_month(),
-        DatepickerNextMonth => app.datepicker_next_month(),
-        DatepickerPrevYear => app.datepicker_prev_year(),
-        DatepickerNextYear => app.datepicker_next_year(),
-        DatepickerToday => app.datepicker_goto_today(),
-        DatepickerConfirm => {
-            app.confirm_datepicker()?;
+        DateInterfaceMoveLeft => app.date_interface_move(-1, 0),
+        DateInterfaceMoveRight => app.date_interface_move(1, 0),
+        DateInterfaceMoveUp => app.date_interface_move(0, -1),
+        DateInterfaceMoveDown => app.date_interface_move(0, 1),
+        DateInterfacePrevMonth => app.date_interface_prev_month(),
+        DateInterfaceNextMonth => app.date_interface_next_month(),
+        DateInterfacePrevYear => app.date_interface_prev_year(),
+        DateInterfaceNextYear => app.date_interface_next_year(),
+        DateInterfaceToday => app.date_interface_goto_today(),
+        DateInterfaceConfirm => {
+            app.confirm_date_interface()?;
         }
-        DatepickerCancel => app.close_datepicker(),
+        DateInterfaceCancel => app.close_date_interface(),
+        ProjectInterfaceMoveUp => app.project_interface_move_up(),
+        ProjectInterfaceMoveDown => app.project_interface_move_down(),
+        ProjectInterfaceSelect => {
+            app.project_interface_select()?;
+        }
+        ProjectInterfaceCancel => app.close_interface(),
         NoOp
         | QuickFilterTag
         | AppendFavoriteTag
         | SelectionAppendTag
-        | DatepickerFooterNavMonth
-        | DatepickerFooterNavYear => {}
+        | DateInterfaceFooterNavMonth
+        | DateInterfaceFooterNavYear => {}
     }
     Ok(true)
 }
@@ -185,30 +192,37 @@ pub fn handle_help_key(app: &mut App, key: KeyEvent) {
     }
 }
 
-pub fn handle_command_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
+pub fn handle_prompt_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    let is_command = matches!(app.input_mode, InputMode::Prompt(PromptContext::Command { .. }));
+
     match key.code {
         KeyCode::Enter => {
             let did_autocomplete =
                 !matches!(app.hint_state, HintContext::Inactive) && app.accept_hint();
 
             if did_autocomplete && !app.command_is_complete() {
-                if !app.input_needs_continuation() {
-                    app.command_buffer.insert_char(' ');
+                if !app.input_needs_continuation()
+                    && let Some(buffer) = app.prompt_buffer_mut()
+                {
+                    buffer.insert_char(' ');
                 }
                 app.update_hints();
             } else {
                 app.clear_hints();
-                app.execute_command()?;
+                if is_command {
+                    app.execute_command()?;
+                } else {
+                    app.execute_filter()?;
+                }
             }
         }
         KeyCode::Esc => {
             app.clear_hints();
-            app.command_buffer.clear();
-            app.input_mode = InputMode::Normal;
+            app.exit_prompt();
         }
-        KeyCode::Backspace if app.command_buffer.is_empty() => {
+        KeyCode::Backspace if app.prompt_is_empty() => {
             app.clear_hints();
-            app.input_mode = InputMode::Normal;
+            app.exit_prompt();
         }
         KeyCode::Right
             if !matches!(
@@ -217,17 +231,21 @@ pub fn handle_command_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
             ) =>
         {
             if app.accept_hint() {
-                if !app.input_needs_continuation() {
-                    app.command_buffer.insert_char(' ');
+                if !app.input_needs_continuation()
+                    && let Some(buffer) = app.prompt_buffer_mut()
+                {
+                    buffer.insert_char(' ');
                 }
                 app.update_hints();
-            } else {
-                handle_text_input(&mut app.command_buffer, key);
+            } else if let Some(buffer) = app.prompt_buffer_mut() {
+                handle_text_input(buffer, key);
                 app.update_hints();
             }
         }
         _ => {
-            handle_text_input(&mut app.command_buffer, key);
+            if let Some(buffer) = app.prompt_buffer_mut() {
+                handle_text_input(buffer, key);
+            }
             app.update_hints();
         }
     }
@@ -315,51 +333,6 @@ pub fn handle_edit_key(app: &mut App, key: KeyEvent) {
         }
         app.update_hints();
     }
-}
-
-pub fn handle_query_input_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
-    match key.code {
-        KeyCode::Enter => {
-            if !matches!(app.hint_state, HintContext::Inactive) {
-                app.accept_hint();
-            }
-
-            if app.input_needs_continuation() {
-                app.update_hints();
-            } else {
-                app.clear_hints();
-                if app.query_is_empty() {
-                    app.cancel_filter_input();
-                } else {
-                    app.execute_filter()?;
-                }
-            }
-        }
-        KeyCode::Esc => {
-            app.clear_hints();
-            app.cancel_filter_input();
-        }
-        KeyCode::Backspace if app.query_is_empty() && key.modifiers.is_empty() => {
-            app.clear_hints();
-            app.cancel_filter_input();
-        }
-        KeyCode::Right if !matches!(app.hint_state, HintContext::Inactive) => {
-            if app.accept_hint() {
-                if !app.input_needs_continuation() {
-                    app.query_insert_char(' ');
-                }
-                app.update_hints();
-            } else {
-                handle_text_input(app.query_buffer_mut(), key);
-                app.update_hints();
-            }
-        }
-        _ => {
-            handle_text_input(app.query_buffer_mut(), key);
-            app.update_hints();
-        }
-    }
-    Ok(())
 }
 
 pub fn handle_reorder_key(app: &mut App, key: KeyEvent) {
@@ -483,30 +456,61 @@ pub fn handle_selection_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
     Ok(())
 }
 
-pub fn handle_datepicker_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
-    if app.datepicker_input_focused() {
+pub fn handle_interface_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    // Toggle key closes interface even with input focus
+    match (&app.input_mode, key.code) {
+        (InputMode::Interface(InterfaceContext::Date(_)), KeyCode::Char('\\')) => {
+            app.close_interface();
+            return Ok(());
+        }
+        (InputMode::Interface(InterfaceContext::Project(_)), KeyCode::Char('+')) => {
+            app.close_interface();
+            return Ok(());
+        }
+        _ => {}
+    }
+
+    // Dispatch to context-specific handler
+    match &app.input_mode {
+        InputMode::Interface(InterfaceContext::Date(_)) => handle_date_interface_key(app, key),
+        InputMode::Interface(InterfaceContext::Project(_)) => {
+            handle_project_interface_key(app, key)
+        }
+        InputMode::Interface(InterfaceContext::Tag(_)) => Ok(()), // Stub for future implementation
+        _ => Ok(()),
+    }
+}
+
+fn handle_date_interface_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    if app.date_interface_input_focused() {
         // Input is focused - handle text editing
         match key.code {
             KeyCode::Enter => {
-                app.datepicker_submit_input()?;
+                app.date_interface_submit_input()?;
             }
-            KeyCode::Tab | KeyCode::Esc => {
-                app.datepicker_toggle_focus();
+            KeyCode::Esc => {
+                app.close_date_interface();
+            }
+            KeyCode::Tab => {
+                app.date_interface_toggle_focus();
+            }
+            KeyCode::Backspace if app.date_interface_input_is_empty() => {
+                app.close_date_interface();
             }
             KeyCode::Backspace => {
-                app.datepicker_input_backspace();
+                app.date_interface_input_backspace();
             }
             KeyCode::Delete => {
-                app.datepicker_input_delete();
+                app.date_interface_input_delete();
             }
             KeyCode::Left => {
-                app.datepicker_input_move_left();
+                app.date_interface_input_move_left();
             }
             KeyCode::Right => {
-                app.datepicker_input_move_right();
+                app.date_interface_input_move_right();
             }
             KeyCode::Char(c) => {
-                app.datepicker_input_char(c);
+                app.date_interface_input_char(c);
             }
             _ => {}
         }
@@ -514,11 +518,11 @@ pub fn handle_datepicker_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
         // Calendar is focused - use keymap, but Tab toggles to input
         match key.code {
             KeyCode::Tab => {
-                app.datepicker_toggle_focus();
+                app.date_interface_toggle_focus();
             }
             _ => {
                 let spec = KeySpec::from_event(&key);
-                if let Some(action) = app.keymap.get(KeyContext::Datepicker, &spec) {
+                if let Some(action) = app.keymap.get(KeyContext::DateInterface, &spec) {
                     dispatch_action(app, action)?;
                 }
             }
@@ -527,62 +531,39 @@ pub fn handle_datepicker_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
     Ok(())
 }
 
-pub fn handle_project_picker_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
-    match key.code {
-        KeyCode::Enter => {
-            // Extract project info before mutating app
-            let project_info = {
-                let InputMode::ProjectPicker(ref state) = app.input_mode else {
-                    return Ok(());
-                };
-                state.selected_project().map(|p| (p.id.clone(), p.available))
-            };
+fn handle_project_interface_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    // Try keymap first for navigation actions
+    let spec = KeySpec::from_event(&key);
+    if let Some(action) = app.keymap.get(KeyContext::ProjectInterface, &spec) {
+        dispatch_action(app, action)?;
+        return Ok(());
+    }
 
-            match project_info {
-                Some((id, true)) => {
-                    app.input_mode = InputMode::Normal;
-                    app.switch_to_registered_project(&id)?;
-                }
-                Some((id, false)) => {
-                    app.set_status(format!("Project '{}' is unavailable", id));
-                }
-                None => {
-                    app.input_mode = InputMode::Normal;
-                }
-            }
-        }
-        KeyCode::Esc => {
-            app.input_mode = InputMode::Normal;
-        }
-        KeyCode::Up => {
-            let InputMode::ProjectPicker(ref mut state) = app.input_mode else {
-                return Ok(());
-            };
-            state.selected = state.selected.saturating_sub(1);
-        }
-        KeyCode::Down => {
-            let InputMode::ProjectPicker(ref mut state) = app.input_mode else {
-                return Ok(());
-            };
-            if state.selected + 1 < state.filtered_indices.len() {
-                state.selected += 1;
-            }
-        }
+    // Handle text input for filtering
+    match key.code {
         KeyCode::Char(c) => {
-            let InputMode::ProjectPicker(ref mut state) = app.input_mode else {
+            let InputMode::Interface(InterfaceContext::Project(ref mut state)) = app.input_mode
+            else {
                 return Ok(());
             };
             state.query.insert_char(c);
             state.update_filter();
         }
         KeyCode::Backspace => {
-            let InputMode::ProjectPicker(ref mut state) = app.input_mode else {
-                return Ok(());
+            let is_empty = {
+                let InputMode::Interface(InterfaceContext::Project(ref mut state)) = app.input_mode
+                else {
+                    return Ok(());
+                };
+                if state.query.delete_char_before() {
+                    state.update_filter();
+                    false
+                } else {
+                    state.query.is_empty()
+                }
             };
-            if state.query.delete_char_before() {
-                state.update_filter();
-            } else if state.query.is_empty() {
-                app.input_mode = InputMode::Normal;
+            if is_empty {
+                app.close_interface();
             }
         }
         _ => {}

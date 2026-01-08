@@ -42,16 +42,16 @@ syntax = "@before:"
 display = "@before:DATE"
 category = "date_op"
 help = "Entries before date"
-readme = "Filter entries from days on or before DATE (inclusive). Supports natural dates."
-completion_hint = "Filter entries from days on or before DATE (inclusive). Supports natural dates."
+readme = "Filter entries from days on or before DATE (inclusive). Supports relative dates."
+completion_hint = "Filter entries from days on or before DATE (inclusive). Supports relative dates."
 
 [[filter]]
 syntax = "@after:"
 display = "@after:DATE"
 category = "date_op"
 help = "Entries after date"
-readme = "Filter entries from days on or after DATE (inclusive). Supports natural dates."
-completion_hint = "Filter entries from days on or after DATE (inclusive). Supports natural dates."
+readme = "Filter entries from days on or after DATE (inclusive). Supports relative dates."
+completion_hint = "Filter entries from days on or after DATE (inclusive). Supports relative dates."
 
 [[filter]]
 syntax = "@overdue"

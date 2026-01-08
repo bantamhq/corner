@@ -4,26 +4,26 @@ use chrono::{Datelike, Days, Local, Months, NaiveDate};
 
 use crate::storage;
 
-use super::{App, DatepickerState, InputMode, ViewMode};
+use super::{App, DateInterfaceState, InputMode, InterfaceContext, ViewMode};
 
 impl App {
-    pub fn open_datepicker(&mut self) {
+    pub fn open_date_interface(&mut self) {
         let initial_date = match &self.view {
             ViewMode::Daily(_) => self.current_date,
             ViewMode::Filter(_) => self.last_daily_date,
         };
 
-        let mut state = DatepickerState::new(initial_date);
+        let mut state = DateInterfaceState::new(initial_date);
         state.day_cache = self.load_month_cache(state.display_month);
-        self.input_mode = InputMode::Datepicker(state);
+        self.input_mode = InputMode::Interface(InterfaceContext::Date(state));
     }
 
-    pub fn close_datepicker(&mut self) {
+    pub fn close_date_interface(&mut self) {
         self.input_mode = InputMode::Normal;
     }
 
-    pub fn confirm_datepicker(&mut self) -> io::Result<()> {
-        let InputMode::Datepicker(state) =
+    pub fn confirm_date_interface(&mut self) -> io::Result<()> {
+        let InputMode::Interface(InterfaceContext::Date(state)) =
             std::mem::replace(&mut self.input_mode, InputMode::Normal)
         else {
             return Ok(());
@@ -32,8 +32,8 @@ impl App {
         self.goto_day(state.selected)
     }
 
-    pub fn datepicker_goto_today(&mut self) {
-        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+    pub fn date_interface_goto_today(&mut self) {
+        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
 
@@ -44,12 +44,12 @@ impl App {
         let new_month = (today.year(), today.month());
         if old_month != new_month {
             state.display_month = first_of_month(today.year(), today.month());
-            self.refresh_datepicker_cache();
+            self.refresh_date_interface_cache();
         }
     }
 
-    pub fn datepicker_move(&mut self, dx: i32, dy: i32) {
-        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+    pub fn date_interface_move(&mut self, dx: i32, dy: i32) {
+        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
 
@@ -71,35 +71,35 @@ impl App {
             let new_month = (new_date.year(), new_date.month());
             if old_month != new_month {
                 state.display_month = first_of_month(new_date.year(), new_date.month());
-                self.refresh_datepicker_cache();
+                self.refresh_date_interface_cache();
             }
         }
     }
 
-    pub fn datepicker_prev_month(&mut self) {
-        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+    pub fn date_interface_prev_month(&mut self) {
+        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
         if let Some(prev) = state.display_month.checked_sub_months(Months::new(1)) {
             state.display_month = prev;
             state.selected = clamp_day_to_month(state.selected, prev);
         }
-        self.refresh_datepicker_cache();
+        self.refresh_date_interface_cache();
     }
 
-    pub fn datepicker_next_month(&mut self) {
-        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+    pub fn date_interface_next_month(&mut self) {
+        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
         if let Some(next) = state.display_month.checked_add_months(Months::new(1)) {
             state.display_month = next;
             state.selected = clamp_day_to_month(state.selected, next);
         }
-        self.refresh_datepicker_cache();
+        self.refresh_date_interface_cache();
     }
 
-    pub fn datepicker_prev_year(&mut self) {
-        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+    pub fn date_interface_prev_year(&mut self) {
+        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
         let new_year = state.display_month.year() - 1;
@@ -107,11 +107,11 @@ impl App {
             state.display_month = new_month;
             state.selected = clamp_day_to_month(state.selected, new_month);
         }
-        self.refresh_datepicker_cache();
+        self.refresh_date_interface_cache();
     }
 
-    pub fn datepicker_next_year(&mut self) {
-        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+    pub fn date_interface_next_year(&mut self) {
+        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
         let new_year = state.display_month.year() + 1;
@@ -119,19 +119,19 @@ impl App {
             state.display_month = new_month;
             state.selected = clamp_day_to_month(state.selected, new_month);
         }
-        self.refresh_datepicker_cache();
+        self.refresh_date_interface_cache();
     }
 
-    pub fn datepicker_toggle_focus(&mut self) {
-        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+    pub fn date_interface_toggle_focus(&mut self) {
+        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
         state.input_focused = !state.input_focused;
     }
 
-    pub fn datepicker_submit_input(&mut self) -> io::Result<()> {
+    pub fn date_interface_submit_input(&mut self) -> io::Result<()> {
         let input = {
-            let InputMode::Datepicker(ref state) = self.input_mode else {
+            let InputMode::Interface(InterfaceContext::Date(ref state)) = self.input_mode else {
                 return Ok(());
             };
             state.query.content().trim().to_string()
@@ -142,7 +142,7 @@ impl App {
         }
 
         let today = Local::now().date_naive();
-        if let Some(date) = storage::parse_natural_date(&input, today) {
+        if let Some(date) = storage::parse_date(&input, storage::ParseContext::Interface, today) {
             self.input_mode = InputMode::Normal;
             self.goto_day(date)?;
         } else {
@@ -152,46 +152,53 @@ impl App {
         Ok(())
     }
 
-    pub fn datepicker_input_char(&mut self, c: char) {
-        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+    pub fn date_interface_input_char(&mut self, c: char) {
+        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
         state.query.insert_char(c);
     }
 
-    pub fn datepicker_input_backspace(&mut self) {
-        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+    pub fn date_interface_input_backspace(&mut self) {
+        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
         state.query.delete_char_before();
     }
 
-    pub fn datepicker_input_delete(&mut self) {
-        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+    pub fn date_interface_input_delete(&mut self) {
+        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
         state.query.delete_char_after();
     }
 
-    pub fn datepicker_input_move_left(&mut self) {
-        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+    pub fn date_interface_input_move_left(&mut self) {
+        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
         state.query.move_left();
     }
 
-    pub fn datepicker_input_move_right(&mut self) {
-        let InputMode::Datepicker(ref mut state) = self.input_mode else {
+    pub fn date_interface_input_move_right(&mut self) {
+        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
         state.query.move_right();
     }
 
-    pub fn datepicker_input_focused(&self) -> bool {
-        let InputMode::Datepicker(ref state) = self.input_mode else {
+    pub fn date_interface_input_focused(&self) -> bool {
+        let InputMode::Interface(InterfaceContext::Date(ref state)) = self.input_mode else {
             return false;
         };
         state.input_focused
+    }
+
+    pub fn date_interface_input_is_empty(&self) -> bool {
+        let InputMode::Interface(InterfaceContext::Date(ref state)) = self.input_mode else {
+            return true;
+        };
+        state.query.content().is_empty()
     }
 
     fn load_month_cache(
@@ -202,9 +209,9 @@ impl App {
         storage::scan_days_in_range(start, end, self.active_path()).unwrap_or_default()
     }
 
-    fn refresh_datepicker_cache(&mut self) {
+    fn refresh_date_interface_cache(&mut self) {
         let month = {
-            let InputMode::Datepicker(ref state) = self.input_mode else {
+            let InputMode::Interface(InterfaceContext::Date(ref state)) = self.input_mode else {
                 return;
             };
             state.display_month
@@ -212,7 +219,7 @@ impl App {
 
         let cache = self.load_month_cache(month);
 
-        if let InputMode::Datepicker(ref mut state) = self.input_mode {
+        if let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode {
             state.day_cache = cache;
         }
     }

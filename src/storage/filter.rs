@@ -3,9 +3,10 @@ use std::io;
 use std::path::Path;
 use std::sync::LazyLock;
 
-use chrono::{Days, NaiveDate};
+use chrono::NaiveDate;
 use regex::Regex;
 
+use super::date_parsing::{ParseContext, parse_date, parse_weekday};
 use super::entries::{Entry, EntryType, Line, RawEntry, RecurringPattern, SourceType, parse_lines};
 use super::persistence::{load_journal, parse_day_header};
 
@@ -44,9 +45,9 @@ pub static TAG_REGEX: LazyLock<Regex> =
 pub static LATER_DATE_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"@(\d{4}/\d{1,2}/\d{1,2}|\d{1,2}/\d{1,2}(?:/\d{2,4})?)").unwrap());
 
-/// Matches natural date patterns for entries (future by default):
+/// Matches relative date patterns for entries (future by default):
 /// @today, @tomorrow, @yesterday, @d7 (7 days, max 999), @mon (next Monday)
-pub static NATURAL_DATE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+pub static RELATIVE_DATE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)@(today|tomorrow|yesterday|d[1-9]\d{0,2}|mon|tue|wed|thu|fri|sat|sun)")
         .unwrap()
 });
@@ -93,166 +94,27 @@ pub fn collect_journal_tags(path: &Path) -> io::Result<Vec<String>> {
     Ok(tags)
 }
 
-/// Parses a date string (without @) into a NaiveDate.
-/// Tries ISO (YYYY/MM/DD), MM/DD/YYYY, MM/DD/YY, and MM/DD formats.
-/// For MM/DD without year, uses "always future" logic: if date has passed
-/// this year, assumes next year.
-#[must_use]
-pub fn parse_later_date(date_str: &str, today: NaiveDate) -> Option<NaiveDate> {
-    use chrono::Datelike;
-
-    // YYYY/MM/DD (only if first part is exactly 4 digits)
-    if let Some(first_slash) = date_str.find('/')
-        && first_slash == 4
-        && date_str[..4].chars().all(|c| c.is_ascii_digit())
-        && let Ok(date) = NaiveDate::parse_from_str(date_str, "%Y/%m/%d")
-    {
-        return Some(date);
-    }
-
-    // MM/DD/YYYY or MM/DD/YY
-    if date_str.matches('/').count() == 2 {
-        let parts: Vec<&str> = date_str.split('/').collect();
-        if parts.len() == 3
-            && let (Ok(month), Ok(day), Ok(year)) = (
-                parts[0].parse::<u32>(),
-                parts[1].parse::<u32>(),
-                parts[2].parse::<i32>(),
-            )
-        {
-            // If year is 2 digits, assume 20xx
-            let full_year = if year < 100 { 2000 + year } else { year };
-            if let Some(date) = NaiveDate::from_ymd_opt(full_year, month, day) {
-                return Some(date);
-            }
-        }
-    }
-
-    // MM/DD (no year) - use "always future" logic
-    let parts: Vec<&str> = date_str.split('/').collect();
-    if parts.len() == 2 {
-        let month: u32 = parts[0].parse().ok()?;
-        let day: u32 = parts[1].parse().ok()?;
-        if let Some(date) = NaiveDate::from_ymd_opt(today.year(), month, day) {
-            if date < today {
-                return NaiveDate::from_ymd_opt(today.year() + 1, month, day);
-            }
-            return Some(date);
-        }
-    }
-
-    None
-}
-
-/// Parses a weekday name (full or abbreviated) into chrono::Weekday.
-fn parse_weekday(s: &str) -> Option<chrono::Weekday> {
-    use chrono::Weekday;
-    match s.to_lowercase().as_str() {
-        "monday" | "mon" => Some(Weekday::Mon),
-        "tuesday" | "tue" => Some(Weekday::Tue),
-        "wednesday" | "wed" => Some(Weekday::Wed),
-        "thursday" | "thu" => Some(Weekday::Thu),
-        "friday" | "fri" => Some(Weekday::Fri),
-        "saturday" | "sat" => Some(Weekday::Sat),
-        "sunday" | "sun" => Some(Weekday::Sun),
-        _ => None,
-    }
-}
-
-/// Returns the next occurrence of a weekday after today (never returns today).
-fn next_weekday_from(today: NaiveDate, target: chrono::Weekday) -> Option<NaiveDate> {
-    use chrono::Datelike;
-    let today_wd = today.weekday().num_days_from_monday();
-    let target_wd = target.num_days_from_monday();
-
-    let days_ahead = if target_wd > today_wd {
-        target_wd - today_wd
-    } else {
-        7 - today_wd + target_wd
-    };
-    let days_ahead = if days_ahead == 0 { 7 } else { days_ahead };
-
-    today.checked_add_days(Days::new(u64::from(days_ahead)))
-}
-
-/// Returns the most recent occurrence of a weekday before today (never returns today).
-fn prev_weekday_from(today: NaiveDate, target: chrono::Weekday) -> Option<NaiveDate> {
-    use chrono::Datelike;
-    let today_wd = today.weekday().num_days_from_monday();
-    let target_wd = target.num_days_from_monday();
-
-    let days_back = if target_wd < today_wd {
-        today_wd - target_wd
-    } else {
-        7 - target_wd + today_wd
-    };
-    let days_back = if days_back == 0 { 7 } else { days_back };
-
-    today.checked_sub_days(Days::new(u64::from(days_back)))
-}
-
-fn parse_relative_date(input: &str, today: NaiveDate, default_future: bool) -> Option<NaiveDate> {
-    let input_lower = input.to_lowercase();
-
-    if input_lower == "today" {
-        return Some(today);
-    }
-    if input_lower == "tomorrow" {
-        return today.checked_add_days(Days::new(1));
-    }
-    if input_lower == "yesterday" {
-        return today.checked_sub_days(Days::new(1));
-    }
-
-    let (base, is_future) = if let Some(b) = input_lower.strip_suffix('+') {
-        (b, true)
-    } else {
-        (input_lower.as_str(), default_future)
-    };
-
-    if let Some(days_str) = base.strip_prefix('d')
-        && days_str.len() <= 3
-        && let Ok(days) = days_str.parse::<u64>()
-        && days > 0
-    {
-        return if is_future {
-            today.checked_add_days(Days::new(days))
-        } else {
-            today.checked_sub_days(Days::new(days))
-        };
-    }
-
-    if let Some(target_weekday) = parse_weekday(base) {
-        return if is_future {
-            next_weekday_from(today, target_weekday)
-        } else {
-            prev_weekday_from(today, target_weekday)
-        };
-    }
-
-    None
-}
-
 /// Parses natural language date expressions for ENTRIES (future by default):
 /// today, tomorrow, yesterday, d7 (7 days from now), mon (next Monday).
-/// Falls back to parse_later_date for standard formats.
+/// Delegates to the consolidated parse_date API with Entry context.
 #[must_use]
 pub fn parse_natural_date(input: &str, today: NaiveDate) -> Option<NaiveDate> {
-    parse_relative_date(input, today, true).or_else(|| parse_later_date(input, today))
+    parse_date(input, ParseContext::Entry, today)
 }
 
 /// Parses date expressions for FILTERS (past by default):
 /// today, tomorrow, yesterday, d7 (7 days ago), mon (last Monday).
 /// Append + for explicit future: d7+ (7 days from now), mon+ (next Monday).
+/// Delegates to the consolidated parse_date API with Filter context.
 #[must_use]
 pub fn parse_filter_date(input: &str, today: NaiveDate) -> Option<NaiveDate> {
-    parse_relative_date(input, today, false).or_else(|| parse_later_date(input, today))
+    parse_date(input, ParseContext::Filter, today)
 }
 
-/// Replaces natural date patterns (@today, @tomorrow, @yesterday, @d7, @mon) with @MM/DD format.
+/// Replaces relative date patterns (@today, @tomorrow, @yesterday, @d7, @mon) with @MM/DD format.
 #[must_use]
-pub fn normalize_natural_dates(content: &str, today: NaiveDate) -> String {
-    NATURAL_DATE_REGEX
+pub fn normalize_relative_dates(content: &str, today: NaiveDate) -> String {
+    RELATIVE_DATE_REGEX
         .replace_all(content, |caps: &regex::Captures| {
             let natural_str = &caps[1];
             parse_natural_date(natural_str, today).map_or_else(
@@ -354,51 +216,23 @@ pub fn extract_recurring_pattern(content: &str) -> Option<RecurringPattern> {
 }
 
 /// Extracts the target date from entry content if it contains an @date pattern.
+/// Uses Entry context (future bias) since entry @dates are forward-looking.
 #[must_use]
 pub fn extract_target_date(content: &str, today: NaiveDate) -> Option<NaiveDate> {
     LATER_DATE_REGEX
         .captures(content)
         .and_then(|cap| cap.get(1))
-        .and_then(|m| parse_later_date(m.as_str(), today))
-}
-
-/// Like parse_later_date but for MM/DD format prefers the most recent past occurrence.
-/// Used for overdue checking where we want to interpret @12/30 on 1/1 as last year.
-#[must_use]
-fn parse_date_prefer_past(date_str: &str, today: NaiveDate) -> Option<NaiveDate> {
-    use chrono::Datelike;
-
-    // For formats with explicit year (MM/DD/YY, MM/DD/YYYY, or YYYY/MM/DD), parse normally
-    if date_str.matches('/').count() == 2 {
-        return parse_later_date(date_str, today);
-    }
-
-    // MM/DD - prefer past (most recent occurrence)
-    let parts: Vec<&str> = date_str.split('/').collect();
-    if parts.len() == 2 {
-        let month: u32 = parts[0].parse().ok()?;
-        let day: u32 = parts[1].parse().ok()?;
-
-        // Try current year first
-        if let Some(date) = NaiveDate::from_ymd_opt(today.year(), month, day) {
-            if date <= today {
-                return Some(date);
-            }
-            // Date is in future this year, so use last year
-            return NaiveDate::from_ymd_opt(today.year() - 1, month, day);
-        }
-    }
-
-    None
+        .and_then(|m| parse_date(m.as_str(), ParseContext::Entry, today))
 }
 
 /// Extracts target date preferring past interpretation (for overdue checking).
+/// Uses Filter context (past bias) to interpret @12/30 on 1/1 as last year.
 #[must_use]
 fn extract_target_date_prefer_past(content: &str, today: NaiveDate) -> Option<NaiveDate> {
     LATER_DATE_REGEX
         .captures(content)
         .and_then(|cap| cap.get(1))
-        .and_then(|m| parse_date_prefer_past(m.as_str(), today))
+        .and_then(|m| parse_date(m.as_str(), ParseContext::Filter, today))
 }
 
 /// Collects all projected entries (both @later and @recurring) for the target date.
@@ -620,7 +454,7 @@ pub fn collect_filtered_entries(filter: &Filter, path: &Path) -> io::Result<Vec<
                 // Later filter: entry must have a @date pattern
                 if filter.later
                     && !LATER_DATE_REGEX.is_match(&raw_entry.content)
-                    && !NATURAL_DATE_REGEX.is_match(&raw_entry.content)
+                    && !RELATIVE_DATE_REGEX.is_match(&raw_entry.content)
                 {
                     line_index_in_day += 1;
                     continue;

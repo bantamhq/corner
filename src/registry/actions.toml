@@ -272,20 +272,20 @@ help = "Show help"
 readme = "Display the help overlay with all keybindings"
 
 [[action]]
-key_action_id = "open_datepicker"
+key_action_id = "open_date_interface"
 default_keys = ["\\"]
 contexts = ["shared_normal"]
 help_sections = ["daily", "filter"]
-help = "Open datepicker"
-readme = "Open the calendar datepicker to navigate to a specific date"
+help = "Open date interface"
+readme = "Open the date interface to navigate to a specific date"
 
 [[action]]
-key_action_id = "open_project_picker"
-default_keys = ["P"]
+key_action_id = "open_project_interface"
+default_keys = ["+"]
 contexts = ["shared_normal"]
 help_sections = ["daily", "filter"]
-help = "Open project picker"
-readme = "Open the project picker to switch between registered projects"
+help = "Open project interface"
+readme = "Open the project interface to switch between registered projects"
 
 # =============================================================================
 # Filter Normal Mode
@@ -546,110 +546,148 @@ help = "Close help"
 readme = "Close the help overlay"
 
 # =============================================================================
-# Datepicker Mode
+# Date Interface Mode
 # =============================================================================
 
 [[action]]
-key_action_id = "datepicker_move_left"
+key_action_id = "date_interface_move_left"
 default_keys = ["h", "left"]
-contexts = ["datepicker"]
+contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Previous day"
 readme = "Move selection to the previous day"
 
 [[action]]
-key_action_id = "datepicker_move_right"
+key_action_id = "date_interface_move_right"
 default_keys = ["l", "right"]
-contexts = ["datepicker"]
+contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Next day"
 readme = "Move selection to the next day"
 
 [[action]]
-key_action_id = "datepicker_move_up"
+key_action_id = "date_interface_move_up"
 default_keys = ["k", "up"]
-contexts = ["datepicker"]
+contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Previous week"
 readme = "Move selection up one week"
 
 [[action]]
-key_action_id = "datepicker_move_down"
+key_action_id = "date_interface_move_down"
 default_keys = ["j", "down"]
-contexts = ["datepicker"]
+contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Next week"
 readme = "Move selection down one week"
 
 [[action]]
-key_action_id = "datepicker_prev_month"
+key_action_id = "date_interface_prev_month"
 default_keys = ["["]
-contexts = ["datepicker"]
+contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Previous month"
 readme = "Navigate to the previous month"
 
 [[action]]
-key_action_id = "datepicker_next_month"
+key_action_id = "date_interface_next_month"
 default_keys = ["]"]
-contexts = ["datepicker"]
+contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Next month"
 readme = "Navigate to the next month"
 
 [[action]]
-key_action_id = "datepicker_prev_year"
+key_action_id = "date_interface_prev_year"
 default_keys = ["Y"]
-contexts = ["datepicker"]
+contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Previous year"
 readme = "Navigate to the previous year"
 
 [[action]]
-key_action_id = "datepicker_next_year"
+key_action_id = "date_interface_next_year"
 default_keys = ["y"]
-contexts = ["datepicker"]
+contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Next year"
 readme = "Navigate to the next year"
 
 [[action]]
-key_action_id = "datepicker_today"
+key_action_id = "date_interface_today"
 default_keys = ["t"]
-contexts = ["datepicker"]
+contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Jump to today"
 readme = "Jump to today's date in the calendar"
 
 [[action]]
-key_action_id = "datepicker_confirm"
+key_action_id = "date_interface_confirm"
 default_keys = ["ret"]
-contexts = ["datepicker"]
+contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Navigate to date"
 readme = "Navigate to the selected date"
 
 [[action]]
-key_action_id = "datepicker_cancel"
+key_action_id = "date_interface_cancel"
 default_keys = ["\\", "esc", "backspace"]
-contexts = ["datepicker"]
+contexts = ["date_interface"]
 help_sections = ["date"]
-help = "Close datepicker"
-readme = "Close datepicker without navigating"
+help = "Close date interface"
+readme = "Close date interface without navigating"
 
-# Footer-only entries for compact datepicker popup (not shown in help)
+# Footer-only entries for compact date interface popup (not shown in help)
 [[action]]
-key_action_id = "datepicker_footer_nav_month"
+key_action_id = "date_interface_footer_nav_month"
 default_keys = ["[]"]
-contexts = ["datepicker"]
-footer = { modes = ["datepicker"], text = "Month" }
+contexts = ["date_interface"]
+footer = { modes = ["date_interface"], text = "Month" }
 help = "Month"
 readme = "Navigate months"
 
 [[action]]
-key_action_id = "datepicker_footer_nav_year"
+key_action_id = "date_interface_footer_nav_year"
 default_keys = ["y/Y"]
-contexts = ["datepicker"]
-footer = { modes = ["datepicker"], text = "Year" }
+contexts = ["date_interface"]
+footer = { modes = ["date_interface"], text = "Year" }
 help = "Year"
 readme = "Navigate years"
+
+# =============================================================================
+# Project Interface Mode
+# =============================================================================
+
+[[action]]
+key_action_id = "project_interface_move_up"
+default_keys = ["k", "up"]
+contexts = ["project_interface"]
+help_sections = ["project"]
+help = "Previous project"
+readme = "Move selection to the previous project"
+
+[[action]]
+key_action_id = "project_interface_move_down"
+default_keys = ["j", "down"]
+contexts = ["project_interface"]
+help_sections = ["project"]
+help = "Next project"
+readme = "Move selection to the next project"
+
+[[action]]
+key_action_id = "project_interface_select"
+default_keys = ["ret"]
+contexts = ["project_interface"]
+help_sections = ["project"]
+footer = { modes = ["project_interface"], text = "Select" }
+help = "Open project"
+readme = "Open the selected project journal"
+
+[[action]]
+key_action_id = "project_interface_cancel"
+default_keys = ["+", "esc"]
+contexts = ["project_interface"]
+help_sections = ["project"]
+footer = { modes = ["project_interface"], text = "Close" }
+help = "Close project interface"
+readme = "Close project interface without switching"

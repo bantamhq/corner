@@ -110,10 +110,10 @@ pub fn create_project_journal() -> io::Result<PathBuf> {
     }
 
     let mut registry = ProjectRegistry::load();
-    if registry.find_by_path(&caliber_dir).is_none() {
-        if let Ok(_info) = registry.register(caliber_dir.clone()) {
-            let _ = registry.save();
-        }
+    if registry.find_by_path(&caliber_dir).is_none()
+        && let Ok(_info) = registry.register(caliber_dir.clone())
+    {
+        let _ = registry.save();
     }
 
     Ok(journal_path)

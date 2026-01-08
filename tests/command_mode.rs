@@ -3,7 +3,7 @@ mod helpers;
 use crossterm::event::KeyCode;
 use helpers::TestContext;
 
-use caliber::app::InputMode;
+use caliber::app::{InputMode, PromptContext};
 
 #[test]
 fn open_command_allows_continued_editing() {
@@ -58,7 +58,7 @@ fn escape_exits_command_mode() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char(':'));
-    assert!(matches!(ctx.app.input_mode, InputMode::Command));
+    assert!(matches!(ctx.app.input_mode, InputMode::Prompt(PromptContext::Command { .. })));
 
     ctx.type_str("goto");
 

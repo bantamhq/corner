@@ -68,7 +68,7 @@ That's enough to get started. The sections below go deeper.
 
 ![daily view demo](examples/entry-ops.gif)
 
-Your home base. Each day is a page in your journal. Navigate between days with `h` / `l` or `[` / `]`, or jump to any date with `\` to open the datepicker.
+Your home base. Each day is a page in your journal. Navigate between days with `h` / `l` or `[` / `]`, or jump to any date with `\` to open the date interface.
 
 Entries from other days that target today appear at the top — one-time `@date` entries and recurring `@every-*` entries surface when the day comes.
 
@@ -76,7 +76,7 @@ Entries from other days that target today appear at the top — one-time `@date`
 |-----|--------|
 | `h` / `l` or `[` / `]` | Previous / next day |
 | `t` | Jump to today |
-| `\` | Open datepicker |
+| `\` | Open date interface |
 | `Enter` | New entry at end |
 | `o` / `O` | New entry below / above cursor |
 | `i` | Edit selected entry |
@@ -85,9 +85,9 @@ Entries from other days that target today appear at the top — one-time `@date`
 | `z` | Hide / show completed tasks |
 | `s` | Sort entries by type |
 
-### Datepicker
+### Date Interface
 
-![datepicker demo](examples/datepicker.gif)
+![date interface demo](examples/datepicker.gif)
 
 Press `\` to open a calendar for quick navigation. Days with entries are highlighted. Navigate with `h/j/k/l` or arrow keys, switch months with `[` and `]`, and press `Enter` to jump to the selected date.
 
@@ -114,12 +114,12 @@ Edit, toggle, or delete entries directly from filter results. Press `Enter` to q
 
 ### Date Filters
 
-Dates in filters support natural language:
+Dates in filters default to past (most useful for searching history):
 
 - `today`, `tomorrow`, `yesterday`
-- `next-mon`, `last-fri`
-- `7d` (7 days from now), `-7d` (7 days ago)
-- Standard formats: `1/15`, `2025/01/15`
+- `mon`, `fri` (last Monday, last Friday)
+- `d7` (7 days ago), `d7+` (7 days from now)
+- Standard formats: `1/15`, `1/15/26`, `2026/01/15`
 
 ### Combining Filters
 
@@ -159,15 +159,14 @@ Use `@date` to schedule an entry for a future day:
 
 ```markdown
 - [ ] Review quarterly report @1/15
-- [ ] Send birthday card @next-friday
+- [ ] Send birthday card @fri
 ```
 
-Natural date shortcuts are converted when you save:
+Relative date shortcuts are converted when you save:
 
 - `@today`, `@tomorrow`, `@yesterday`
-- `@next-monday` (or `@next-mon`)
-- `@last-friday` (or `@last-fri`)
-- `@3d` (3 days from now), `@-3d` (3 days ago)
+- `@mon`, `@fri` (next Monday, next Friday)
+- `@d3` (3 days from now)
 
 The entry appears in the "Later" section when you view the target date.
 
@@ -231,7 +230,7 @@ Define reusable filter queries in your config, then use `$name` to expand them.
 t = "!tasks"
 n = "!notes"
 next = "!tasks #next"
-stale = "!tasks @before:-7d"
+stale = "!tasks @before:d7"
 ```
 
 Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!tasks #work`.
@@ -273,8 +272,8 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | `/` | Filter mode |
 | `:` | Command mode |
 | `?` | Show help |
-| `\` | Open datepicker |
-| `P` | Open project picker |
+| `\` | Open date interface |
+| `+` | Open project interface |
 
 
 ### Filter Mode
@@ -302,8 +301,8 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | `/` | Filter mode |
 | `:` | Command mode |
 | `?` | Show help |
-| `\` | Open datepicker |
-| `P` | Open project picker |
+| `\` | Open date interface |
+| `+` | Open project interface |
 | `Enter` | Quick add to today |
 | `r` | Refresh results |
 | `Esc`/`Tab` | Exit to daily |
@@ -353,9 +352,9 @@ Press `v` for batch operations on multiple entries.
 | `Esc` | Exit selection |
 
 
-### Date Mode
+### Date Interface
 
-Press `\` to open the calendar picker.
+Press `\` to open the calendar interface.
 
 | Key | Action |
 |-----|--------|
@@ -369,14 +368,26 @@ Press `\` to open the calendar picker.
 | `y` | Next year |
 | `t` | Jump to today |
 | `Enter` | Navigate to date |
-| `\`/`Esc`/`Bksp` | Close datepicker |
+| `\`/`Esc`/`Bksp` | Close date interface |
+
+
+### Project Interface
+
+Press `+` to open the project switcher.
+
+| Key | Action |
+|-----|--------|
+| `k`/`↑` | Previous project |
+| `j`/`↓` | Next project |
+| `Enter` | Open project |
+| `+`/`Esc` | Close project interface |
 
 
 ### Commands
 
 | Key | Action |
 |-----|--------|
-| `:projects ` | Open project manager |
+| `:project ` | Open project interface |
 | `:scratchpad ` | Open scratchpad for quick notes |
 | `:quit ` | Quit application |
 

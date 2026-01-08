@@ -34,7 +34,8 @@ fn help_section_to_context(section: HelpSection) -> Option<KeyContext> {
         HelpSection::Edit => Some(KeyContext::Edit),
         HelpSection::Reorder => Some(KeyContext::Reorder),
         HelpSection::Selection => Some(KeyContext::Selection),
-        HelpSection::Date => Some(KeyContext::Datepicker),
+        HelpSection::Date => Some(KeyContext::DateInterface),
+        HelpSection::Project => Some(KeyContext::ProjectInterface),
         HelpSection::Help => Some(KeyContext::Help),
         HelpSection::Commands | HelpSection::Filters => None,
     }
@@ -54,7 +55,8 @@ fn build_help_lines(keymap: &Keymap) -> Vec<RatatuiLine<'static>> {
         (HelpSection::Edit, "[Edit Mode]"),
         (HelpSection::Reorder, "[Reorder Mode]"),
         (HelpSection::Selection, "[Selection Mode]"),
-        (HelpSection::Date, "[Date Mode]"),
+        (HelpSection::Date, "[Date Interface]"),
+        (HelpSection::Project, "[Project Interface]"),
     ];
 
     for (section, title) in sections {
@@ -96,8 +98,14 @@ fn build_help_lines(keymap: &Keymap) -> Vec<RatatuiLine<'static>> {
         ));
     }
     lines.push(help_line(
-        "DATE:",
-        "MM/DD, today, tomorrow, yesterday, mon, d7 (+ for future)",
+        "Dates:",
+        "MM/DD, MM/DD/YY, YYYY/MM/DD",
+        key_style,
+        desc_style,
+    ));
+    lines.push(help_line(
+        "Relative:",
+        "today, tomorrow, yesterday, mon..sun, d1..d999 (+ for future)",
         key_style,
         desc_style,
     ));

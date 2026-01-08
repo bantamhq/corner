@@ -9,12 +9,16 @@ use crossterm::{
     },
 };
 
-use super::{App, InputMode};
+use super::{App, InputMode, PromptContext};
 
 impl App {
     pub fn execute_command(&mut self) -> io::Result<()> {
-        let cmd = self.command_buffer.content().trim().to_string();
-        self.command_buffer.clear();
+        let cmd = match &self.input_mode {
+            InputMode::Prompt(PromptContext::Command { buffer }) => {
+                buffer.content().trim().to_string()
+            }
+            _ => return Ok(()),
+        };
 
         match cmd.as_str() {
             "quit" => {
@@ -22,8 +26,8 @@ impl App {
                 self.should_quit = true;
                 self.input_mode = InputMode::Normal;
             }
-            "projects" => {
-                self.open_project_picker();
+            "project" => {
+                self.open_project_interface();
             }
             "scratchpad" => {
                 self.open_scratchpad()?;

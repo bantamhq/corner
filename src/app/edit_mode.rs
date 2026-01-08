@@ -10,7 +10,7 @@ impl App {
     /// Preprocesses content before saving: expands favorite tags and normalizes dates.
     fn preprocess_content(&self, content: &str) -> String {
         let content = storage::expand_favorite_tags(content, &self.config.favorite_tags);
-        storage::normalize_natural_dates(&content, Local::now().date_naive())
+        storage::normalize_relative_dates(&content, Local::now().date_naive())
     }
 
     /// Cycle entry type while editing (BackTab)

@@ -6,11 +6,11 @@ use ratatui::{
     widgets::Paragraph,
 };
 
-use crate::app::ProjectPickerState;
+use crate::app::ProjectInterfaceState;
 
-use super::popup_interface::{PopupLayout, render_popup_frame, render_query_input};
+use super::interface_popup::{PopupLayout, render_popup_frame, render_query_input};
 
-pub fn render_project_picker(f: &mut Frame, state: &ProjectPickerState, area: Rect) {
+pub fn render_project_interface(f: &mut Frame, state: &ProjectInterfaceState, area: Rect) {
     let layout = PopupLayout::new(area);
 
     if layout.is_too_small() {
@@ -40,7 +40,7 @@ pub fn render_project_picker(f: &mut Frame, state: &ProjectPickerState, area: Re
         };
 
         let spans = vec![
-            Span::styled(format!("{} ", indicator), Style::new().fg(Color::Cyan)),
+            Span::styled(format!("{} ", indicator), Style::new().fg(Color::Blue)),
             Span::styled(project.name.clone(), name_style),
         ];
 

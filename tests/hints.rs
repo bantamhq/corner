@@ -16,7 +16,7 @@ fn command_hints_show_but_do_not_autocomplete() {
     ctx.press(KeyCode::Right);
 
     // Commands show hints but right arrow doesn't autocomplete
-    assert_eq!(ctx.app.command_buffer.content(), "qu");
+    assert_eq!(ctx.app.prompt_content(), Some("qu"));
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn date_op_hint_completes_with_right_arrow() {
     ctx.type_str("@be");
     ctx.press(KeyCode::Right);
 
-    assert_eq!(ctx.app.command_buffer.content(), "@before:");
+    assert_eq!(ctx.app.prompt_content(), Some("@before:"));
 }
 
 #[test]
@@ -70,8 +70,8 @@ fn negation_hint_completes_with_right_arrow() {
     ctx.type_str("not:#fe");
     ctx.press(KeyCode::Right);
 
-    let query = ctx.app.command_buffer.content();
-    assert_eq!(query, "not:#feature ");
+    let query = ctx.app.prompt_content();
+    assert_eq!(query, Some("not:#feature "));
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn escape_clears_command_buffer_and_exits() {
     ctx.type_str("da");
     ctx.press(KeyCode::Esc);
 
-    assert!(ctx.app.command_buffer.is_empty());
+    assert!(ctx.app.prompt_is_empty());
     assert!(matches!(
         ctx.app.input_mode,
         caliber::app::InputMode::Normal
@@ -168,7 +168,7 @@ fn saved_filter_hint_completes_with_right_arrow() {
     ctx.type_str("$wo");
     ctx.press(KeyCode::Right);
 
-    assert_eq!(ctx.app.command_buffer.content(), "$work ");
+    assert_eq!(ctx.app.prompt_content(), Some("$work "));
 }
 
 #[test]
@@ -179,7 +179,7 @@ fn date_value_hints_show_after_colon() {
     ctx.type_str("@before:d");
     ctx.press(KeyCode::Right);
 
-    assert!(ctx.app.command_buffer.content().starts_with("@before:d"));
+    assert!(ctx.app.prompt_content().is_some_and(|s| s.starts_with("@before:d")));
 }
 
 #[test]
@@ -194,7 +194,7 @@ fn empty_filter_shows_guidance_message() {
     ));
 
     ctx.press(KeyCode::Right);
-    assert!(ctx.app.command_buffer.is_empty());
+    assert!(ctx.app.prompt_is_empty());
 }
 
 #[test]

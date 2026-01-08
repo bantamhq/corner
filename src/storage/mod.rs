@@ -1,4 +1,5 @@
 mod context;
+mod date_parsing;
 mod entries;
 mod filter;
 mod persistence;
@@ -24,14 +25,17 @@ pub use persistence::{
     update_day_content, update_entry_content,
 };
 
+// Re-export date parsing types and functions
+pub use date_parsing::{ParseContext, parse_date, parse_weekday};
+
 // Re-export filter types and functions
 pub use filter::{
-    FAVORITE_TAG_REGEX, Filter, FilterType, LATER_DATE_REGEX, NATURAL_DATE_REGEX, RECURRING_REGEX,
-    SAVED_FILTER_REGEX, TAG_REGEX, collect_filtered_entries, collect_journal_tags,
-    collect_projected_entries_for_date, expand_favorite_tags, expand_saved_filters,
-    extract_recurring_pattern, extract_tags, extract_target_date, normalize_natural_dates,
-    parse_filter_date, parse_filter_query, parse_later_date, parse_natural_date,
-    parse_recurring_pattern, strip_recurring_tags,
+    FAVORITE_TAG_REGEX, Filter, FilterType, LATER_DATE_REGEX, RECURRING_REGEX,
+    RELATIVE_DATE_REGEX, SAVED_FILTER_REGEX, TAG_REGEX, collect_filtered_entries,
+    collect_journal_tags, collect_projected_entries_for_date, expand_favorite_tags,
+    expand_saved_filters, extract_recurring_pattern, extract_tags, extract_target_date,
+    normalize_relative_dates, parse_filter_date, parse_filter_query,
+    parse_natural_date, parse_recurring_pattern, strip_recurring_tags,
 };
 
 // Re-export project registry types
@@ -82,92 +86,83 @@ mod tests {
     }
 
     #[test]
-    fn parse_natural_date_handles_all_formats() {
+    fn parse_date_entry_context_uses_future_bias() {
         let today = NaiveDate::from_ymd_opt(2026, 1, 5).unwrap();
 
         assert_eq!(
-            parse_natural_date("today", today),
+            parse_date("today", ParseContext::Entry, today),
             NaiveDate::from_ymd_opt(2026, 1, 5)
         );
         assert_eq!(
-            parse_natural_date("tomorrow", today),
+            parse_date("tomorrow", ParseContext::Entry, today),
             NaiveDate::from_ymd_opt(2026, 1, 6)
         );
         assert_eq!(
-            parse_natural_date("yesterday", today),
+            parse_date("yesterday", ParseContext::Entry, today),
             NaiveDate::from_ymd_opt(2026, 1, 4)
         );
-
         assert_eq!(
-            parse_natural_date("d3", today),
+            parse_date("d3", ParseContext::Entry, today),
             NaiveDate::from_ymd_opt(2026, 1, 8)
         );
-
         assert_eq!(
-            parse_natural_date("mon", today),
+            parse_date("mon", ParseContext::Entry, today),
             NaiveDate::from_ymd_opt(2026, 1, 12)
         );
         assert_eq!(
-            parse_natural_date("fri", today),
+            parse_date("fri", ParseContext::Entry, today),
             NaiveDate::from_ymd_opt(2026, 1, 9)
         );
-
         assert_eq!(
-            parse_natural_date("1/15", today),
+            parse_date("1/15", ParseContext::Entry, today),
             NaiveDate::from_ymd_opt(2026, 1, 15)
         );
     }
 
     #[test]
-    fn parse_filter_date_handles_relative_dates() {
+    fn parse_date_filter_context_uses_past_bias() {
         let today = NaiveDate::from_ymd_opt(2026, 1, 5).unwrap();
 
         assert_eq!(
-            parse_filter_date("d3", today),
+            parse_date("d3", ParseContext::Filter, today),
             NaiveDate::from_ymd_opt(2026, 1, 2)
         );
         assert_eq!(
-            parse_filter_date("mon", today),
+            parse_date("mon", ParseContext::Filter, today),
             NaiveDate::from_ymd_opt(2025, 12, 29)
         );
-
         assert_eq!(
-            parse_filter_date("d3+", today),
+            parse_date("d3+", ParseContext::Filter, today),
             NaiveDate::from_ymd_opt(2026, 1, 8)
         );
         assert_eq!(
-            parse_filter_date("mon+", today),
+            parse_date("mon+", ParseContext::Filter, today),
             NaiveDate::from_ymd_opt(2026, 1, 12)
         );
-
         assert_eq!(
-            parse_filter_date("today", today),
+            parse_date("today", ParseContext::Filter, today),
             NaiveDate::from_ymd_opt(2026, 1, 5)
         );
     }
 
     #[test]
-    fn normalize_converts_natural_to_mm_dd() {
+    fn normalize_converts_relative_to_mm_dd() {
         let today = NaiveDate::from_ymd_opt(2026, 1, 5).unwrap();
 
-        // @today includes year to avoid "always future" misinterpretation
         assert_eq!(
-            normalize_natural_dates("Do it @today", today),
+            normalize_relative_dates("Do it @today", today),
             "Do it @01/05/26"
         );
-        // Other natural dates use MM/DD format
         assert_eq!(
-            normalize_natural_dates("Call dentist @tomorrow", today),
+            normalize_relative_dates("Call dentist @tomorrow", today),
             "Call dentist @01/06"
         );
-        // New d# syntax (entry context = future)
         assert_eq!(
-            normalize_natural_dates("Review @d3", today),
+            normalize_relative_dates("Review @d3", today),
             "Review @01/08"
         );
-        // New weekday syntax (entry context = next occurrence)
         assert_eq!(
-            normalize_natural_dates("Meeting @mon", today),
+            normalize_relative_dates("Meeting @mon", today),
             "Meeting @01/12"
         );
     }

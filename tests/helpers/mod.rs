@@ -77,17 +77,14 @@ impl TestContext {
             handlers::handle_help_key(&mut self.app, key);
         } else {
             match &self.app.input_mode {
-                InputMode::Command => {
-                    let _ = handlers::handle_command_key(&mut self.app, key);
+                InputMode::Prompt(_) => {
+                    let _ = handlers::handle_prompt_key(&mut self.app, key);
                 }
                 InputMode::Normal => {
                     let _ = handlers::handle_normal_key(&mut self.app, key);
                 }
                 InputMode::Edit(_) => {
                     handlers::handle_edit_key(&mut self.app, key);
-                }
-                InputMode::QueryInput => {
-                    let _ = handlers::handle_query_input_key(&mut self.app, key);
                 }
                 InputMode::Reorder => {
                     handlers::handle_reorder_key(&mut self.app, key);
@@ -98,11 +95,8 @@ impl TestContext {
                 InputMode::Selection(_) => {
                     let _ = handlers::handle_selection_key(&mut self.app, key);
                 }
-                InputMode::Datepicker(_) => {
-                    let _ = handlers::handle_datepicker_key(&mut self.app, key);
-                }
-                InputMode::ProjectPicker(_) => {
-                    let _ = handlers::handle_project_picker_key(&mut self.app, key);
+                InputMode::Interface(_) => {
+                    let _ = handlers::handle_interface_key(&mut self.app, key);
                 }
             }
         }
