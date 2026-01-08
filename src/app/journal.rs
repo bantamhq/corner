@@ -4,7 +4,7 @@ use chrono::Local;
 
 use crate::config::{Config, resolve_path};
 use crate::dispatch::Keymap;
-use crate::storage::{JournalSlot, ProjectRegistry};
+use crate::storage::{JournalSlot, ProjectRegistry, create_project_journal};
 
 use super::{App, ConfirmContext, InputMode};
 
@@ -59,6 +59,20 @@ impl App {
 
     pub fn switch_to_project(&mut self) -> io::Result<()> {
         self.switch_to_journal(JournalSlot::Project)
+    }
+
+    /// Creates project journal, registers it, and prompts for gitignore if in git repo.
+    pub fn init_project(&mut self) -> io::Result<()> {
+        let path = create_project_journal()?;
+        self.journal_context.set_project_path(path);
+
+        if self.in_git_repo {
+            self.input_mode = InputMode::Confirm(ConfirmContext::AddToGitignore);
+        } else {
+            self.switch_to_project()?;
+            self.set_status("Project initialized");
+        }
+        Ok(())
     }
 
     pub fn toggle_journal(&mut self) -> io::Result<()> {

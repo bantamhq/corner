@@ -69,20 +69,19 @@ pub fn render_project_picker(f: &mut Frame, state: &ProjectPickerState, area: Re
         let project = &state.projects[project_idx];
         let is_selected = i == state.selected;
 
-        let indicator = if is_selected { ">" } else { " " };
+        let indicator = if is_selected { "→" } else { " " };
 
-        let (name_style, id_style) = if !project.available {
-            (Style::new().dim(), Style::new().dim())
+        let name_style = if !project.available {
+            Style::new().dim()
         } else if is_selected {
-            (Style::new().fg(Color::Cyan), Style::new().fg(Color::Cyan).dim())
+            Style::new().fg(Color::Cyan)
         } else {
-            (Style::new(), Style::new().dim())
+            Style::new()
         };
 
         let mut spans = vec![
             Span::styled(format!("{} ", indicator), Style::new().fg(Color::Cyan)),
             Span::styled(project.name.clone(), name_style),
-            Span::styled(format!(" [{}]", project.id), id_style),
         ];
 
         if !project.available {

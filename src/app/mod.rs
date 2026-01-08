@@ -195,10 +195,10 @@ impl ProjectPickerState {
             .iter()
             .enumerate()
             .filter(|(_, p)| {
-                !p.hidden
+                !p.hide_from_registry
                     && (query.is_empty()
-                        || p.name.to_lowercase().contains(&query)
-                        || p.id.to_lowercase().contains(&query))
+                        || p.name.to_lowercase().starts_with(&query)
+                        || p.id.to_lowercase().starts_with(&query))
             })
             .map(|(i, _)| i)
             .collect();

@@ -12,7 +12,7 @@ use crossterm::{
 
 use super::{App, InputMode};
 use crate::config;
-use crate::storage::{ProjectRegistry, create_project_journal};
+use crate::storage::ProjectRegistry;
 
 impl App {
     pub fn execute_command(&mut self) -> io::Result<()> {
@@ -95,11 +95,7 @@ impl App {
     }
 
     fn handle_project_init(&mut self) -> io::Result<()> {
-        let path = create_project_journal()?;
-        self.journal_context.set_project_path(path);
-        self.switch_to_project()?;
-        self.set_status("Project initialized");
-        Ok(())
+        self.init_project()
     }
 
     fn handle_project_remove(&mut self, id: &str) -> io::Result<()> {

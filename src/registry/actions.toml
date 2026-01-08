@@ -281,7 +281,7 @@ readme = "Open the calendar datepicker to navigate to a specific date"
 
 [[action]]
 key_action_id = "open_project_picker"
-default_keys = ["C-p"]
+default_keys = ["P"]
 contexts = ["shared_normal"]
 help_sections = ["daily", "filter"]
 help = "Open project picker"

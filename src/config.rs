@@ -62,18 +62,8 @@ pub struct Config {
     pub hide_completed: bool,
     #[serde(default)]
     pub keys: HashMap<String, HashMap<String, String>>,
-    /// Auto-initialize project journals in git repositories (base config only)
     #[serde(default = "default_auto_init_project")]
     pub auto_init_project: bool,
-    /// Project display name for registry
-    #[serde(default)]
-    pub name: Option<String>,
-    /// Project short ID for registry
-    #[serde(default)]
-    pub id: Option<String>,
-    /// Hide project from picker (project config only)
-    #[serde(default)]
-    pub hidden: bool,
 }
 
 /// Raw config for deserialization - all fields are Option to distinguish "not set" from "set to default"
@@ -89,9 +79,6 @@ struct RawConfig {
     pub hide_completed: Option<bool>,
     pub keys: Option<HashMap<String, HashMap<String, String>>>,
     pub auto_init_project: Option<bool>,
-    pub name: Option<String>,
-    pub id: Option<String>,
-    pub hidden: Option<bool>,
 }
 
 impl RawConfig {
@@ -109,9 +96,6 @@ impl RawConfig {
             hide_completed: self.hide_completed.unwrap_or(false),
             keys: self.keys.unwrap_or_default(),
             auto_init_project: self.auto_init_project.unwrap_or_else(default_auto_init_project),
-            name: self.name,
-            id: self.id,
-            hidden: self.hidden.unwrap_or(false),
         }
     }
 
@@ -126,12 +110,7 @@ impl RawConfig {
             favorite_tags: Some(merge_hashmaps(base.favorite_tags, self.favorite_tags)),
             filters: Some(merge_hashmaps(base.filters, self.filters)),
             keys: Some(merge_keys(base.keys, self.keys)),
-            // auto_init_project only comes from base config
             auto_init_project: base.auto_init_project,
-            name: self.name.or(base.name),
-            id: self.id.or(base.id),
-            // hidden only comes from project config
-            hidden: self.hidden,
         }
     }
 }

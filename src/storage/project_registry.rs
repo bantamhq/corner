@@ -19,21 +19,14 @@ pub struct ProjectRegistryFile {
     pub project: Vec<RegisteredProject>,
 }
 
-/// Resolved project info combining registry path with project config
 #[derive(Debug, Clone)]
 pub struct ProjectInfo {
-    /// Path to .caliber/ directory
     pub path: PathBuf,
-    /// Git root or parent of .caliber/
     pub root: PathBuf,
-    /// Display name (from config or derived from folder)
     pub name: String,
-    /// Unique identifier (from config or derived from folder)
     pub id: String,
-    /// Whether the journal file exists
     pub available: bool,
-    /// Whether the project is hidden from picker
-    pub hidden: bool,
+    pub hide_from_registry: bool,
 }
 
 impl ProjectInfo {
@@ -117,8 +110,6 @@ impl ProjectRegistry {
 
         let unique_id = self.generate_unique_id(&info.id);
         info.id = unique_id;
-
-        write_project_identity(&caliber_path, &info.name, &info.id)?;
 
         self.projects.push(info.clone());
         Ok(info)
@@ -214,16 +205,8 @@ fn resolve_project_info(caliber_path: &Path) -> Option<ProjectInfo> {
     let journal_path = caliber_path.join("journal.md");
     let available = journal_path.exists();
 
-    let config_path = caliber_path.join("config.toml");
-    let (name, id, hidden) = if config_path.exists() {
-        load_project_identity(&config_path).unwrap_or_else(|| {
-            let (n, i) = derive_identity(root);
-            (n, i, false)
-        })
-    } else {
-        let (n, i) = derive_identity(root);
-        (n, i, false)
-    };
+    let (name, id) = derive_identity(root);
+    let hide_from_registry = load_hide_from_registry(&caliber_path.join("config.toml"));
 
     Some(ProjectInfo {
         path: caliber_path.to_path_buf(),
@@ -231,63 +214,22 @@ fn resolve_project_info(caliber_path: &Path) -> Option<ProjectInfo> {
         name,
         id,
         available,
-        hidden,
+        hide_from_registry,
     })
 }
 
-fn load_project_identity(config_path: &Path) -> Option<(String, String, bool)> {
+fn load_hide_from_registry(config_path: &Path) -> bool {
     #[derive(Deserialize)]
     struct ProjectConfig {
-        name: Option<String>,
-        id: Option<String>,
         #[serde(default)]
-        hidden: bool,
+        hide_from_registry: bool,
     }
 
-    let content = fs::read_to_string(config_path).ok()?;
-    let config: ProjectConfig = toml::from_str(&content).ok()?;
-
-    let root = config_path.parent()?.parent()?;
-    let derived = derive_identity(root);
-
-    Some((
-        config.name.unwrap_or(derived.0),
-        config.id.map(|id| sanitize_id(&id)).unwrap_or(derived.1),
-        config.hidden,
-    ))
-}
-
-/// Preserves other settings in config.toml
-pub fn write_project_identity(caliber_path: &Path, name: &str, id: &str) -> io::Result<()> {
-    let config_path = caliber_path.join("config.toml");
-
-    let mut doc = if config_path.exists() {
-        let content = fs::read_to_string(&config_path)?;
-        content
-            .parse::<toml_edit::DocumentMut>()
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
-    } else {
-        toml_edit::DocumentMut::new()
-    };
-
-    doc["name"] = toml_edit::value(name);
-    doc["id"] = toml_edit::value(id);
-
-    fs::write(&config_path, doc.to_string())
-}
-
-/// Creates config.toml only if missing or empty
-pub fn ensure_project_config(caliber_path: &Path, name: &str, id: &str) -> io::Result<()> {
-    let config_path = caliber_path.join("config.toml");
-    let config_missing = !config_path.exists()
-        || fs::read_to_string(&config_path)
-            .map(|s| s.trim().is_empty())
-            .unwrap_or(true);
-
-    if config_missing {
-        write_project_identity(caliber_path, name, id)?;
-    }
-    Ok(())
+    fs::read_to_string(config_path)
+        .ok()
+        .and_then(|content| toml::from_str::<ProjectConfig>(&content).ok())
+        .map(|c| c.hide_from_registry)
+        .unwrap_or(false)
 }
 
 fn derive_identity(root: &Path) -> (String, String) {
@@ -374,7 +316,7 @@ mod tests {
             name: "Test".to_string(),
             id: "myapp".to_string(),
             available: true,
-            hidden: false,
+            hide_from_registry: false,
         });
 
         assert!(registry.find_by_id("myapp").is_some());
@@ -392,7 +334,7 @@ mod tests {
             name: "Test".to_string(),
             id: "myapp".to_string(),
             available: true,
-            hidden: false,
+            hide_from_registry: false,
         });
 
         assert_eq!(registry.generate_unique_id("other"), "other");
@@ -404,7 +346,7 @@ mod tests {
             name: "Test 2".to_string(),
             id: "myapp-2".to_string(),
             available: true,
-            hidden: false,
+            hide_from_registry: false,
         });
 
         assert_eq!(registry.generate_unique_id("myapp"), "myapp-3");
@@ -419,7 +361,7 @@ mod tests {
             name: "Test".to_string(),
             id: "myapp".to_string(),
             available: true,
-            hidden: false,
+            hide_from_registry: false,
         });
 
         assert!(registry.remove("MYAPP"));
@@ -435,7 +377,7 @@ mod tests {
             name: "Test".to_string(),
             id: "myapp".to_string(),
             available: true,
-            hidden: false,
+            hide_from_registry: false,
         });
 
         assert!(registry.find_by_path(Path::new("/test/.caliber")).is_some());

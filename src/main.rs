@@ -134,11 +134,7 @@ fn run_app<B: ratatui::backend::Backend>(
         && app.journal_context.project_path().is_none()
         && app.config.auto_init_project
     {
-        // Auto-create project and prompt for gitignore
-        if let Ok(path) = storage::create_project_journal() {
-            app.journal_context.set_project_path(path);
-            app.input_mode = InputMode::Confirm(ConfirmContext::AddToGitignore);
-        }
+        let _ = app.init_project();
     }
 
     loop {

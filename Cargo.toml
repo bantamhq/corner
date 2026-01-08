@@ -2,9 +2,9 @@
 name = "caliber"
 version = "0.4.0"
 edition = "2024"
-description = "A simple, bullet journal-inspired way to capture tasks and notes in the terminal"
+description = "A terminal-based task journal for developers. Capture ideas without leaving your workflow, find them when you need them."
 license = "MIT"
-repository = "https://github.com/kylemorck/caliber"
+repository = "https://github.com/bantamhq/caliber"
 readme = "README.md"
 keywords = ["tui", "terminal", "bullet-journal", "todo", "productivity"]
 categories = ["command-line-utilities"]
@@ -19,7 +19,6 @@ crossterm = "0.28"
 chrono = "0.4"
 dirs = "6.0"
 toml = "0.8"
-toml_edit = "0.22"
 serde = { version = "1.0", features = ["derive"] }
 unicode-width = "0.2"
 regex = "1"

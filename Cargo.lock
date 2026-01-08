@@ -96,7 +96,6 @@ dependencies = [
  "tempfile",
  "time",
  "toml",
- "toml_edit",
  "unicode-width 0.2.0",
 ]
 

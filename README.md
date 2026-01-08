@@ -274,7 +274,7 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | `:` | Command mode |
 | `?` | Show help |
 | `\` | Open datepicker |
-| `C-p` | Open project picker |
+| `P` | Open project picker |
 
 
 ### Filter Mode
@@ -303,7 +303,7 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | `:` | Command mode |
 | `?` | Show help |
 | `\` | Open datepicker |
-| `C-p` | Open project picker |
+| `P` | Open project picker |
 | `Enter` | Quick add to today |
 | `r` | Refresh results |
 | `Esc`/`Tab` | Exit to daily |

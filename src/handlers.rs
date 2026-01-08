@@ -8,7 +8,7 @@ use crate::app::{
 use crate::cursor::CursorBuffer;
 use crate::dispatch::KeySpec;
 use crate::registry::{KeyActionId, KeyContext};
-use crate::storage::{add_caliber_to_gitignore, create_project_journal};
+use crate::storage::add_caliber_to_gitignore;
 use crate::ui;
 
 fn shifted_char_to_digit(c: char) -> Option<char> {
@@ -419,24 +419,12 @@ pub fn handle_confirm_key(app: &mut App, key: KeyCode) -> io::Result<()> {
 
     match key {
         KeyCode::Char('y') | KeyCode::Char('Y') => match context {
-            ConfirmContext::CreateProjectJournal => match create_project_journal() {
-                Ok(path) => {
-                    app.journal_context.set_project_path(path);
-                    if app.in_git_repo {
-                        // Offer to add to .gitignore
-                        app.input_mode = InputMode::Confirm(ConfirmContext::AddToGitignore);
-                    } else {
-                        // Not in git repo, just switch to project
-                        app.set_status("Project created");
-                        app.switch_to_project()?;
-                        app.input_mode = InputMode::Normal;
-                    }
-                }
-                Err(e) => {
+            ConfirmContext::CreateProjectJournal => {
+                if let Err(e) = app.init_project() {
                     app.set_status(format!("Failed to create project: {e}"));
                     app.input_mode = InputMode::Normal;
                 }
-            },
+            }
             ConfirmContext::AddToGitignore => {
                 if let Err(e) = add_caliber_to_gitignore() {
                     app.set_status(format!("Failed to update .gitignore: {e}"));

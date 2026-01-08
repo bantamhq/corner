@@ -94,7 +94,7 @@ pub fn detect_project_journal() -> Option<PathBuf> {
     None
 }
 
-/// Creates journal and config if missing, registers if not registered.
+/// Creates .caliber/journal.md if missing, registers if not registered.
 /// Uses git root if available, otherwise current directory.
 pub fn create_project_journal() -> io::Result<PathBuf> {
     use crate::storage::ProjectRegistry;
@@ -114,8 +114,6 @@ pub fn create_project_journal() -> io::Result<PathBuf> {
         if let Ok(_info) = registry.register(caliber_dir.clone()) {
             let _ = registry.save();
         }
-    } else if let Some(info) = registry.find_by_path(&caliber_dir) {
-        let _ = super::ensure_project_config(&caliber_dir, &info.name, &info.id);
     }
 
     Ok(journal_path)

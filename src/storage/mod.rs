@@ -35,9 +35,7 @@ pub use filter::{
 };
 
 // Re-export project registry types
-pub use project_registry::{
-    ProjectInfo, ProjectRegistry, ensure_project_config, get_registry_path, write_project_identity,
-};
+pub use project_registry::{ProjectInfo, ProjectRegistry, get_registry_path};
 
 #[cfg(test)]
 mod tests {
