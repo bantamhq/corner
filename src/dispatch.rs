@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::registry::{DEFAULT_KEYMAP, KeyActionId, KeyContext};
+use crate::registry::{DEFAULT_KEYMAP, KeyActionId, KeyContext, get_keys_for_action};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KeySpec {
@@ -236,6 +236,9 @@ impl std::fmt::Display for KeymapError {
 
 pub struct Keymap {
     maps: HashMap<KeyContext, HashMap<KeySpec, KeyActionId>>,
+    /// Actions that are overridden by config in each context.
+    /// If an action appears here, its default keys were not applied.
+    overrides: HashMap<KeyContext, HashSet<KeyActionId>>,
 }
 
 impl Default for Keymap {
@@ -249,16 +252,34 @@ impl Keymap {
         config_keys: &HashMap<String, HashMap<String, String>>,
     ) -> Result<Self, KeymapError> {
         let mut maps: HashMap<KeyContext, HashMap<KeySpec, KeyActionId>> = HashMap::new();
+        let mut overrides: HashMap<KeyContext, HashSet<KeyActionId>> = HashMap::new();
+
+        for (context_str, key_actions) in config_keys {
+            let contexts = parse_contexts(context_str);
+            for action_str in key_actions.values() {
+                if action_str == "no_op" || action_str.is_empty() {
+                    continue;
+                }
+                if let Some(action_id) = parse_action_id(action_str) {
+                    for context in &contexts {
+                        overrides.entry(*context).or_default().insert(action_id);
+                    }
+                }
+            }
+        }
 
         for (context, entries) in DEFAULT_KEYMAP {
             let context_map = maps.entry(*context).or_default();
+            let context_overrides = overrides.get(context);
             for (key_str, action_id) in *entries {
+                if context_overrides.is_some_and(|o| o.contains(action_id)) {
+                    continue;
+                }
                 if let Ok(spec) = KeySpec::parse(key_str) {
                     context_map.insert(spec, *action_id);
                 }
             }
         }
-
         let mut config_keys_added: HashMap<KeyContext, HashMap<KeySpec, String>> = HashMap::new();
 
         for (context_str, key_actions) in config_keys {
@@ -300,7 +321,7 @@ impl Keymap {
             }
         }
 
-        Ok(Keymap { maps })
+        Ok(Keymap { maps, overrides })
     }
 
     #[must_use]
@@ -320,6 +341,64 @@ impl Keymap {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// Get keys bound to an action in deterministic order for display.
+    ///
+    /// Order:
+    /// 1. Registry default keys (in TOML order) that are still active
+    /// 2. Config-defined keys not in defaults, sorted lexicographically
+    ///
+    /// If the action is overridden by config, only config keys are returned (sorted).
+    #[must_use]
+    pub fn keys_for_action_ordered(
+        &self,
+        context: KeyContext,
+        action: KeyActionId,
+    ) -> Vec<String> {
+        let is_overridden = self
+            .overrides
+            .get(&context)
+            .is_some_and(|o| o.contains(&action));
+
+        let active_keys: HashSet<String> = self
+            .maps
+            .get(&context)
+            .map(|m| {
+                m.iter()
+                    .filter(|(_, a)| **a == action)
+                    .map(|(k, _)| k.to_key_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        if is_overridden {
+            let mut keys: Vec<String> = active_keys.into_iter().collect();
+            keys.sort();
+            keys
+        } else {
+            let default_keys = get_keys_for_action(context, action);
+            let mut result: Vec<String> = Vec::new();
+
+            for default_key in default_keys {
+                let key_string = KeySpec::parse(default_key)
+                    .map(|s| s.to_key_string())
+                    .unwrap_or_else(|_| (*default_key).to_string());
+                if active_keys.contains(&key_string) {
+                    result.push(key_string);
+                }
+            }
+
+            let default_set: HashSet<String> = result.iter().cloned().collect();
+            let mut extras: Vec<String> = active_keys
+                .into_iter()
+                .filter(|k| !default_set.contains(k))
+                .collect();
+            extras.sort();
+            result.extend(extras);
+
+            result
+        }
     }
 }
 
@@ -537,5 +616,128 @@ mod tests {
         let spec = KeySpec::parse("S-1").unwrap();
         assert_eq!(spec.key, Key::Char('!'));
         assert!(!spec.modifiers.shift);
+    }
+
+    #[test]
+    fn test_config_override_replaces_all_defaults() {
+        let default_keys = get_keys_for_action(KeyContext::DailyNormal, KeyActionId::MoveDown);
+        assert!(!default_keys.is_empty());
+
+        let mut config = HashMap::new();
+        let mut daily_keys = HashMap::new();
+        daily_keys.insert("n".to_string(), "move_down".to_string());
+        config.insert("daily_normal".to_string(), daily_keys);
+
+        let keymap = Keymap::new(&config).unwrap();
+
+        for default_key in default_keys {
+            let spec = KeySpec::parse(default_key).unwrap();
+            assert_eq!(keymap.get(KeyContext::DailyNormal, &spec), None);
+        }
+
+        let n_spec = KeySpec::parse("n").unwrap();
+        assert_eq!(
+            keymap.get(KeyContext::DailyNormal, &n_spec),
+            Some(KeyActionId::MoveDown)
+        );
+    }
+
+    #[test]
+    fn test_config_override_multiple_keys_same_action() {
+        let mut config = HashMap::new();
+        let mut daily_keys = HashMap::new();
+        daily_keys.insert("n".to_string(), "move_down".to_string());
+        daily_keys.insert("m".to_string(), "move_down".to_string());
+        config.insert("daily_normal".to_string(), daily_keys);
+
+        let keymap = Keymap::new(&config).unwrap();
+
+        let n_spec = KeySpec::parse("n").unwrap();
+        let m_spec = KeySpec::parse("m").unwrap();
+        assert_eq!(
+            keymap.get(KeyContext::DailyNormal, &n_spec),
+            Some(KeyActionId::MoveDown)
+        );
+        assert_eq!(
+            keymap.get(KeyContext::DailyNormal, &m_spec),
+            Some(KeyActionId::MoveDown)
+        );
+
+        let default_keys = get_keys_for_action(KeyContext::DailyNormal, KeyActionId::MoveDown);
+        for default_key in default_keys {
+            let spec = KeySpec::parse(default_key).unwrap();
+            assert_eq!(keymap.get(KeyContext::DailyNormal, &spec), None);
+        }
+    }
+
+    #[test]
+    fn test_ordered_keys_matches_registry_order() {
+        let keymap = Keymap::default();
+
+        let registry_keys = get_keys_for_action(KeyContext::DailyNormal, KeyActionId::MoveDown);
+        let ordered_keys =
+            keymap.keys_for_action_ordered(KeyContext::DailyNormal, KeyActionId::MoveDown);
+
+        let expected: Vec<String> = registry_keys
+            .iter()
+            .map(|k| {
+                KeySpec::parse(k)
+                    .map(|s| s.to_key_string())
+                    .unwrap_or_else(|_| (*k).to_string())
+            })
+            .collect();
+        assert_eq!(ordered_keys, expected);
+    }
+
+    #[test]
+    fn test_ordered_keys_config_sorted() {
+        let mut config = HashMap::new();
+        let mut daily_keys = HashMap::new();
+        daily_keys.insert("z".to_string(), "move_down".to_string());
+        daily_keys.insert("a".to_string(), "move_down".to_string());
+        config.insert("daily_normal".to_string(), daily_keys);
+
+        let keymap = Keymap::new(&config).unwrap();
+
+        let keys = keymap.keys_for_action_ordered(KeyContext::DailyNormal, KeyActionId::MoveDown);
+        assert_eq!(keys, vec!["a", "z"]);
+    }
+
+    #[test]
+    fn test_no_op_does_not_override() {
+        let mut config = HashMap::new();
+        let mut daily_keys = HashMap::new();
+        daily_keys.insert("x".to_string(), "no_op".to_string());
+        config.insert("daily_normal".to_string(), daily_keys);
+
+        let keymap = Keymap::new(&config).unwrap();
+
+        let default_keys = get_keys_for_action(KeyContext::DailyNormal, KeyActionId::MoveDown);
+        for default_key in default_keys {
+            let spec = KeySpec::parse(default_key).unwrap();
+            assert_eq!(
+                keymap.get(KeyContext::DailyNormal, &spec),
+                Some(KeyActionId::MoveDown)
+            );
+        }
+    }
+
+    #[test]
+    fn test_unrelated_actions_keep_defaults() {
+        let mut config = HashMap::new();
+        let mut daily_keys = HashMap::new();
+        daily_keys.insert("n".to_string(), "move_down".to_string());
+        config.insert("daily_normal".to_string(), daily_keys);
+
+        let keymap = Keymap::new(&config).unwrap();
+
+        let default_keys = get_keys_for_action(KeyContext::DailyNormal, KeyActionId::MoveUp);
+        for default_key in default_keys {
+            let spec = KeySpec::parse(default_key).unwrap();
+            assert_eq!(
+                keymap.get(KeyContext::DailyNormal, &spec),
+                Some(KeyActionId::MoveUp)
+            );
+        }
     }
 }

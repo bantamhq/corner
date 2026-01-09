@@ -426,7 +426,7 @@ fn run_app<B: ratatui::backend::Backend>(
                     height: 1,
                 };
 
-                let close_keys = app.keymap.keys_for_action(KeyContext::Help, KeyActionId::CloseHelp);
+                let close_keys = app.keymap.keys_for_action_ordered(KeyContext::Help, KeyActionId::CloseHelp);
                 let close_key = close_keys
                     .first()
                     .map(|k| format_key_for_display(k))

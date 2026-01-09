@@ -102,7 +102,7 @@ fn build_footer_line(
 }
 
 fn action_spans(action: &KeyAction, keymap: &Keymap, context: KeyContext) -> [Span<'static>; 2] {
-    let keys = keymap.keys_for_action(context, action.id);
+    let keys = keymap.keys_for_action_ordered(context, action.id);
 
     let key_display = if keys.is_empty() {
         // Fall back to default_keys if no keys bound (shouldn't happen normally)

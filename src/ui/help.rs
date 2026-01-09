@@ -106,7 +106,7 @@ fn help_line_from_action(
     desc_style: Style,
 ) -> RatatuiLine<'static> {
     let keys = context
-        .map(|ctx| keymap.keys_for_action(ctx, action.id))
+        .map(|ctx| keymap.keys_for_action_ordered(ctx, action.id))
         .unwrap_or_default();
 
     let key_display = if keys.is_empty() {

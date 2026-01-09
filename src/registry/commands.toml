@@ -2,6 +2,12 @@
 # Each entry defines a command with its subargs and help text variants
 
 [[command]]
+name = "date"
+help = "Open date interface"
+readme = "Open date interface"
+completion_hint = "Open date interface"
+
+[[command]]
 name = "project"
 help = "Open project interface"
 readme = "Open project interface"
@@ -12,12 +18,6 @@ name = "scratchpad"
 help = "Open scratchpad for quick notes"
 readme = "Open scratchpad for quick notes"
 completion_hint = "Open scratchpad for quick notes"
-
-[[command]]
-name = "date"
-help = "Open date interface"
-readme = "Open date interface"
-completion_hint = "Open date interface"
 
 [[command]]
 name = "quit"

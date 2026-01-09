@@ -253,20 +253,20 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | `U` | Redo undone action |
 | `x` | Remove last tag |
 | `X` | Remove all tags |
-| `j`/`↓` | Navigate down |
-| `k`/`↑` | Navigate up |
+| `0-9` | Filter favorite tag |
+| `Shift+0-9` | Append favorite tag |
+| `Shift+tab` | Cycle entry type |
+| `↓`/`j` | Navigate down |
+| `↑`/`k` | Navigate up |
 | `g` | Jump to first |
 | `G` | Jump to last |
-| `h`/`[` | Previous day |
-| `l`/`]` | Next day |
+| `[`/`h` | Previous day |
+| `]`/`l` | Next day |
 | `t` | Go to today |
 | `z` | Toggle hide completed |
 | `T` | Tidy entries |
 | `r` | Reorder mode |
 | `v` | Selection mode |
-| `0-9` | Filter favorite tag |
-| `Shift+0-9` | Append favorite tag |
-| `Shift+tab` | Cycle entry type |
 | `Tab` | Return to filter |
 | `` ` `` | Toggle Hub/Project journal |
 | `/` | Filter mode |
@@ -289,14 +289,14 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | `U` | Redo undone action |
 | `x` | Remove last tag |
 | `X` | Remove all tags |
-| `j`/`↓` | Navigate down |
-| `k`/`↑` | Navigate up |
-| `g` | Jump to first |
-| `G` | Jump to last |
-| `v` | Selection mode |
 | `0-9` | Filter favorite tag |
 | `Shift+0-9` | Append favorite tag |
 | `Shift+tab` | Cycle entry type |
+| `↓`/`j` | Navigate down |
+| `↑`/`k` | Navigate up |
+| `g` | Jump to first |
+| `G` | Jump to last |
+| `v` | Selection mode |
 | `` ` `` | Toggle Hub/Project journal |
 | `/` | Filter mode |
 | `:` | Command mode |
@@ -313,8 +313,8 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | Key | Action |
 |-----|--------|
 | `Enter` | Save and exit |
-| `Tab` | Autocomplete hint |
 | `↓` | Save and new |
+| `Tab` | Autocomplete hint |
 | `Shift+tab` | Cycle entry type |
 | `Esc` | Cancel |
 
@@ -325,9 +325,9 @@ Press `r` to manually arrange entries within a day.
 
 | Key | Action |
 |-----|--------|
-| `j`/`↓` | Move entry down |
-| `k`/`↑` | Move entry up |
-| `r`/`Enter` | Save |
+| `↓`/`j` | Move entry down |
+| `↑`/`k` | Move entry up |
+| `Enter`/`r` | Save |
 | `Esc` | Cancel |
 
 
@@ -339,8 +339,8 @@ Press `v` for batch operations on multiple entries.
 |-----|--------|
 | `v` | Toggle selection |
 | `V` | Select range |
-| `j`/`↓` | Move cursor down |
-| `k`/`↑` | Move cursor up |
+| `↓`/`j` | Move cursor down |
+| `↑`/`k` | Move cursor up |
 | `g` | Jump to first |
 | `G` | Jump to last |
 | `d` | Delete selected |
@@ -359,17 +359,17 @@ Press `\` to open the calendar interface.
 
 | Key | Action |
 |-----|--------|
-| `h`/`←` | Previous day |
-| `l`/`→` | Next day |
-| `k`/`↑` | Previous week |
-| `j`/`↓` | Next week |
+| `←`/`h` | Previous day |
+| `→`/`l` | Next day |
+| `↑`/`k` | Previous week |
+| `↓`/`j` | Next week |
 | `[` | Previous month |
 | `]` | Next month |
 | `Y` | Previous year |
 | `y` | Next year |
 | `t` | Jump to today |
 | `Enter` | Navigate to date |
-| `\`/`Esc`/`Bksp` | Close date interface |
+| `Esc`/`\`/`Bksp` | Close date interface |
 
 
 ### Project Interface
@@ -378,19 +378,19 @@ Press `+` to open the project switcher.
 
 | Key | Action |
 |-----|--------|
-| `k`/`↑` | Previous project |
-| `j`/`↓` | Next project |
+| `↑`/`k` | Previous project |
+| `↓`/`j` | Next project |
 | `Enter` | Open project |
-| `.`/`Esc` | Close project interface |
+| `Esc`/`.` | Close project interface |
 
 
 ### Commands
 
 | Key | Action |
 |-----|--------|
+| `:date ` | Open date interface |
 | `:project ` | Open project interface |
 | `:scratchpad ` | Open scratchpad for quick notes |
-| `:date ` | Open date interface |
 | `:quit ` | Quit application |
 
 

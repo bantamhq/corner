@@ -111,11 +111,35 @@ help_sections = ["daily", "filter"]
 help = "Remove all tags"
 readme = "Remove all trailing tags from the selected entry"
 
+[[action]]
+key_action_id = "quick_filter_tag"
+default_keys = ["0-9"]
+contexts = ["shared_normal"]
+help_sections = ["daily", "filter"]
+help = "Filter favorite tag"
+readme = "Quick filter by favorite tag (configured in config.toml)"
+
+[[action]]
+key_action_id = "append_favorite_tag"
+default_keys = ["S-0-9"]
+contexts = ["shared_normal"]
+help_sections = ["daily", "filter"]
+help = "Append favorite tag"
+readme = "Append favorite tag to the selected entry (configured in config.toml)"
+
+[[action]]
+key_action_id = "cycle_entry_type_normal"
+default_keys = ["S-tab"]
+contexts = ["shared_normal"]
+help_sections = ["daily", "filter"]
+help = "Cycle entry type"
+readme = "Cycle through entry types (task -> note -> event)"
+
 # --- Navigation ---
 
 [[action]]
 key_action_id = "move_down"
-default_keys = ["j", "down"]
+default_keys = ["down", "j"]
 contexts = ["shared_normal"]
 help_sections = ["daily", "filter"]
 help = "Navigate down"
@@ -123,7 +147,7 @@ readme = "Move selection to the next entry"
 
 [[action]]
 key_action_id = "move_up"
-default_keys = ["k", "up"]
+default_keys = ["up", "k"]
 contexts = ["shared_normal"]
 help_sections = ["daily", "filter"]
 help = "Navigate up"
@@ -147,7 +171,7 @@ readme = "Jump to the last entry"
 
 [[action]]
 key_action_id = "prev_day"
-default_keys = ["h", "["]
+default_keys = ["[", "h"]
 contexts = ["daily_normal"]
 help_sections = ["daily"]
 help = "Previous day"
@@ -155,7 +179,7 @@ readme = "Navigate to the previous day"
 
 [[action]]
 key_action_id = "next_day"
-default_keys = ["l", "]"]
+default_keys = ["]", "l"]
 contexts = ["daily_normal"]
 help_sections = ["daily"]
 help = "Next day"
@@ -202,30 +226,6 @@ contexts = ["shared_normal"]
 help_sections = ["daily", "filter"]
 help = "Selection mode"
 readme = "Enter selection mode for multi-entry operations"
-
-[[action]]
-key_action_id = "quick_filter_tag"
-default_keys = ["0-9"]
-contexts = ["shared_normal"]
-help_sections = ["daily", "filter"]
-help = "Filter favorite tag"
-readme = "Quick filter by favorite tag (configured in config.toml)"
-
-[[action]]
-key_action_id = "append_favorite_tag"
-default_keys = ["S-0-9"]
-contexts = ["shared_normal"]
-help_sections = ["daily", "filter"]
-help = "Append favorite tag"
-readme = "Append favorite tag to the selected entry (configured in config.toml)"
-
-[[action]]
-key_action_id = "cycle_entry_type_normal"
-default_keys = ["S-tab"]
-contexts = ["shared_normal"]
-help_sections = ["daily", "filter"]
-help = "Cycle entry type"
-readme = "Cycle through entry types (task → note → event)"
 
 # --- Mode Switching ---
 
@@ -331,15 +331,6 @@ help = "Save and exit"
 readme = "Save the entry and exit edit mode"
 
 [[action]]
-key_action_id = "autocomplete"
-default_keys = ["tab"]
-contexts = ["edit"]
-help_sections = ["edit"]
-footer = { modes = ["edit"], text = "Complete" }
-help = "Autocomplete hint"
-readme = "Accept the current autocomplete hint and continue editing"
-
-[[action]]
 key_action_id = "save_and_new"
 default_keys = ["down"]
 contexts = ["edit"]
@@ -347,6 +338,15 @@ help_sections = ["edit"]
 footer = { modes = ["edit"], text = "Save+new" }
 help = "Save and new"
 readme = "Save the current entry and create a new one"
+
+[[action]]
+key_action_id = "autocomplete"
+default_keys = ["tab"]
+contexts = ["edit"]
+help_sections = ["edit"]
+footer = { modes = ["edit"], text = "Complete" }
+help = "Autocomplete hint"
+readme = "Accept the current autocomplete hint and continue editing"
 
 [[action]]
 key_action_id = "cycle_entry_type"
@@ -372,7 +372,7 @@ readme = "Cancel editing without saving"
 
 [[action]]
 key_action_id = "reorder_move_down"
-default_keys = ["j", "down"]
+default_keys = ["down", "j"]
 contexts = ["reorder"]
 help_sections = ["reorder"]
 footer = { modes = ["reorder"], text = "Move down" }
@@ -381,7 +381,7 @@ readme = "Move the selected entry down in the list"
 
 [[action]]
 key_action_id = "reorder_move_up"
-default_keys = ["k", "up"]
+default_keys = ["up", "k"]
 contexts = ["reorder"]
 help_sections = ["reorder"]
 help = "Move entry up"
@@ -389,7 +389,7 @@ readme = "Move the selected entry up in the list"
 
 [[action]]
 key_action_id = "reorder_save"
-default_keys = ["r", "ret"]
+default_keys = ["ret", "r"]
 contexts = ["reorder"]
 help_sections = ["reorder"]
 footer = { modes = ["reorder"], text = "Save" }
@@ -429,7 +429,7 @@ readme = "Select all entries between last selection and cursor"
 
 [[action]]
 key_action_id = "selection_move_down"
-default_keys = ["j", "down"]
+default_keys = ["down", "j"]
 contexts = ["selection"]
 help_sections = ["selection"]
 help = "Move cursor down"
@@ -437,7 +437,7 @@ readme = "Move cursor down without changing selection"
 
 [[action]]
 key_action_id = "selection_move_up"
-default_keys = ["k", "up"]
+default_keys = ["up", "k"]
 contexts = ["selection"]
 help_sections = ["selection"]
 help = "Move cursor up"
@@ -532,7 +532,7 @@ readme = "Exit selection mode and return to normal mode"
 
 [[action]]
 key_action_id = "help_scroll_down"
-default_keys = ["j", "down"]
+default_keys = ["down", "j"]
 contexts = ["help"]
 help_sections = ["help"]
 help = "Scroll down"
@@ -540,7 +540,7 @@ readme = "Scroll the help content down"
 
 [[action]]
 key_action_id = "help_scroll_up"
-default_keys = ["k", "up"]
+default_keys = ["up", "k"]
 contexts = ["help"]
 help_sections = ["help"]
 help = "Scroll up"
@@ -548,7 +548,7 @@ readme = "Scroll the help content up"
 
 [[action]]
 key_action_id = "close_help"
-default_keys = ["?", "esc"]
+default_keys = ["esc", "?"]
 contexts = ["help"]
 help_sections = ["help"]
 help = "Close help"
@@ -560,7 +560,7 @@ readme = "Close the help overlay"
 
 [[action]]
 key_action_id = "date_interface_move_left"
-default_keys = ["h", "left"]
+default_keys = ["left", "h"]
 contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Previous day"
@@ -568,7 +568,7 @@ readme = "Move selection to the previous day"
 
 [[action]]
 key_action_id = "date_interface_move_right"
-default_keys = ["l", "right"]
+default_keys = ["right", "l"]
 contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Next day"
@@ -576,7 +576,7 @@ readme = "Move selection to the next day"
 
 [[action]]
 key_action_id = "date_interface_move_up"
-default_keys = ["k", "up"]
+default_keys = ["up", "k"]
 contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Previous week"
@@ -584,7 +584,7 @@ readme = "Move selection up one week"
 
 [[action]]
 key_action_id = "date_interface_move_down"
-default_keys = ["j", "down"]
+default_keys = ["down", "j"]
 contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Next week"
@@ -640,7 +640,7 @@ readme = "Navigate to the selected date"
 
 [[action]]
 key_action_id = "date_interface_cancel"
-default_keys = ["\\", "esc", "backspace"]
+default_keys = ["esc", "\\", "backspace"]
 contexts = ["date_interface"]
 help_sections = ["date"]
 help = "Close date interface"
@@ -669,7 +669,7 @@ readme = "Navigate years"
 
 [[action]]
 key_action_id = "project_interface_move_up"
-default_keys = ["k", "up"]
+default_keys = ["up", "k"]
 contexts = ["project_interface"]
 help_sections = ["project"]
 help = "Previous project"
@@ -677,7 +677,7 @@ readme = "Move selection to the previous project"
 
 [[action]]
 key_action_id = "project_interface_move_down"
-default_keys = ["j", "down"]
+default_keys = ["down", "j"]
 contexts = ["project_interface"]
 help_sections = ["project"]
 help = "Next project"
@@ -694,7 +694,7 @@ readme = "Open the selected project journal"
 
 [[action]]
 key_action_id = "project_interface_cancel"
-default_keys = [".", "esc"]
+default_keys = ["esc", "."]
 contexts = ["project_interface"]
 help_sections = ["project"]
 footer = { modes = ["project_interface"], text = "Close" }
