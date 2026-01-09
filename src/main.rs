@@ -126,8 +126,12 @@ fn run_app<B: ratatui::backend::Backend>(
         if app.journal_context.project_path().is_none() && app.config.auto_init_project {
             fs::create_dir_all(&caliber_dir)?;
 
-            let journal_path = caliber_dir.join("journal.md");
+            let journal_path = app.config.get_project_journal_path(&git_root);
             if !journal_path.exists() {
+                // Create parent directories if journal is at custom location
+                if let Some(parent) = journal_path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
                 fs::write(&journal_path, "")?;
             }
 

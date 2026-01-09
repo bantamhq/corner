@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use crate::config::Config;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JournalSlot {
     Hub,
@@ -73,21 +75,23 @@ pub fn find_git_root() -> Option<PathBuf> {
     None
 }
 
+/// Detect project journal path, checking config for custom location.
 #[must_use]
 pub fn detect_project_journal() -> Option<PathBuf> {
-    if let Some(root) = find_git_root() {
-        let project_journal = root.join(".caliber").join("journal.md");
-        if project_journal.exists() {
-            return Some(project_journal);
-        }
+    let root = find_git_root().or_else(|| std::env::current_dir().ok())?;
+    let caliber_dir = root.join(".caliber");
+
+    if !caliber_dir.exists() {
         return None;
     }
 
-    let cwd = std::env::current_dir().ok()?;
-    let project_journal = cwd.join(".caliber").join("journal.md");
-    if project_journal.exists() {
-        return Some(project_journal);
-    }
+    // Load merged config to get journal_file setting
+    let config = Config::load_merged_from(&root).ok()?;
+    let journal_path = config.get_project_journal_path(&root);
 
-    None
+    if journal_path.exists() {
+        Some(journal_path)
+    } else {
+        None
+    }
 }

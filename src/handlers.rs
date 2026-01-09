@@ -6,6 +6,7 @@ use crate::app::{
     App, ConfirmContext, InputMode, InsertPosition, InterfaceContext, PromptContext, SelectedItem,
     ViewMode,
 };
+use crate::config::Config;
 use crate::cursor::CursorBuffer;
 use crate::dispatch::KeySpec;
 use crate::registry::{KeyActionId, KeyContext};
@@ -457,13 +458,24 @@ pub fn handle_confirm_key(app: &mut App, key: KeyCode) -> io::Result<()> {
                     return Ok(());
                 }
 
-                let journal_path = caliber_dir.join("journal.md");
-                if !journal_path.exists()
-                    && let Err(e) = std::fs::write(&journal_path, "")
-                {
-                    app.set_status(format!("Failed to create journal: {e}"));
-                    app.input_mode = InputMode::Normal;
-                    return Ok(());
+                // Load config to get custom journal path if configured
+                let config = Config::load_merged_from(&root).unwrap_or_default();
+                let journal_path = config.get_project_journal_path(&root);
+
+                if !journal_path.exists() {
+                    // Create parent directories if journal is at custom location
+                    if let Some(parent) = journal_path.parent()
+                        && let Err(e) = std::fs::create_dir_all(parent)
+                    {
+                        app.set_status(format!("Failed to create journal directory: {e}"));
+                        app.input_mode = InputMode::Normal;
+                        return Ok(());
+                    }
+                    if let Err(e) = std::fs::write(&journal_path, "") {
+                        app.set_status(format!("Failed to create journal: {e}"));
+                        app.input_mode = InputMode::Normal;
+                        return Ok(());
+                    }
                 }
 
                 let mut registry = storage::ProjectRegistry::load();

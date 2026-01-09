@@ -47,6 +47,8 @@ pub struct Config {
     #[serde(default)]
     pub hub_file: Option<String>,
     #[serde(default)]
+    pub journal_file: Option<String>,
+    #[serde(default)]
     pub scratchpad_file: Option<String>,
     #[serde(default = "default_tidy_order")]
     pub tidy_order: Vec<String>,
@@ -70,6 +72,7 @@ pub struct Config {
 #[derive(Debug, Clone, Deserialize, Default)]
 struct RawConfig {
     pub hub_file: Option<String>,
+    pub journal_file: Option<String>,
     pub scratchpad_file: Option<String>,
     pub tidy_order: Option<Vec<String>>,
     pub favorite_tags: Option<HashMap<String, String>>,
@@ -85,6 +88,7 @@ impl RawConfig {
     fn into_config(self) -> Config {
         Config {
             hub_file: self.hub_file,
+            journal_file: self.journal_file,
             scratchpad_file: self.scratchpad_file,
             tidy_order: self.tidy_order.unwrap_or_else(default_tidy_order),
             favorite_tags: self.favorite_tags.unwrap_or_else(default_favorite_tags),
@@ -99,9 +103,15 @@ impl RawConfig {
         }
     }
 
+    /// Merge project config over base config.
+    /// Some fields are context-specific and don't merge:
+    /// - hub_file: base only (hub-specific)
+    /// - journal_file: overlay only (project-specific)
+    /// - auto_init_project: base only (global setting)
     fn merge_over(self, base: RawConfig) -> RawConfig {
         RawConfig {
             hub_file: base.hub_file,
+            journal_file: self.journal_file,
             scratchpad_file: self.scratchpad_file.or(base.scratchpad_file),
             tidy_order: self.tidy_order.or(base.tidy_order),
             default_filter: self.default_filter.or(base.default_filter),
@@ -239,6 +249,16 @@ impl Config {
             expand_tilde(file)
         } else {
             default_scratchpad_file()
+        }
+    }
+
+    /// Get project journal path, defaulting to .caliber/journal.md if not configured.
+    #[must_use]
+    pub fn get_project_journal_path(&self, project_root: &Path) -> PathBuf {
+        if let Some(ref file) = self.journal_file {
+            expand_tilde(file)
+        } else {
+            project_root.join(".caliber").join("journal.md")
         }
     }
 }

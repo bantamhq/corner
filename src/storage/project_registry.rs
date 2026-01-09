@@ -30,9 +30,16 @@ pub struct ProjectInfo {
 }
 
 impl ProjectInfo {
+    /// Get journal path, checking config for custom location.
     #[must_use]
     pub fn journal_path(&self) -> PathBuf {
-        self.path.join("journal.md")
+        use crate::config::Config;
+
+        if let Ok(config) = Config::load_merged_from(&self.root) {
+            config.get_project_journal_path(&self.root)
+        } else {
+            self.path.join("journal.md")
+        }
     }
 }
 
@@ -197,12 +204,17 @@ fn normalize_to_caliber_dir(path: &Path) -> PathBuf {
 }
 
 fn resolve_project_info(caliber_path: &Path) -> Option<ProjectInfo> {
+    use crate::config::Config;
+
     if caliber_path.file_name()?.to_str()? != ".caliber" {
         return None;
     }
     let root = caliber_path.parent()?;
 
-    let journal_path = caliber_path.join("journal.md");
+    // Check config for custom journal location
+    let journal_path = Config::load_merged_from(root)
+        .map(|c| c.get_project_journal_path(root))
+        .unwrap_or_else(|_| caliber_path.join("journal.md"));
     let available = journal_path.exists();
 
     let (name, id) = derive_identity(root);
