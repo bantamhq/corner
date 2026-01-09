@@ -265,8 +265,8 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | `r` | Reorder mode |
 | `v` | Selection mode |
 | `0-9` | Filter favorite tag |
-| `S-0-9` | Append favorite tag |
-| `Shift+Tab` | Cycle entry type |
+| `Shift+0-9` | Append favorite tag |
+| `Shift+tab` | Cycle entry type |
 | `Tab` | Return to filter |
 | `` ` `` | Toggle Hub/Project journal |
 | `/` | Filter mode |
@@ -295,8 +295,8 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | `G` | Jump to last |
 | `v` | Selection mode |
 | `0-9` | Filter favorite tag |
-| `S-0-9` | Append favorite tag |
-| `Shift+Tab` | Cycle entry type |
+| `Shift+0-9` | Append favorite tag |
+| `Shift+tab` | Cycle entry type |
 | `` ` `` | Toggle Hub/Project journal |
 | `/` | Filter mode |
 | `:` | Command mode |
@@ -315,7 +315,7 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | `Enter` | Save and exit |
 | `Tab` | Autocomplete hint |
 | `↓` | Save and new |
-| `Shift+Tab` | Toggle entry type |
+| `Shift+tab` | Toggle entry type |
 | `Esc` | Cancel |
 
 
@@ -348,8 +348,8 @@ Press `v` for batch operations on multiple entries.
 | `y` | Yank selected |
 | `x` | Remove last tag |
 | `X` | Remove all tags |
-| `S-0-9` | Append favorite tag |
-| `Shift+Tab` | Cycle entry type |
+| `Shift+0-9` | Append favorite tag |
+| `Shift+tab` | Cycle entry type |
 | `Esc` | Exit selection |
 
 

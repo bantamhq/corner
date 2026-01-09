@@ -181,6 +181,25 @@ pub fn truncate_with_tags(text: &str, max_width: usize) -> String {
     }
 }
 
+/// Format a key spec for user-facing display
+#[must_use]
+pub fn format_key_for_display(key: &str) -> String {
+    match key {
+        "down" => "↓".to_string(),
+        "up" => "↑".to_string(),
+        "left" => "←".to_string(),
+        "right" => "→".to_string(),
+        "ret" => "Enter".to_string(),
+        "esc" => "Esc".to_string(),
+        "tab" => "Tab".to_string(),
+        "backtab" => "Shift+Tab".to_string(),
+        "backspace" => "Bksp".to_string(),
+        " " => "Space".to_string(),
+        _ if key.starts_with("S-") => format!("Shift+{}", &key[2..]),
+        _ => key.to_string(),
+    }
+}
+
 pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     if max_width == 0 {
         return vec![text.to_string()];

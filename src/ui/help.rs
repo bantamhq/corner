@@ -8,24 +8,10 @@ use crate::registry::{
     COMMANDS, FILTER_SYNTAX, FilterCategory, HelpSection, KeyAction, KeyContext, help_section_keys,
 };
 
+use super::shared::format_key_for_display;
+
 const KEY_WIDTH: usize = 14;
 const GUTTER_WIDTH: usize = 2;
-
-fn format_key_for_display(key: &str) -> String {
-    match key {
-        "down" => "↓".to_string(),
-        "up" => "↑".to_string(),
-        "left" => "←".to_string(),
-        "right" => "→".to_string(),
-        "ret" => "Enter".to_string(),
-        "esc" => "Esc".to_string(),
-        "tab" => "Tab".to_string(),
-        "backtab" => "S-Tab".to_string(),
-        "backspace" => "Bksp".to_string(),
-        " " => "Space".to_string(),
-        _ => key.to_string(),
-    }
-}
 
 fn help_section_to_context(section: HelpSection) -> Option<KeyContext> {
     match section {

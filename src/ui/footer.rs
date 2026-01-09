@@ -8,6 +8,8 @@ use crate::app::{App, InputMode, InterfaceContext, PromptContext, ViewMode};
 use crate::dispatch::Keymap;
 use crate::registry::{FooterMode, KeyAction, KeyContext, footer_actions};
 
+use super::shared::format_key_for_display;
+
 pub fn render_footer(app: &App) -> RatatuiLine<'static> {
     match (&app.view, &app.input_mode) {
         (_, InputMode::Prompt(PromptContext::Command { buffer })) => RatatuiLine::from(vec![
@@ -97,22 +99,6 @@ fn build_footer_line(
     }
 
     RatatuiLine::from(spans)
-}
-
-fn format_key_for_display(key: &str) -> String {
-    match key {
-        "down" => "↓".to_string(),
-        "up" => "↑".to_string(),
-        "left" => "←".to_string(),
-        "right" => "→".to_string(),
-        "ret" => "Enter".to_string(),
-        "esc" => "Esc".to_string(),
-        "tab" => "Tab".to_string(),
-        "backtab" => "S-Tab".to_string(),
-        "backspace" => "Bksp".to_string(),
-        " " => "Space".to_string(),
-        _ => key.to_string(),
-    }
 }
 
 fn action_spans(action: &KeyAction, keymap: &Keymap, context: KeyContext) -> [Span<'static>; 2] {
