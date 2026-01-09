@@ -255,7 +255,7 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | `X` | Remove all tags |
 | `0-9` | Filter favorite tag |
 | `Shift+0-9` | Append favorite tag |
-| `Shift+tab` | Cycle entry type |
+| `Shift+Tab` | Cycle entry type |
 | `↓`/`j` | Navigate down |
 | `↑`/`k` | Navigate up |
 | `g` | Jump to first |
@@ -291,7 +291,7 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | `X` | Remove all tags |
 | `0-9` | Filter favorite tag |
 | `Shift+0-9` | Append favorite tag |
-| `Shift+tab` | Cycle entry type |
+| `Shift+Tab` | Cycle entry type |
 | `↓`/`j` | Navigate down |
 | `↑`/`k` | Navigate up |
 | `g` | Jump to first |
@@ -315,7 +315,7 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | `Enter` | Save and exit |
 | `↓` | Save and new |
 | `Tab` | Autocomplete hint |
-| `Shift+tab` | Cycle entry type |
+| `Shift+Tab` | Cycle entry type |
 | `Esc` | Cancel |
 
 
@@ -349,7 +349,7 @@ Press `v` for batch operations on multiple entries.
 | `x` | Remove last tag |
 | `X` | Remove all tags |
 | `Shift+0-9` | Append favorite tag |
-| `Shift+tab` | Cycle entry type |
+| `Shift+Tab` | Cycle entry type |
 | `Esc` | Exit selection |
 
 

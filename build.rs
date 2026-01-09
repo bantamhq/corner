@@ -153,6 +153,7 @@ fn format_key_for_display(key: &str) -> String {
         "tab" => "Tab".to_string(),
         "backspace" => "Bksp".to_string(),
         "space" => "Space".to_string(),
+        "S-tab" => "Shift+Tab".to_string(),
         _ if key.starts_with("S-") => format!("Shift+{}", &key[2..]),
         _ => key.to_string(),
     }

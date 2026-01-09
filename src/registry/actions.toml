@@ -260,7 +260,7 @@ default_keys = [":"]
 contexts = ["shared_normal"]
 help_sections = ["daily", "filter"]
 help = "Command mode"
-readme = "Enter command mode for :quit, :open, etc."
+readme = "Enter command mode for :quit, :project, etc."
 
 [[action]]
 key_action_id = "show_help"
