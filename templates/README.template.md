@@ -37,7 +37,7 @@ Requires Rust 1.85+ (edition 2024).
 caliber                  # Open your journal
 ```
 
-Launch Caliber in a git repository and it will prompt you to create a project journal. Otherwise, you'll start in your hub journal.
+Launch Caliber in a git repository and it will auto-init a project journal (configurable). Otherwise, you'll start in your hub journal.
 
 **The basics:**
 
@@ -50,6 +50,8 @@ Launch Caliber in a git repository and it will prompt you to create a project jo
 | `/` | Open filter |
 | `` ` `` | Toggle between project and hub journal |
 | `?` | Help |
+| `.` | Project interface |
+| `,` | Tag interface |
 
 **Entry types:**
 
@@ -81,13 +83,14 @@ Entries from other days that target today appear at the top — one-time `@date`
 | `d` | Delete entry |
 | `c` | Toggle task completion |
 | `z` | Hide / show completed tasks |
-| `s` | Sort entries by type |
+| `T` | Tidy entries by type |
 
 ### Date Interface
 
 ![date interface demo](examples/datepicker.gif)
 
 Press `\` to open a calendar for quick navigation. Days with entries are highlighted. Navigate with `h/j/k/l` or arrow keys, switch months with `[` and `]`, and press `Enter` to jump to the selected date.
+You can also type a date directly in the date interface and press `Enter` to jump. Use `{` and `}` to navigate years.
 
 ## Filtering
 
@@ -125,6 +128,7 @@ Dates in filters default to past (most useful for searching history):
 - Entry type filters combine with OR: `!tasks !notes` shows both tasks and notes
 - Negative filters combine with OR: `not:#work not:#personal` excludes entries with either tag
 - One `@before:` and one `@after:` allowed per query
+- `@on:` cannot be combined with `@before:` or `@after:`
 
 ## Task Management
 
@@ -149,7 +153,7 @@ Press `v` to enter selection mode for batch operations. Select multiple entries,
 
 ### Tags
 
-Add tags anywhere in an entry with `#tagname`. Remove the last tag from an entry with `x`, or all tags with `X`.
+Add tags anywhere in an entry with `#tagname`. Tags must start with a letter and may include letters, digits, `_`, or `-`. Remove the last tag from an entry with `x`, or all tags with `X`.
 
 ### Scheduling
 
@@ -194,6 +198,35 @@ To edit or delete a recurring entry, press `o` to jump to its source.
 ### Undo / Redo
 
 Most actions can be undone with `u` and redone with `U`. Undo history clears when you navigate to a different day, filter, or journal.
+
+## Project Registry
+
+Caliber maintains a project registry at `~/.config/caliber/projects.toml` used by the project interface.
+You can hide a project from the interface via `hide_from_registry = true` in the project config.
+
+## Tag Interface
+
+Press `,` to open a tag list with counts. Select a tag to filter, `d` to delete, or `r` to rename it across the journal.
+
+## Project Interface
+
+Press `.` to open the project list. Select to switch journals, `d` to remove from registry, or `H` to hide.
+
+## Commands
+
+Enter `:` to run a command:
+
+- `:date` — open date interface
+- `:project` — open project interface
+- `:tag` / `:tags` — open tag interface
+- `:scratchpad` — open scratchpad in your editor
+- `:quit` — save and exit
+
+## Configuration
+
+Base config lives at `~/.config/caliber/config.toml`. Hub config can be overlaid via `~/.config/caliber/hub_config.toml`.
+Project config lives at `.caliber/config.toml`.
+Key remapping uses `[keys]` per context/action; defining any key for an action disables its defaults.
 
 ## Favorite Tags
 
