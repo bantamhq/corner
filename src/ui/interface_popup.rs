@@ -15,11 +15,23 @@ pub struct PopupLayout {
     pub popup_area: Rect,
     pub content_area: Rect,
     pub query_area: Rect,
+    pub scroll_indicator_area: Rect,
 }
 
 impl PopupLayout {
+    /// Layout with query input area (for date interface)
     #[must_use]
-    pub fn new(area: Rect) -> Self {
+    pub fn with_query(area: Rect) -> Self {
+        Self::create(area, true)
+    }
+
+    /// Layout without query input area (for tag/project interfaces)
+    #[must_use]
+    pub fn without_query(area: Rect) -> Self {
+        Self::create(area, false)
+    }
+
+    fn create(area: Rect, has_query: bool) -> Self {
         let popup_width = POPUP_WIDTH.min(area.width.saturating_sub(4));
         let popup_height = POPUP_HEIGHT.min(area.height.saturating_sub(4));
 
@@ -32,12 +44,14 @@ impl PopupLayout {
             height: popup_area.height.saturating_sub(2),
         };
 
-        // Add horizontal padding (1 char each side)
+        // Reserve 2 lines if query input (query + legend), 1 for scroll indicator row
+        let reserved_lines = if has_query { 2 } else { 1 };
+
         let content_area = Rect {
             x: inner.x + 1,
             y: inner.y,
             width: inner.width.saturating_sub(2),
-            height: inner.height.saturating_sub(2),
+            height: inner.height.saturating_sub(reserved_lines),
         };
 
         let query_area = Rect {
@@ -47,10 +61,23 @@ impl PopupLayout {
             height: 1,
         };
 
+        // Scroll indicator: above query if has_query, at bottom row otherwise
+        let scroll_indicator_area = Rect {
+            x: inner.x + 1,
+            y: if has_query {
+                query_area.y.saturating_sub(1)
+            } else {
+                query_area.y
+            },
+            width: inner.width.saturating_sub(2),
+            height: 1,
+        };
+
         Self {
             popup_area,
             content_area,
             query_area,
+            scroll_indicator_area,
         }
     }
 
@@ -127,14 +154,8 @@ pub fn render_scroll_indicators(
             (false, true) => "▼",
             (false, false) => "",
         };
-        let indicator_area = Rect {
-            x: layout.query_area.x,
-            y: layout.query_area.y.saturating_sub(1),
-            width: layout.query_area.width,
-            height: 1,
-        };
         let indicator =
             Paragraph::new(Span::styled(arrows, Style::new().dim())).alignment(Alignment::Right);
-        f.render_widget(indicator, indicator_area);
+        f.render_widget(indicator, layout.scroll_indicator_area);
     }
 }

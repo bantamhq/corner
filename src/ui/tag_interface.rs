@@ -8,69 +8,62 @@ use ratatui::{
 
 use crate::app::TagInterfaceState;
 
-use super::interface_popup::{
-    PopupLayout, render_popup_frame, render_query_input, render_scroll_indicators,
-};
+use super::interface_popup::{PopupLayout, render_popup_frame, render_scroll_indicators};
 
 pub fn render_tag_interface(f: &mut Frame, state: &TagInterfaceState, area: Rect) {
-    let layout = PopupLayout::new(area);
+    let layout = PopupLayout::without_query(area);
 
     if layout.is_too_small() {
         return;
     }
 
     render_popup_frame(f, &layout, "Tags");
-    render_query_input(f, &layout, &state.query, state.input_focused);
 
     let visible_height = layout.content_area.height as usize;
-    let total_items = state.filtered_indices.len();
+    let total_items = state.tags.len();
 
-    // Render scroll indicators using the shared function
     render_scroll_indicators(f, &layout, state.scroll_offset, visible_height, total_items);
 
+    let content_width = layout.content_area.width as usize;
+
     let mut lines = Vec::new();
-    for (i, &tag_idx) in state
-        .filtered_indices
+    for (i, tag) in state
+        .tags
         .iter()
         .enumerate()
         .skip(state.scroll_offset)
         .take(visible_height)
     {
-        let tag = &state.tags[tag_idx];
         let is_selected = i == state.selected;
 
-        let indicator = if is_selected { "→" } else { " " };
-        let indicator_style = if is_selected && !state.input_focused {
-            Style::new().fg(Color::Blue)
-        } else if is_selected && state.input_focused {
-            Style::new().fg(Color::Blue).dim()
+        let style = if is_selected {
+            Style::new().fg(Color::Black).bg(Color::Yellow)
         } else {
-            Style::new()
-        };
-
-        let name_style = if is_selected && !state.input_focused {
             Style::new().fg(Color::Yellow)
-        } else {
-            Style::new().fg(Color::Yellow).dim()
         };
 
-        let count_style = Style::new().dim();
+        let count_style = if is_selected {
+            Style::new().fg(Color::Black).bg(Color::Yellow).dim()
+        } else {
+            Style::new().dim()
+        };
+
+        let tag_text = format!(" #{}", tag.name);
+        let count_text = format!("({}) ", tag.count);
+        let text_len = tag_text.len() + count_text.len();
+        let padding = " ".repeat(content_width.saturating_sub(text_len));
 
         let spans = vec![
-            Span::styled(format!("{} ", indicator), indicator_style),
-            Span::styled(format!("#{}", tag.name), name_style),
-            Span::styled(format!(" ({})", tag.count), count_style),
+            Span::styled(tag_text, style),
+            Span::styled(padding, style),
+            Span::styled(count_text, count_style),
         ];
 
         lines.push(Line::from(spans));
     }
 
     if lines.is_empty() {
-        let message = if state.tags.is_empty() {
-            "No tags in journal"
-        } else {
-            "No matching tags"
-        };
+        let message = "No tags in journal";
         lines.push(Line::from(Span::styled(message, Style::new().dim())));
     }
 

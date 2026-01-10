@@ -213,17 +213,14 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
         HelpScrollUp => {
             app.help_scroll = app.help_scroll.saturating_sub(1);
         }
-        ProjectInterfaceMoveUp => app.project_interface_move_up(),
-        ProjectInterfaceMoveDown => app.project_interface_move_down(),
+        ProjectInterfaceMoveUp | TagInterfaceMoveUp => app.interface_move_up(),
+        ProjectInterfaceMoveDown | TagInterfaceMoveDown => app.interface_move_down(),
         ProjectInterfaceSelect => {
             app.project_interface_select()?;
         }
-        TagInterfaceMoveUp => app.interface_move_up(),
-        TagInterfaceMoveDown => app.interface_move_down(),
         TagInterfaceSelect => {
             app.tag_interface_select()?;
         }
-        InterfaceToggleFocus => app.interface_toggle_focus(),
         InterfaceMoveUp => app.interface_move_up(),
         InterfaceMoveDown => app.interface_move_down(),
         InterfaceMoveLeft => app.interface_move_left(),
@@ -234,60 +231,13 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
         InterfaceDelete => app.interface_delete(),
         InterfaceRename => app.interface_rename(),
         InterfaceHide => app.interface_hide(),
-        InterfaceNextMonth => {
-            if matches!(
-                app.input_mode,
-                InputMode::Interface(InterfaceContext::Date(_))
-            ) {
-                app.date_interface_next_month();
-            }
-        }
-        InterfacePrevMonth => {
-            if matches!(
-                app.input_mode,
-                InputMode::Interface(InterfaceContext::Date(_))
-            ) {
-                app.date_interface_prev_month();
-            }
-        }
-        InterfaceNextYear => {
-            if matches!(
-                app.input_mode,
-                InputMode::Interface(InterfaceContext::Date(_))
-            ) {
-                app.date_interface_next_year();
-            }
-        }
-        InterfacePrevYear => {
-            if matches!(
-                app.input_mode,
-                InputMode::Interface(InterfaceContext::Date(_))
-            ) {
-                app.date_interface_prev_year();
-            }
-        }
-        InterfaceToday => {
-            if matches!(
-                app.input_mode,
-                InputMode::Interface(InterfaceContext::Date(_))
-            ) {
-                app.date_interface_goto_today();
-            }
-        }
-        ProjectInterfaceRemove => {
-            if let InputMode::Interface(InterfaceContext::Project(ref mut state)) = app.input_mode
-                && let Some(id) = state.remove_selected()
-            {
-                app.set_status(format!("Removed {id} from registry"));
-            }
-        }
-        ProjectInterfaceHide => {
-            if let InputMode::Interface(InterfaceContext::Project(ref mut state)) = app.input_mode
-                && let Some(id) = state.hide_selected()
-            {
-                app.set_status(format!("Hidden {id} from registry"));
-            }
-        }
+        InterfaceNextMonth => app.date_interface_next_month(),
+        InterfacePrevMonth => app.date_interface_prev_month(),
+        InterfaceNextYear => app.date_interface_next_year(),
+        InterfacePrevYear => app.date_interface_prev_year(),
+        InterfaceToday => app.date_interface_goto_today(),
+        ProjectInterfaceRemove => app.interface_delete(),
+        ProjectInterfaceHide => app.interface_hide(),
         Cancel => match &app.input_mode {
             InputMode::Edit(_) => {
                 app.clear_hints();
@@ -624,126 +574,77 @@ pub fn handle_selection_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
 }
 
 pub fn handle_interface_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
-    if app.interface_input_focused() {
-        handle_interface_input(app, key)
-    } else {
-        handle_interface_list(app, key)
+    match &app.input_mode {
+        InputMode::Interface(InterfaceContext::Date(_)) => handle_date_interface(app, key),
+        InputMode::Interface(InterfaceContext::Project(_)) => handle_project_interface(app, key),
+        InputMode::Interface(InterfaceContext::Tag(_)) => handle_tag_interface(app, key),
+        _ => Ok(()),
     }
 }
 
-fn handle_interface_input(app: &mut App, key: KeyEvent) -> io::Result<()> {
-    if matches!(key.code, KeyCode::Esc) {
-        app.cancel_interface();
-        return Ok(());
-    }
-
-    match &mut app.input_mode {
-        InputMode::Interface(InterfaceContext::Date(state)) => match key.code {
-            KeyCode::Char('\\') => {
+fn handle_date_interface(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    match key.code {
+        KeyCode::Esc | KeyCode::Char('\\') => {
+            app.cancel_interface();
+        }
+        KeyCode::Char(c) if c.is_ascii_digit() || c == '/' => {
+            app.date_interface_input_char(c);
+        }
+        KeyCode::Backspace => {
+            if app.date_interface_input_is_empty() {
                 app.cancel_interface();
+            } else {
+                app.date_interface_input_backspace();
             }
-            KeyCode::Enter => {
-                app.date_interface_submit_input()?;
+        }
+        KeyCode::Delete => {
+            app.date_interface_input_delete();
+        }
+        KeyCode::Enter => {
+            app.interface_submit()?;
+        }
+        _ => {
+            let spec = KeySpec::from_event(&key);
+            if let Some(action) = app.keymap.get(KeyContext::DateInterface, &spec) {
+                dispatch_action(app, action)?;
             }
-            KeyCode::Tab => {
-                app.interface_toggle_focus();
-            }
-            KeyCode::Backspace if state.query.is_empty() => {
-                app.cancel_interface();
-            }
-            KeyCode::Backspace => {
-                state.query.delete_char_before();
-            }
-            KeyCode::Delete => {
-                state.query.delete_char_after();
-            }
-            KeyCode::Left => {
-                state.query.move_left();
-            }
-            KeyCode::Right => {
-                state.query.move_right();
-            }
-            KeyCode::Char(c) if c.is_ascii_digit() || c == '/' => {
-                state.query.insert_char(c);
-            }
-            _ => {}
-        },
-        InputMode::Interface(InterfaceContext::Project(state)) => match key.code {
-            KeyCode::Enter => {
-                app.interface_exit_input();
-            }
-            KeyCode::Tab => {
-                app.interface_toggle_focus();
-            }
-            KeyCode::Backspace if state.query.is_empty() => {
-                app.cancel_interface();
-            }
-            KeyCode::Backspace => {
-                if state.query.delete_char_before() {
-                    state.update_filter();
-                }
-            }
-            KeyCode::Char(c) if c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == ' ' => {
-                state.query.insert_char(c);
-                state.update_filter();
-            }
-            _ => {}
-        },
-        InputMode::Interface(InterfaceContext::Tag(state)) => match key.code {
-            KeyCode::Enter => {
-                app.interface_exit_input();
-            }
-            KeyCode::Tab => {
-                app.interface_toggle_focus();
-            }
-            KeyCode::Backspace if state.query.is_empty() => {
-                app.cancel_interface();
-            }
-            KeyCode::Backspace => {
-                if state.query.delete_char_before() {
-                    state.update_filter();
-                }
-            }
-            KeyCode::Char(c) if c.is_ascii_alphanumeric() || c == '_' || c == '-' => {
-                state.query.insert_char(c);
-                state.update_filter();
-            }
-            _ => {}
-        },
-        _ => {}
+        }
     }
     Ok(())
 }
 
-fn handle_interface_list(app: &mut App, key: KeyEvent) -> io::Result<()> {
+fn handle_project_interface(app: &mut App, key: KeyEvent) -> io::Result<()> {
     match key.code {
-        KeyCode::Esc => {
+        KeyCode::Esc | KeyCode::Char('.') => {
             app.cancel_interface();
-            return Ok(());
-        }
-        KeyCode::Tab => {
-            app.interface_toggle_focus();
-            return Ok(());
         }
         KeyCode::Enter => {
-            app.interface_submit()?;
-            return Ok(());
+            app.project_interface_select()?;
         }
-        _ => {}
+        _ => {
+            let spec = KeySpec::from_event(&key);
+            if let Some(action) = app.keymap.get(KeyContext::ProjectInterface, &spec) {
+                dispatch_action(app, action)?;
+            }
+        }
     }
+    Ok(())
+}
 
-    let spec = KeySpec::from_event(&key);
-
-    let context = match &app.input_mode {
-        InputMode::Interface(InterfaceContext::Date(_)) => KeyContext::DateInterface,
-        InputMode::Interface(InterfaceContext::Project(_)) => KeyContext::ProjectInterface,
-        InputMode::Interface(InterfaceContext::Tag(_)) => KeyContext::TagInterface,
-        _ => return Ok(()),
-    };
-
-    if let Some(action) = app.keymap.get(context, &spec) {
-        dispatch_action(app, action)?;
+fn handle_tag_interface(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    match key.code {
+        KeyCode::Esc | KeyCode::Char(',') => {
+            app.cancel_interface();
+        }
+        KeyCode::Enter => {
+            app.tag_interface_select()?;
+        }
+        _ => {
+            let spec = KeySpec::from_event(&key);
+            if let Some(action) = app.keymap.get(KeyContext::TagInterface, &spec) {
+                dispatch_action(app, action)?;
+            }
+        }
     }
-
     Ok(())
 }

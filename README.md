@@ -366,7 +366,6 @@ Press `\` to open the calendar interface.
 | `↓`/`j` | Move down |
 | `←`/`h` | Move left |
 | `→`/`l` | Move right |
-| `Tab` | Toggle focus |
 | `Enter` | Submit/Select |
 | `[` | Previous month |
 | `]` | Next month |
@@ -384,7 +383,6 @@ Press `+` to open the project switcher.
 |-----|--------|
 | `↑`/`k` | Move up |
 | `↓`/`j` | Move down |
-| `Tab` | Toggle focus |
 | `Enter` | Submit/Select |
 | `d` | Delete/Remove |
 | `H` | Hide project |

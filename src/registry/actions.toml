@@ -559,15 +559,6 @@ help = "Move right"
 readme = "Move right in calendar (date interface only, when calendar focused)"
 
 [[action]]
-key_action_id = "interface_toggle_focus"
-default_keys = ["tab"]
-contexts = ["date_interface", "project_interface", "tag_interface"]
-help_sections = ["date", "project", "tag"]
-footer = { modes = ["date_interface", "project_interface", "tag_interface"], text = "Focus" }
-help = "Toggle focus"
-readme = "Toggle focus between list/calendar and input field"
-
-[[action]]
 key_action_id = "interface_submit"
 default_keys = ["ret"]
 contexts = ["date_interface", "project_interface", "tag_interface"]

@@ -8,9 +8,7 @@ use ratatui::{
 
 use crate::app::ProjectInterfaceState;
 
-use super::interface_popup::{
-    PopupLayout, render_popup_frame, render_query_input, render_scroll_indicators,
-};
+use super::interface_popup::{PopupLayout, render_popup_frame, render_scroll_indicators};
 
 pub fn render_project_interface(
     f: &mut Frame,
@@ -18,64 +16,61 @@ pub fn render_project_interface(
     area: Rect,
     current_project_id: Option<&str>,
 ) {
-    let layout = PopupLayout::new(area);
+    let layout = PopupLayout::without_query(area);
 
     if layout.is_too_small() {
         return;
     }
 
     render_popup_frame(f, &layout, "Projects");
-    render_query_input(f, &layout, &state.query, state.input_focused);
 
     let visible_height = layout.content_area.height as usize;
-    let total_items = state.filtered_indices.len();
+    let total_items = state.projects.len();
 
-    // Render scroll indicators using the shared function
     render_scroll_indicators(f, &layout, state.scroll_offset, visible_height, total_items);
 
+    let content_width = layout.content_area.width as usize;
+
     let mut lines = Vec::new();
-    for (i, &project_idx) in state
-        .filtered_indices
+    for (i, project) in state
+        .projects
         .iter()
         .enumerate()
         .skip(state.scroll_offset)
         .take(visible_height)
     {
-        let project = &state.projects[project_idx];
         let is_selected = i == state.selected;
         let is_current = current_project_id.is_some_and(|id| project.id.eq_ignore_ascii_case(id));
 
-        let (indicator, indicator_style) = match (is_current, is_selected, state.input_focused) {
-            (true, true, false) => ("◆", Style::new().fg(Color::Blue)),
-            (true, true, true) => ("◆", Style::new().fg(Color::Blue).dim()),
-            (true, false, _) => ("◆", Style::new().dim()),
-            (false, true, false) => ("→", Style::new().fg(Color::Blue)),
-            (false, true, true) => ("→", Style::new().fg(Color::Blue).dim()),
-            (false, false, _) => (" ", Style::new()),
+        let current_prefix = if is_current { "◆ " } else { "  " };
+
+        let style = if !project.available {
+            if is_selected {
+                Style::new().dim().reversed()
+            } else {
+                Style::new().dim()
+            }
+        } else if is_selected {
+            Style::new().fg(Color::Black).bg(Color::Yellow)
+        } else {
+            Style::new().fg(Color::Yellow)
         };
 
-        let name_style = if !project.available {
-            Style::new().dim()
-        } else if is_selected && !state.input_focused {
-            Style::new().fg(Color::Yellow)
-        } else {
-            Style::new().fg(Color::Yellow).dim()
-        };
+        // Use 2 for prefix display width (not .len()) since ◆ is multi-byte UTF-8
+        let text_len = 2 + project.name.len();
+        let padding = " ".repeat(content_width.saturating_sub(text_len));
 
         let spans = vec![
-            Span::styled(format!("{} ", indicator), indicator_style),
-            Span::styled(project.name.clone(), name_style),
+            Span::styled(current_prefix, style),
+            Span::styled(project.name.clone(), style),
+            Span::styled(padding, style),
         ];
 
         lines.push(Line::from(spans));
     }
 
     if lines.is_empty() {
-        let message = if state.projects.is_empty() {
-            "No projects registered"
-        } else {
-            "No matching projects"
-        };
+        let message = "No projects registered";
         lines.push(Line::from(Span::styled(message, Style::new().dim())));
     }
 

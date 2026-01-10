@@ -4,7 +4,7 @@ use chrono::{Datelike, Days, Local, Months, NaiveDate};
 
 use crate::storage;
 
-use super::{App, DateInterfaceState, InputMode, InterfaceContext, ViewMode};
+use super::{App, DateInterfaceState, InputMode, InterfaceContext, LastInteraction, ViewMode};
 
 impl App {
     pub fn open_date_interface(&mut self) {
@@ -33,6 +33,8 @@ impl App {
             return;
         };
 
+        state.last_interaction = LastInteraction::Calendar;
+
         let today = Local::now().date_naive();
         let old_month = (state.display_month.year(), state.display_month.month());
         state.selected = today;
@@ -48,6 +50,8 @@ impl App {
         let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
+
+        state.last_interaction = LastInteraction::Calendar;
 
         let days_offset = dx + (dy * 7);
         let new_selected = if days_offset > 0 {
@@ -76,6 +80,7 @@ impl App {
         let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
+        state.last_interaction = LastInteraction::Calendar;
         if let Some(prev) = state.display_month.checked_sub_months(Months::new(1)) {
             state.display_month = prev;
             state.selected = clamp_day_to_month(state.selected, prev);
@@ -87,6 +92,7 @@ impl App {
         let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
+        state.last_interaction = LastInteraction::Calendar;
         if let Some(next) = state.display_month.checked_add_months(Months::new(1)) {
             state.display_month = next;
             state.selected = clamp_day_to_month(state.selected, next);
@@ -98,6 +104,7 @@ impl App {
         let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
+        state.last_interaction = LastInteraction::Calendar;
         let new_year = state.display_month.year() - 1;
         if let Some(new_month) = NaiveDate::from_ymd_opt(new_year, state.display_month.month(), 1) {
             state.display_month = new_month;
@@ -110,19 +117,13 @@ impl App {
         let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
             return;
         };
+        state.last_interaction = LastInteraction::Calendar;
         let new_year = state.display_month.year() + 1;
         if let Some(new_month) = NaiveDate::from_ymd_opt(new_year, state.display_month.month(), 1) {
             state.display_month = new_month;
             state.selected = clamp_day_to_month(state.selected, new_month);
         }
         self.refresh_date_interface_cache();
-    }
-
-    pub fn date_interface_toggle_focus(&mut self) {
-        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
-            return;
-        };
-        state.input_focused = !state.input_focused;
     }
 
     pub fn date_interface_submit_input(&mut self) -> io::Result<()> {
@@ -153,6 +154,7 @@ impl App {
             return;
         };
         state.query.insert_char(c);
+        state.last_interaction = LastInteraction::Typed;
     }
 
     pub fn date_interface_input_backspace(&mut self) {
@@ -160,6 +162,9 @@ impl App {
             return;
         };
         state.query.delete_char_before();
+        if state.query.is_empty() {
+            state.last_interaction = LastInteraction::Calendar;
+        }
     }
 
     pub fn date_interface_input_delete(&mut self) {
@@ -169,32 +174,11 @@ impl App {
         state.query.delete_char_after();
     }
 
-    pub fn date_interface_input_move_left(&mut self) {
-        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
-            return;
-        };
-        state.query.move_left();
-    }
-
-    pub fn date_interface_input_move_right(&mut self) {
-        let InputMode::Interface(InterfaceContext::Date(ref mut state)) = self.input_mode else {
-            return;
-        };
-        state.query.move_right();
-    }
-
-    pub fn date_interface_input_focused(&self) -> bool {
-        let InputMode::Interface(InterfaceContext::Date(ref state)) = self.input_mode else {
-            return false;
-        };
-        state.input_focused
-    }
-
     pub fn date_interface_input_is_empty(&self) -> bool {
         let InputMode::Interface(InterfaceContext::Date(ref state)) = self.input_mode else {
             return true;
         };
-        state.query.content().is_empty()
+        state.query.is_empty()
     }
 
     fn load_month_cache(

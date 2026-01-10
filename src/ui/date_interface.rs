@@ -26,7 +26,7 @@ fn to_time_date(date: NaiveDate) -> Date {
 }
 
 pub fn render_date_interface(f: &mut Frame, state: &DateInterfaceState, area: Rect) {
-    let layout = PopupLayout::new(area);
+    let layout = PopupLayout::with_query(area);
 
     if layout.is_too_small() {
         return;
@@ -34,7 +34,7 @@ pub fn render_date_interface(f: &mut Frame, state: &DateInterfaceState, area: Re
 
     let title = state.display_month.format("%B %Y").to_string();
     render_popup_frame(f, &layout, &title);
-    render_query_input(f, &layout, &state.query, state.input_focused);
+    render_query_input(f, &layout, &state.query, true);
 
     let today = Local::now().date_naive();
     let mut events = CalendarEventStore::default();

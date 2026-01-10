@@ -521,22 +521,22 @@ fn run_app<B: ratatui::backend::Backend>(
                     InterfaceContext::Date(state) => ui::render_date_interface(f, state, size),
                     InterfaceContext::Project(state) => {
                         let visible_height =
-                            (ui::POPUP_HEIGHT.saturating_sub(4) as usize).min(size.height as usize);
+                            (ui::POPUP_HEIGHT.saturating_sub(3) as usize).min(size.height as usize);
                         ensure_selected_visible(
                             &mut state.scroll_offset,
                             state.selected,
-                            state.filtered_indices.len(),
+                            state.projects.len(),
                             visible_height,
                         );
                         ui::render_project_interface(f, state, size, current_project_id.as_deref());
                     }
                     InterfaceContext::Tag(state) => {
                         let visible_height =
-                            (ui::POPUP_HEIGHT.saturating_sub(4) as usize).min(size.height as usize);
+                            (ui::POPUP_HEIGHT.saturating_sub(3) as usize).min(size.height as usize);
                         ensure_selected_visible(
                             &mut state.scroll_offset,
                             state.selected,
-                            state.filtered_indices.len(),
+                            state.tags.len(),
                             visible_height,
                         );
                         ui::render_tag_interface(f, state, size);

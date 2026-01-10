@@ -35,7 +35,6 @@ fn date_interface_closes_with_esc() {
 fn date_interface_closes_with_backspace_on_empty_input() {
     let mut ctx = TestContext::new();
     ctx.press(KeyCode::Char('\\'));
-    ctx.press(KeyCode::Tab);
     ctx.press(KeyCode::Backspace);
 
     assert!(ctx.footer_contains(" DAILY "));
@@ -47,7 +46,6 @@ fn date_interface_backspace_deletes_char_when_input_has_text() {
 
     let mut ctx = TestContext::new();
     ctx.press(KeyCode::Char('\\'));
-    ctx.press(KeyCode::Tab);
     ctx.type_str("1/15");
     ctx.press(KeyCode::Backspace);
 
@@ -58,10 +56,9 @@ fn date_interface_backspace_deletes_char_when_input_has_text() {
 }
 
 #[test]
-fn date_interface_toggle_closes_even_with_input_focus_and_text() {
+fn date_interface_closes_with_backslash_when_has_text() {
     let mut ctx = TestContext::new();
     ctx.press(KeyCode::Char('\\'));
-    ctx.press(KeyCode::Tab);
     ctx.type_str("1/15");
     ctx.press(KeyCode::Char('\\'));
 
@@ -167,19 +164,6 @@ fn tag_interface_select_filters_by_tag() {
 
     assert!(ctx.footer_contains(" FILTER "));
     assert!(ctx.screen_contains("Task two"));
-}
-
-#[test]
-fn tag_interface_backspace_on_empty_closes() {
-    let mut ctx = TestContext::with_journal_content(
-        chrono::NaiveDate::from_ymd_opt(2026, 1, 15).unwrap(),
-        "# 2026/01/15\n- [ ] Task #work\n",
-    );
-    ctx.press(KeyCode::Char(','));
-    ctx.press(KeyCode::Tab);
-    ctx.press(KeyCode::Backspace);
-
-    assert!(ctx.footer_contains(" DAILY "));
 }
 
 #[test]

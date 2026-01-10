@@ -155,6 +155,16 @@ impl SelectionState {
     }
 }
 
+/// Tracks the last interaction type in the date interface for smart submit
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum LastInteraction {
+    /// User typed into the query field
+    Typed,
+    /// User navigated the calendar (default)
+    #[default]
+    Calendar,
+}
+
 /// State for the date interface popup
 #[derive(Clone, Debug)]
 pub struct DateInterfaceState {
@@ -166,8 +176,8 @@ pub struct DateInterfaceState {
     pub day_cache: HashMap<NaiveDate, DayInfo>,
     /// Query input for quick date entry
     pub query: CursorBuffer,
-    /// Whether the input field is focused (vs calendar)
-    pub input_focused: bool,
+    /// Last interaction type for smart submit behavior
+    pub last_interaction: LastInteraction,
 }
 
 impl DateInterfaceState {
@@ -178,19 +188,16 @@ impl DateInterfaceState {
             display_month: NaiveDate::from_ymd_opt(date.year(), date.month(), 1).unwrap(),
             day_cache: HashMap::new(),
             query: CursorBuffer::empty(),
-            input_focused: false,
+            last_interaction: LastInteraction::Calendar,
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct ProjectInterfaceState {
-    pub query: CursorBuffer,
-    pub filtered_indices: Vec<usize>,
     pub selected: usize,
     pub scroll_offset: usize,
     pub projects: Vec<storage::ProjectInfo>,
-    pub input_focused: bool,
 }
 
 impl Default for ProjectInterfaceState {
@@ -203,46 +210,22 @@ impl ProjectInterfaceState {
     #[must_use]
     pub fn new() -> Self {
         let registry = storage::ProjectRegistry::load();
-        let mut projects = registry.projects;
+        let mut projects: Vec<_> = registry
+            .projects
+            .into_iter()
+            .filter(|p| !p.hide_from_registry)
+            .collect();
         projects.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        let mut state = Self {
-            query: CursorBuffer::empty(),
-            filtered_indices: Vec::new(),
+        Self {
             selected: 0,
             scroll_offset: 0,
             projects,
-            input_focused: false,
-        };
-        state.update_filter();
-        state
-    }
-
-    pub fn update_filter(&mut self) {
-        let query = self.query.content().to_lowercase();
-        self.filtered_indices = self
-            .projects
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| {
-                !p.hide_from_registry
-                    && (query.is_empty()
-                        || p.name.to_lowercase().starts_with(&query)
-                        || p.id.to_lowercase().starts_with(&query))
-            })
-            .map(|(i, _)| i)
-            .collect();
-
-        if self.selected >= self.filtered_indices.len() {
-            self.selected = self.filtered_indices.len().saturating_sub(1);
         }
-        self.scroll_offset = 0;
     }
 
     #[must_use]
     pub fn selected_project(&self) -> Option<&storage::ProjectInfo> {
-        self.filtered_indices
-            .get(self.selected)
-            .and_then(|&i| self.projects.get(i))
+        self.projects.get(self.selected)
     }
 
     /// Remove the selected project from the registry and return its ID.
@@ -257,10 +240,10 @@ impl ProjectInterfaceState {
             }
         }
 
-        if let Some(pos) = self.projects.iter().position(|p| p.id == id) {
-            self.projects.remove(pos);
+        self.projects.remove(self.selected);
+        if self.selected >= self.projects.len() && self.selected > 0 {
+            self.selected -= 1;
         }
-        self.update_filter();
 
         Some(id)
     }
@@ -272,10 +255,10 @@ impl ProjectInterfaceState {
         let path = project.path.clone();
 
         if storage::set_hide_from_registry(&path, true).is_ok() {
-            if let Some(p) = self.projects.iter_mut().find(|p| p.id == id) {
-                p.hide_from_registry = true;
+            self.projects.remove(self.selected);
+            if self.selected >= self.projects.len() && self.selected > 0 {
+                self.selected -= 1;
             }
-            self.update_filter();
             return Some(id);
         }
         None
@@ -292,50 +275,24 @@ pub struct TagInfo {
 /// State for the tag interface popup
 #[derive(Clone, Debug)]
 pub struct TagInterfaceState {
-    pub query: CursorBuffer,
-    pub filtered_indices: Vec<usize>,
     pub selected: usize,
     pub scroll_offset: usize,
     pub tags: Vec<TagInfo>,
-    pub input_focused: bool,
 }
 
 impl TagInterfaceState {
     #[must_use]
     pub fn new(tags: Vec<TagInfo>) -> Self {
-        let mut state = Self {
-            query: CursorBuffer::empty(),
-            filtered_indices: Vec::new(),
+        Self {
             selected: 0,
             scroll_offset: 0,
             tags,
-            input_focused: false,
-        };
-        state.update_filter();
-        state
-    }
-
-    pub fn update_filter(&mut self) {
-        let query = self.query.content().to_lowercase();
-        self.filtered_indices = self
-            .tags
-            .iter()
-            .enumerate()
-            .filter(|(_, tag)| query.is_empty() || tag.name.to_lowercase().starts_with(&query))
-            .map(|(i, _)| i)
-            .collect();
-
-        if self.selected >= self.filtered_indices.len() {
-            self.selected = self.filtered_indices.len().saturating_sub(1);
         }
-        self.scroll_offset = 0;
     }
 
     #[must_use]
     pub fn selected_tag(&self) -> Option<&TagInfo> {
-        self.filtered_indices
-            .get(self.selected)
-            .and_then(|&i| self.tags.get(i))
+        self.tags.get(self.selected)
     }
 }
 
@@ -846,22 +803,6 @@ impl App {
     pub fn open_project_interface(&mut self) {
         self.input_mode =
             InputMode::Interface(InterfaceContext::Project(ProjectInterfaceState::new()));
-    }
-
-    pub fn project_interface_move_up(&mut self) {
-        let InputMode::Interface(InterfaceContext::Project(ref mut state)) = self.input_mode else {
-            return;
-        };
-        state.selected = state.selected.saturating_sub(1);
-    }
-
-    pub fn project_interface_move_down(&mut self) {
-        let InputMode::Interface(InterfaceContext::Project(ref mut state)) = self.input_mode else {
-            return;
-        };
-        if state.selected + 1 < state.filtered_indices.len() {
-            state.selected += 1;
-        }
     }
 
     pub fn project_interface_select(&mut self) -> std::io::Result<()> {
