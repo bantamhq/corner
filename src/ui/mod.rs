@@ -7,7 +7,7 @@ mod footer;
 mod help;
 mod helpers;
 mod hints;
-mod interface_popup;
+mod interface_modal;
 mod list_helpers;
 mod model;
 mod overlay;

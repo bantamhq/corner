@@ -10,7 +10,7 @@ use super::theme;
 
 use crate::app::TagInterfaceState;
 
-use super::interface_popup::{
+use super::interface_modal::{
     PopupLayout, build_list_item_line, render_popup_frame, render_scroll_indicators,
 };
 

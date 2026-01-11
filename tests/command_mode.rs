@@ -74,10 +74,10 @@ fn question_mark_toggles_help_overlay() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char('?'));
-    assert!(ctx.app.show_help);
+    assert!(ctx.app.help_visible);
 
     ctx.press(KeyCode::Char('?'));
-    assert!(!ctx.app.show_help);
+    assert!(!ctx.app.help_visible);
 }
 
 #[test]
@@ -85,7 +85,7 @@ fn help_overlay_scrolls_with_j_k() {
     let mut ctx = TestContext::new();
 
     ctx.press(KeyCode::Char('?'));
-    assert!(ctx.app.show_help);
+    assert!(ctx.app.help_visible);
 
     let initial_offset = ctx.app.help_scroll;
     ctx.press(KeyCode::Char('j'));
@@ -95,5 +95,5 @@ fn help_overlay_scrolls_with_j_k() {
     assert_eq!(ctx.app.help_scroll, initial_offset);
 
     ctx.press(KeyCode::Esc);
-    assert!(!ctx.app.show_help);
+    assert!(!ctx.app.help_visible);
 }

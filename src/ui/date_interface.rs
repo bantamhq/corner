@@ -13,7 +13,7 @@ use time::{Date, Month};
 
 use crate::app::DateInterfaceState;
 
-use super::interface_popup::{PopupLayout, render_popup_frame, render_query_input};
+use super::interface_modal::{PopupLayout, render_popup_frame, render_query_input};
 
 const CALENDAR_WIDTH: u16 = 22;
 

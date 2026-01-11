@@ -6,7 +6,7 @@ use super::container::{render_container, render_list};
 use super::context::RenderContext;
 use super::overlay::{
     render_confirm_modal, render_footer_bar, render_help_modal, render_hint_overlay,
-    render_interface_popup, render_journal_indicator, render_status_banner,
+    render_interface_modal, render_journal_indicator, render_status_banner,
 };
 use super::prep::prepare_render;
 use super::scroll::set_edit_cursor;
@@ -53,6 +53,6 @@ pub fn render_app(f: &mut Frame<'_>, app: &mut App) {
     }
 
     if let Some(interface) = view_model.overlays.interface {
-        render_interface_popup(f, interface, context.size);
+        render_interface_modal(f, interface, context.size);
     }
 }

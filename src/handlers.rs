@@ -65,11 +65,11 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
             app.cycle_current_entry_type()?;
         }
         ToggleHelp => {
-            if app.show_help {
-                app.show_help = false;
+            if app.help_visible {
+                app.help_visible = false;
                 app.help_scroll = 0;
             } else {
-                app.show_help = true;
+                app.help_visible = true;
             }
         }
         ToggleFilterPrompt => {
@@ -244,8 +244,8 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
             | InputMode::Interface(InterfaceContext::Project(_))
             | InputMode::Interface(InterfaceContext::Tag(_)) => app.cancel_interface(),
             InputMode::Normal | InputMode::Confirm(_) => {
-                if app.show_help {
-                    app.show_help = false;
+                if app.help_visible {
+                    app.help_visible = false;
                     app.help_scroll = 0;
                 } else if matches!(app.view, ViewMode::Filter(_)) {
                     app.cancel_filter();

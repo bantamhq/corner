@@ -82,7 +82,7 @@ impl TestContext {
     }
 
     fn handle_key_event(&mut self, key: KeyEvent) {
-        if self.app.show_help {
+        if self.app.help_visible {
             handlers::handle_help_key(&mut self.app, key);
         } else {
             match &self.app.input_mode {

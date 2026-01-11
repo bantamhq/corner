@@ -47,7 +47,7 @@ pub fn prepare_render(app: &mut App, layout: &RenderContext) -> RenderPrep {
         }
     }
 
-    if app.show_help {
+    if app.help_visible {
         app.help_visible_height = layout.help_visible_height;
     }
 

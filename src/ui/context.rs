@@ -1,6 +1,6 @@
 use super::footer::centered_rect;
 use super::hints::HINT_OVERLAY_HEIGHT;
-use super::interface_popup::POPUP_HEIGHT;
+use super::interface_modal::POPUP_HEIGHT;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     widgets::{Block, Borders},

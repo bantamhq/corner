@@ -274,7 +274,7 @@ pub fn render_confirm_modal(f: &mut Frame<'_>, model: ConfirmModel<'_>, area: Re
     f.render_widget(paragraph, inner_area);
 }
 
-pub fn render_interface_popup(f: &mut Frame<'_>, model: InterfaceModel<'_>, area: Rect) {
+pub fn render_interface_modal(f: &mut Frame<'_>, model: InterfaceModel<'_>, area: Rect) {
     match model {
         InterfaceModel::Date(state) => render_date_interface(f, state, area),
         InterfaceModel::Project {

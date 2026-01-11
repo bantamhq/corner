@@ -154,7 +154,7 @@ fn run_app<B: ratatui::backend::Backend>(
         {
             app.status_message = None;
 
-            if app.show_help {
+            if app.help_visible {
                 handlers::handle_help_key(&mut app, key);
             } else {
                 match &app.input_mode {

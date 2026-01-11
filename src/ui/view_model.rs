@@ -74,7 +74,7 @@ pub fn build_view_model<'a>(
         hint: HintModel::new(&app.hint_state),
         journal: JournalIndicatorModel::new(app.active_journal(), current_project_id.clone()),
         help: app
-            .show_help
+            .help_visible
             .then(|| HelpModel::new(&app.keymap, app.help_scroll, app.help_visible_height)),
         confirm: match &app.input_mode {
             InputMode::Confirm(confirm_context) => Some(ConfirmModel::new(confirm_context)),
