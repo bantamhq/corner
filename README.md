@@ -1,10 +1,10 @@
-<!-- AUTO-GENERATED FILE. DO NOT EDIT DIRECTLY. Edit /templates/README.template.md instead. -->
+<!-- AUTO-GENERATED FILE. DO NOT EDIT DIRECTLY. Edit /docs/templates/README.template.md instead. -->
 
 # Caliber
 
 A terminal-based task journal for developers. Capture ideas without leaving your workflow, find them when you need them.
 
-![caliber demo](examples/hero.gif)
+![caliber demo](docs/examples/hero.gif)
 
 - **Keyboard-driven** — Vim-style navigation that feels natural in the terminal
 - **Zero-friction capture** — Press enter and start typing, organize later or don't
@@ -68,7 +68,7 @@ That's enough to get started. The sections below go deeper.
 
 ## Daily View
 
-![daily view demo](examples/entry-ops.gif)
+![daily view demo](docs/examples/entry-ops.gif)
 
 Your home base. Each day is a page in your journal. Navigate between days with `h` / `l` or `[` / `]`, or jump to any date with `\` to open the date interface.
 
@@ -89,14 +89,14 @@ Entries from other days that target today appear at the top — one-time `@date`
 
 ### Date Interface
 
-![date interface demo](examples/datepicker.gif)
+![date interface demo](docs/examples/datepicker.gif)
 
 Press `\` to open a calendar for quick navigation. Days with entries are highlighted. Navigate with `h/j/k/l` or arrow keys, switch months with `[` and `]`, and press `Enter` to jump to the selected date.
 You can also type a date directly in the date interface and press `Enter` to jump. Use `{` and `}` to navigate years.
 
 ## Filtering
 
-![filter view demo](examples/filter.gif)
+![filter view demo](docs/examples/filter.gif)
 
 Press `/` to search across your entire journal. Filter by entry type, tags, dates, or text — and combine them.
 
@@ -134,7 +134,7 @@ Dates in filters default to past (most useful for searching history):
 
 ## Task Management
 
-![selection mode demo](examples/selection.gif)
+![selection mode demo](docs/examples/selection.gif)
 
 ### Selection Mode
 
@@ -232,7 +232,7 @@ Key remapping uses `[keys]` per context/action; defining any key for an action d
 
 ## Favorite Tags
 
-![favorite tags demo](examples/favorite-tags.gif)
+![favorite tags demo](docs/examples/favorite-tags.gif)
 
 Slots `1-9` give you quick access to commonly-used tags.
 

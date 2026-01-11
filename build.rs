@@ -795,14 +795,14 @@ fn generate_readme(
     filters: &[FilterDef],
     help_entries: &[HelpEntryDef],
 ) {
-    let template_path = manifest_dir.join("templates/README.template.md");
+    let template_path = manifest_dir.join("docs/templates/README.template.md");
     let readme_path = manifest_dir.join("README.md");
 
     if !template_path.exists() {
         return;
     }
 
-    println!("cargo:rerun-if-changed=templates/README.template.md");
+    println!("cargo:rerun-if-changed=docs/templates/README.template.md");
 
     let template = fs::read_to_string(&template_path).expect("Failed to read README.template.md");
 
@@ -830,7 +830,7 @@ fn generate_readme(
         .replace("<!-- GENERATED:DATE_SYNTAX -->", &date_syntax_table);
 
     let readme = format!(
-        "<!-- AUTO-GENERATED FILE. DO NOT EDIT DIRECTLY. Edit /templates/README.template.md instead. -->\n\n{}",
+        "<!-- AUTO-GENERATED FILE. DO NOT EDIT DIRECTLY. Edit /docs/templates/README.template.md instead. -->\n\n{}",
         readme
     );
 

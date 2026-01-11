@@ -1,4 +1,4 @@
-Output ../selection.gif
+Output ../reorder.gif
 
 Set Padding 16
 Set Width 1600
@@ -7,34 +7,29 @@ Set TypingSpeed 0.2
 Set Theme "DoomOne"
 
 Hide
-Type "cd ../.."
+Type "cd ../../.."
 Enter
 Sleep 0.3s
-Type "cargo run examples/src/example_journal.md"
+Type "cargo run docs/examples/src/example_journal.md"
 Enter
 Sleep 1s
 Show
 
 Sleep 2s
 
-Type "v"
+Type "r"
 Sleep 0.5s
 
-Up@300ms 2
-Sleep 0.3s
-Type "v"
+Up@300ms 3
 Sleep 0.5s
 
-Up 3
-Sleep 0.3s
-Type "V"
-Sleep 1s
-
-Type "c"
+Enter
 Sleep 2s
 
 Hide
-Type "c"
+Type "r"
 Sleep 0.3s
-Escape
+Down@300ms 4
+Sleep 0.3s
+Enter
 Sleep 0.3s

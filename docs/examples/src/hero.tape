@@ -7,10 +7,10 @@ Set TypingSpeed 0.2
 Set Theme "DoomOne"
 
 Hide
-Type "cd ../.."
+Type "cd ../../.."
 Enter
 Sleep 0.3s
-Type "cargo run examples/src/example_journal.md"
+Type "cargo run docs/examples/src/example_journal.md"
 Enter
 Sleep 1s
 Show
