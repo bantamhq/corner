@@ -24,7 +24,7 @@ fn journals_remain_isolated_when_loading() {
     let context = storage::JournalContext::new(global_path, Some(project_path), JournalSlot::Hub);
 
     let config = Config::default();
-    let app = App::new_with_context(config, date, context).unwrap();
+    let app = App::new_with_context(config, date, context, None).unwrap();
 
     let has_global = app.entry_indices.iter().any(|&i| {
         if let Line::Entry(e) = &app.lines[i] {
@@ -60,7 +60,7 @@ fn project_journal_loads_project_entries() {
         storage::JournalContext::new(global_path, Some(project_path), JournalSlot::Project);
 
     let config = Config::default();
-    let app = App::new_with_context(config, date, context).unwrap();
+    let app = App::new_with_context(config, date, context, None).unwrap();
 
     let has_project = app.entry_indices.iter().any(|&i| {
         if let Line::Entry(e) = &app.lines[i] {
@@ -97,7 +97,7 @@ fn backtick_toggles_between_journals() {
     let context = storage::JournalContext::new(global_path, Some(project_path), JournalSlot::Hub);
 
     let config = Config::default();
-    let mut app = App::new_with_context(config, date, context).unwrap();
+    let mut app = App::new_with_context(config, date, context, None).unwrap();
 
     assert_eq!(app.active_journal(), JournalSlot::Hub);
 
@@ -130,7 +130,7 @@ fn backtick_prompts_project_journal_creation() {
     let context = storage::JournalContext::new(global_path.clone(), None, JournalSlot::Hub);
 
     let config = Config::default();
-    let mut app = App::new_with_context(config, date, context).unwrap();
+    let mut app = App::new_with_context(config, date, context, None).unwrap();
 
     let event = KeyEvent::new(KeyCode::Char('`'), KeyModifiers::NONE);
     let _ = caliber::handlers::handle_normal_key(&mut app, event);
@@ -171,7 +171,7 @@ fn project_creation_preserves_existing_journal() {
     let context = storage::JournalContext::new(global_path, None, JournalSlot::Hub);
 
     let config = Config::default();
-    let mut app = App::new_with_context(config, date, context).unwrap();
+    let mut app = App::new_with_context(config, date, context, None).unwrap();
     app.in_git_repo = true;
 
     std::env::set_current_dir(temp_dir.path()).unwrap();

@@ -186,7 +186,15 @@ impl App {
         month: NaiveDate,
     ) -> std::collections::HashMap<NaiveDate, storage::DayInfo> {
         let (start, end) = month_date_range(month.year(), month.month());
-        storage::scan_days_in_range(start, end, self.active_path()).unwrap_or_default()
+        let mut cache = storage::scan_days_in_range(start, end, self.active_path()).unwrap_or_default();
+
+        for date in start.iter_days().take_while(|d| *d <= end) {
+            if !self.calendar_store.events_for_date(date).is_empty() {
+                cache.entry(date).or_default().has_calendar_events = true;
+            }
+        }
+
+        cache
     }
 
     fn refresh_date_interface_cache(&mut self) {

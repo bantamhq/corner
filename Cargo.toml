@@ -16,13 +16,18 @@ doctest = false
 ratatui = { version = "0.29", features = ["widget-calendar"] }
 time = "0.3"
 crossterm = "0.28"
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
 dirs = "6.0"
 toml = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 unicode-width = "0.2"
 regex = "1"
 arboard = "3.6.1"
+ical = "0.11"
+rrule = "0.13"
+reqwest = { version = "0.12", features = ["rustls-tls"], default-features = false }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
 
 [build-dependencies]
 toml = "0.8"

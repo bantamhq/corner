@@ -40,16 +40,18 @@ pub fn render_date_interface(f: &mut Frame, state: &DateInterfaceState, area: Re
     let mut events = CalendarEventStore::default();
 
     // Style for days with content (not dimmed)
-    // Priority: incomplete tasks (yellow) > events (blue) > content (gray)
+    // Priority: incomplete tasks (yellow) > journal events (magenta) > calendar events (blue) > other (gray)
     for (date, info) in &state.day_cache {
         if *date == state.selected || *date == today {
             continue;
         }
-        if info.has_entries {
+        if info.has_entries || info.has_calendar_events {
             let style = if info.has_incomplete_tasks {
                 Style::new().fg(Color::Yellow).not_dim()
             } else if info.has_events {
                 Style::new().fg(Color::Magenta).not_dim()
+            } else if info.has_calendar_events {
+                Style::new().fg(Color::Blue).not_dim()
             } else {
                 Style::new().fg(Color::Gray).not_dim()
             };
@@ -74,6 +76,8 @@ pub fn render_date_interface(f: &mut Frame, state: &DateInterfaceState, area: Re
         Style::new().fg(Color::Yellow).reversed().not_dim()
     } else if selected_info.map(|i| i.has_events).unwrap_or(false) {
         Style::new().fg(Color::Magenta).reversed().not_dim()
+    } else if selected_info.map(|i| i.has_calendar_events).unwrap_or(false) {
+        Style::new().fg(Color::Blue).reversed().not_dim()
     } else {
         Style::new().reversed().not_dim()
     };
@@ -102,9 +106,11 @@ pub fn render_date_interface(f: &mut Frame, state: &DateInterfaceState, area: Re
     let dim = Style::new().dim();
     let legend_line = Line::from(vec![
         Span::styled("● ", Style::new().fg(Color::Yellow)),
-        Span::styled("open tasks  ", dim),
+        Span::styled("tasks  ", dim),
         Span::styled("● ", Style::new().fg(Color::Magenta)),
-        Span::styled("events", dim),
+        Span::styled("events  ", dim),
+        Span::styled("● ", Style::new().fg(Color::Blue)),
+        Span::styled("cal", dim),
     ]);
 
     f.render_widget(Paragraph::new(legend_line), legend_area);

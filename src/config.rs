@@ -9,6 +9,45 @@ use crate::storage::find_git_root;
 
 const VALID_TIDY_TYPES: &[&str] = &["completed", "uncompleted", "notes", "events"];
 
+/// Configuration for a single calendar source.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CalendarConfig {
+    /// ICS URL to fetch calendar data from
+    pub url: String,
+    /// Whether this calendar is enabled (defaults to true)
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Calendar visibility mode for projects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CalendarVisibilityMode {
+    /// Show all enabled calendars by default
+    #[default]
+    All,
+    /// Show no calendars by default (must be explicitly enabled per-project)
+    None,
+}
+
+/// Global calendar visibility settings.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CalendarVisibilityConfig {
+    /// Default visibility mode for projects
+    #[serde(default)]
+    pub default_mode: CalendarVisibilityMode,
+    /// Whether to display cancelled events (with strikethrough)
+    #[serde(default)]
+    pub display_cancelled: bool,
+    /// Whether to display declined events (with strikethrough)
+    #[serde(default)]
+    pub display_declined: bool,
+}
+
 fn default_tidy_order() -> Vec<String> {
     vec![
         "completed".to_string(),
@@ -66,6 +105,12 @@ pub struct Config {
     pub keys: HashMap<String, HashMap<String, String>>,
     #[serde(default = "default_auto_init_project")]
     pub auto_init_project: bool,
+    /// Calendar sources (only loaded from base config for security)
+    #[serde(default)]
+    pub calendars: HashMap<String, CalendarConfig>,
+    /// Calendar visibility settings
+    #[serde(default)]
+    pub calendar_visibility: CalendarVisibilityConfig,
 }
 
 /// Raw config for deserialization - all fields are Option to distinguish "not set" from "set to default"
@@ -82,6 +127,10 @@ struct RawConfig {
     pub hide_completed: Option<bool>,
     pub keys: Option<HashMap<String, HashMap<String, String>>>,
     pub auto_init_project: Option<bool>,
+    /// Calendar sources (base config only for security)
+    pub calendars: Option<HashMap<String, CalendarConfig>>,
+    /// Calendar visibility settings
+    pub calendar_visibility: Option<CalendarVisibilityConfig>,
 }
 
 impl RawConfig {
@@ -102,6 +151,8 @@ impl RawConfig {
             auto_init_project: self
                 .auto_init_project
                 .unwrap_or_else(default_auto_init_project),
+            calendars: self.calendars.unwrap_or_default(),
+            calendar_visibility: self.calendar_visibility.unwrap_or_default(),
         }
     }
 
@@ -110,6 +161,8 @@ impl RawConfig {
     /// - hub_file: base only (hub-specific)
     /// - journal_file: overlay only (project-specific)
     /// - auto_init_project: base only (global setting)
+    /// - calendars: base only (security - URLs shouldn't be in repos)
+    /// - calendar_visibility: base only (global setting)
     fn merge_over(self, base: RawConfig) -> RawConfig {
         RawConfig {
             hub_file: base.hub_file,
@@ -123,6 +176,8 @@ impl RawConfig {
             filters: Some(merge_hashmaps(base.filters, self.filters)),
             keys: Some(merge_keys(base.keys, self.keys)),
             auto_init_project: base.auto_init_project,
+            calendars: base.calendars,
+            calendar_visibility: base.calendar_visibility,
         }
     }
 }
@@ -187,6 +242,28 @@ impl Config {
             .get(&key.to_string())
             .map(String::as_str)
             .filter(|s| !s.is_empty())
+    }
+
+    /// Get all enabled calendar IDs.
+    #[must_use]
+    pub fn enabled_calendar_ids(&self) -> Vec<String> {
+        self.calendars
+            .iter()
+            .filter(|(_, cfg)| cfg.enabled)
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+
+    /// Get a calendar config by ID.
+    #[must_use]
+    pub fn get_calendar(&self, id: &str) -> Option<&CalendarConfig> {
+        self.calendars.get(id)
+    }
+
+    /// Check if any calendars are configured.
+    #[must_use]
+    pub fn has_calendars(&self) -> bool {
+        !self.calendars.is_empty()
     }
 
     /// Load hub config (base + optional hub_config.toml overlay)

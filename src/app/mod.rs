@@ -22,11 +22,17 @@ use std::path::Path;
 
 use chrono::{Datelike, Local, NaiveDate};
 
+use tokio::runtime::Handle;
+use tokio::sync::mpsc;
+
+use crate::calendar::{
+    CalendarFetchResult, CalendarStore, fetch_all_calendars, get_visible_calendar_ids, update_store,
+};
 use crate::config::Config;
 use crate::cursor::CursorBuffer;
 use crate::dispatch::Keymap;
 use crate::storage::{
-    self, DayInfo, Entry, EntryType, JournalContext, JournalSlot, Line, RawEntry,
+    self, DayInfo, Entry, EntryType, JournalContext, JournalSlot, Line, ProjectRegistry, RawEntry,
 };
 
 pub const DAILY_HEADER_LINES: usize = 1;
@@ -413,6 +419,10 @@ pub struct App {
     pub executor: actions::ActionExecutor,
     pub keymap: Keymap,
     original_edit_content: Option<String>,
+    pub calendar_store: CalendarStore,
+    runtime_handle: Option<Handle>,
+    calendar_rx: Option<mpsc::Receiver<CalendarFetchResult>>,
+    calendar_tx: Option<mpsc::Sender<CalendarFetchResult>>,
 }
 
 impl App {
@@ -429,7 +439,7 @@ impl App {
             .unwrap_or_else(crate::config::get_default_journal_path);
         let project_path = storage::detect_project_journal();
         let context = JournalContext::new(hub_path, project_path, JournalSlot::Hub);
-        Self::new_with_context(config, date, context)
+        Self::new_with_context(config, date, context, None)
     }
 
     /// Creates a new App with explicit context (for testing and main)
@@ -437,6 +447,7 @@ impl App {
         config: Config,
         date: NaiveDate,
         journal_context: JournalContext,
+        runtime_handle: Option<Handle>,
     ) -> io::Result<Self> {
         let path = journal_context.active_path().to_path_buf();
         let lines = storage::load_day_lines(date, &path)?;
@@ -451,6 +462,13 @@ impl App {
             eprintln!("Invalid key config: {e}");
             Keymap::default()
         });
+
+        let (calendar_tx, calendar_rx) = if runtime_handle.is_some() {
+            let (tx, rx) = mpsc::channel(1);
+            (Some(tx), Some(rx))
+        } else {
+            (None, None)
+        };
 
         let mut app = Self {
             current_date: date,
@@ -476,11 +494,17 @@ impl App {
             executor: actions::ActionExecutor::new(),
             keymap,
             original_edit_content: None,
+            calendar_store: CalendarStore::new(),
+            runtime_handle,
+            calendar_rx,
+            calendar_tx,
         };
 
         if hide_completed {
             app.clamp_selection_to_visible();
         }
+
+        app.trigger_calendar_fetch();
 
         Ok(app)
     }
@@ -495,6 +519,67 @@ impl App {
     #[must_use]
     pub fn active_journal(&self) -> JournalSlot {
         self.journal_context.active_slot()
+    }
+
+    pub fn trigger_calendar_fetch(&mut self) {
+        let Some(ref handle) = self.runtime_handle else {
+            return;
+        };
+
+        if !self.config.has_calendars() {
+            return;
+        }
+
+        let project = self.get_current_project_info();
+        let visible_ids = get_visible_calendar_ids(
+            &self.config,
+            &self.active_journal(),
+            project.as_ref(),
+        );
+
+        if visible_ids.is_empty() {
+            self.calendar_store.clear();
+            return;
+        }
+
+        self.calendar_store.set_fetching();
+
+        let config = self.config.clone();
+        let Some(tx) = self.calendar_tx.clone() else {
+            return;
+        };
+
+        handle.spawn(async move {
+            let result = fetch_all_calendars(&config, &visible_ids).await;
+            let _ = tx.send(result).await;
+        });
+    }
+
+    pub fn poll_calendar_results(&mut self) {
+        let Some(ref mut rx) = self.calendar_rx else {
+            return;
+        };
+        if let Ok(result) = rx.try_recv() {
+            update_store(&mut self.calendar_store, result);
+        }
+    }
+
+    /// Returns the number of calendar events for the current date.
+    /// Used for scroll offset calculations since calendar events are rendered
+    /// at the top but are not selectable.
+    #[must_use]
+    pub fn calendar_event_count(&self) -> usize {
+        self.calendar_store.events_for_date(self.current_date).len()
+    }
+
+    /// Get ProjectInfo for the current project (if in project journal).
+    fn get_current_project_info(&self) -> Option<storage::ProjectInfo> {
+        if !matches!(self.active_journal(), JournalSlot::Project) {
+            return None;
+        }
+        let path = self.journal_context.project_path()?;
+        let registry = ProjectRegistry::load();
+        registry.find_by_path(path).cloned()
     }
 
     #[must_use]

@@ -107,7 +107,12 @@ fn run_app<B: ratatui::backend::Backend>(
     journal_context: JournalContext,
 ) -> io::Result<()> {
     let date = chrono::Local::now().date_naive();
-    let mut app = App::new_with_context(config, date, journal_context)?;
+
+    let runtime = tokio::runtime::Runtime::new()
+        .map_err(|e| io::Error::other(format!("Failed to create tokio runtime: {e}")))?;
+    let runtime_handle = Some(runtime.handle().clone());
+
+    let mut app = App::new_with_context(config, date, journal_context, runtime_handle)?;
 
     // Project initialization flow for git repositories
     if app.in_git_repo
@@ -203,6 +208,7 @@ fn run_app<B: ratatui::backend::Backend>(
             let filter_visual_line = app.filter_visual_line();
             let filter_total_lines = app.filter_total_lines();
             let visible_entry_count = app.visible_entry_count();
+            let calendar_event_count = app.calendar_event_count();
 
             match &mut app.view {
                 ViewMode::Filter(state) => {
@@ -217,10 +223,11 @@ fn run_app<B: ratatui::backend::Backend>(
                     }
                 }
                 ViewMode::Daily(state) => {
+                    let fixed_lines = DAILY_HEADER_LINES + calendar_event_count;
                     ensure_selected_visible(
                         &mut state.scroll_offset,
-                        state.selected + DAILY_HEADER_LINES,
-                        visible_entry_count + DAILY_HEADER_LINES,
+                        state.selected + fixed_lines,
+                        visible_entry_count + fixed_lines,
                         scroll_height,
                     );
                     if state.selected == 0 {
@@ -302,7 +309,8 @@ fn run_app<B: ratatui::backend::Backend>(
                                 cursor_col,
                                 entry_start_line: app.visible_projected_count()
                                     + app.visible_entries_before(*entry_index)
-                                    + DAILY_HEADER_LINES,
+                                    + DAILY_HEADER_LINES
+                                    + calendar_event_count,
                             }
                         }),
                 };
@@ -544,6 +552,8 @@ fn run_app<B: ratatui::backend::Backend>(
                 }
             }
         })?;
+
+        app.poll_calendar_results();
 
         if event::poll(std::time::Duration::from_millis(16))?
             && let Event::Key(key) = event::read()?

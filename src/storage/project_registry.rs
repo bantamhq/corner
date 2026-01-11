@@ -6,10 +6,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::get_config_dir;
 
-/// Entry in the registry file - stores only the path
+/// Entry in the registry file - stores path and optional calendar visibility
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RegisteredProject {
     pub path: PathBuf,
+    /// Calendar IDs visible in this project (None = use default_mode from config)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendars: Option<Vec<String>>,
 }
 
 /// Registry file format
@@ -27,6 +30,8 @@ pub struct ProjectInfo {
     pub id: String,
     pub available: bool,
     pub hide_from_registry: bool,
+    /// Calendar IDs visible in this project (None = use default_mode from config)
+    pub calendars: Option<Vec<String>>,
 }
 
 impl ProjectInfo {
@@ -59,7 +64,7 @@ impl ProjectRegistry {
 
         for reg in file.project {
             let caliber_path = normalize_to_caliber_dir(&reg.path);
-            if let Some(mut info) = resolve_project_info(&caliber_path) {
+            if let Some(mut info) = resolve_project_info(&caliber_path, reg.calendars) {
                 let base_id = info.id.clone();
                 let mut final_id = base_id.clone();
                 let mut counter = 2;
@@ -79,7 +84,7 @@ impl ProjectRegistry {
         Self { projects }
     }
 
-    /// Save registry to disk (persists paths only)
+    /// Save registry to disk (persists paths and calendar visibility)
     pub fn save(&self) -> io::Result<()> {
         let file = ProjectRegistryFile {
             project: self
@@ -87,6 +92,7 @@ impl ProjectRegistry {
                 .iter()
                 .map(|p| RegisteredProject {
                     path: p.path.clone(),
+                    calendars: p.calendars.clone(),
                 })
                 .collect(),
         };
@@ -111,7 +117,7 @@ impl ProjectRegistry {
             ));
         }
 
-        let Some(mut info) = resolve_project_info(&caliber_path) else {
+        let Some(mut info) = resolve_project_info(&caliber_path, None) else {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
                 "Invalid project path - must be a .caliber/ directory",
@@ -201,7 +207,10 @@ fn normalize_to_caliber_dir(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
 
-fn resolve_project_info(caliber_path: &Path) -> Option<ProjectInfo> {
+fn resolve_project_info(
+    caliber_path: &Path,
+    calendars: Option<Vec<String>>,
+) -> Option<ProjectInfo> {
     use crate::config::Config;
 
     if caliber_path.file_name()?.to_str()? != ".caliber" {
@@ -225,6 +234,7 @@ fn resolve_project_info(caliber_path: &Path) -> Option<ProjectInfo> {
         id,
         available,
         hide_from_registry,
+        calendars,
     })
 }
 
@@ -345,6 +355,7 @@ mod tests {
             id: "myapp".to_string(),
             available: true,
             hide_from_registry: false,
+            calendars: None,
         });
 
         assert!(registry.find_by_id("myapp").is_some());
@@ -363,6 +374,7 @@ mod tests {
             id: "myapp".to_string(),
             available: true,
             hide_from_registry: false,
+            calendars: None,
         });
 
         assert_eq!(registry.generate_unique_id("other"), "other");
@@ -375,6 +387,7 @@ mod tests {
             id: "myapp-2".to_string(),
             available: true,
             hide_from_registry: false,
+            calendars: None,
         });
 
         assert_eq!(registry.generate_unique_id("myapp"), "myapp-3");
@@ -390,6 +403,7 @@ mod tests {
             id: "myapp".to_string(),
             available: true,
             hide_from_registry: false,
+            calendars: None,
         });
 
         assert!(registry.remove("MYAPP"));
@@ -406,6 +420,7 @@ mod tests {
             id: "myapp".to_string(),
             available: true,
             hide_from_registry: false,
+            calendars: None,
         });
 
         assert!(registry.find_by_path(Path::new("/test/.caliber")).is_some());

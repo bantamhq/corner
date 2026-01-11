@@ -1,3 +1,4 @@
+use chrono::Timelike;
 use ratatui::{
     style::{Color, Style, Stylize},
     text::{Line as RatatuiLine, Span},
@@ -5,6 +6,7 @@ use ratatui::{
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, EditContext, InputMode, ViewMode};
+use crate::calendar::CalendarEvent;
 use crate::storage::{EntryType, Line, SourceType};
 
 use super::shared::{
@@ -37,6 +39,15 @@ pub fn render_daily_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> {
             date_header,
             Style::default().fg(Color::Cyan),
         )));
+    }
+
+    let calendar_events = app.calendar_store.events_for_date(app.current_date);
+    let show_calendar_name = app.calendar_store.visible_calendar_count > 1;
+    let calendar_event_count = calendar_events.len();
+
+    for event in calendar_events {
+        let line = render_calendar_event(event, width, show_calendar_name);
+        lines.push(line);
     }
 
     let mut visible_projected_idx = 0;
@@ -141,7 +152,7 @@ pub fn render_daily_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> {
         }
     }
 
-    if visible_projected_idx == 0 && visible_entry_idx == 0 {
+    if calendar_event_count == 0 && visible_projected_idx == 0 && visible_entry_idx == 0 {
         let has_hidden = app.hide_completed && app.hidden_completed_count() > 0;
         let message = if has_hidden {
             "(No visible entries - press z to show completed or Enter to add)"
@@ -157,7 +168,74 @@ pub fn render_daily_view(app: &App, width: usize) -> Vec<RatatuiLine<'static>> {
     lines
 }
 
-/// Determine the indicator character for a projected entry (↪ for Later, ↺ for Recurring)
+fn render_calendar_event(
+    event: &CalendarEvent,
+    width: usize,
+    show_calendar_name: bool,
+) -> RatatuiLine<'static> {
+    let prefix = "* ";
+    let prefix_width = prefix.width();
+    let indicator = "○";
+
+    let content = format_calendar_event(event, show_calendar_name);
+    let available = width.saturating_sub(prefix_width);
+    let display_text = truncate_with_tags(&content, available);
+
+    let content_style = if event.is_cancelled || event.is_declined {
+        Style::default().italic().crossed_out()
+    } else {
+        Style::default().italic()
+    };
+    let rest_of_prefix: String = prefix.chars().skip(1).collect();
+
+    let mut spans = vec![
+        Span::styled(indicator.to_string(), Style::default().fg(Color::Blue)),
+        Span::styled(rest_of_prefix, content_style),
+    ];
+    spans.extend(style_content(&display_text, content_style));
+
+    RatatuiLine::from(spans)
+}
+
+#[must_use]
+fn format_calendar_event(event: &CalendarEvent, show_calendar_name: bool) -> String {
+    let mut parts = vec![event.title.clone()];
+
+    if let Some((day, total)) = event.multi_day_info {
+        parts.push(format!("{day}/{total}"));
+    }
+
+    if !event.is_all_day {
+        let start_hour = event.start.hour();
+        let end_hour = event.end.hour();
+        let same_period = (start_hour < 12) == (end_hour < 12);
+
+        let time_str = if same_period {
+            let start_time = event.start.format("%-I:%M").to_string();
+            let end_time = event.end.format("%-I:%M%P").to_string();
+            format!("{start_time}-{end_time}")
+        } else {
+            let start_time = event.start.format("%-I:%M%P").to_string();
+            let end_time = event.end.format("%-I:%M%P").to_string();
+            format!("{start_time}-{end_time}")
+        };
+        parts.push(time_str);
+    }
+
+    if show_calendar_name {
+        parts.push(format!("({})", event.calendar_name));
+    }
+
+    if parts.len() == 1 {
+        parts.into_iter().next().unwrap()
+    } else if show_calendar_name && parts.len() > 1 {
+        let last = parts.pop().unwrap();
+        format!("{} {last}", parts.join(" - "))
+    } else {
+        parts.join(" - ")
+    }
+}
+
 fn get_projected_entry_indicator(
     app: &App,
     is_cursor: bool,
@@ -174,6 +252,7 @@ fn get_projected_entry_indicator(
         SourceType::Later => "↪",
         SourceType::Recurring => "↺",
         SourceType::Local => unreachable!("projected entries are never Local"),
+        SourceType::Calendar { .. } => "○",
     };
 
     if is_cursor {
@@ -193,7 +272,6 @@ fn get_projected_entry_indicator(
     }
 }
 
-/// Determine the indicator character for a regular entry based on mode and selection state
 fn get_entry_indicator(
     app: &App,
     is_cursor: bool,

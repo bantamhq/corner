@@ -1,4 +1,5 @@
 pub mod app;
+pub mod calendar;
 pub mod config;
 pub mod cursor;
 pub mod dispatch;

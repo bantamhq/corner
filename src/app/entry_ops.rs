@@ -149,6 +149,9 @@ impl App {
                         self.save();
                     }
                     SourceType::Local => unreachable!("projected entries are never Local"),
+                    SourceType::Calendar { .. } => {
+                        unreachable!("calendar entries are never toggled")
+                    }
                 }
                 self.refresh_projected_entries();
             }

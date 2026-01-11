@@ -29,7 +29,7 @@ impl EntryType {
 }
 
 /// Where an entry originates from relative to the viewed day.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SourceType {
     /// Entry belongs to the viewed day, editable
     Local,
@@ -37,6 +37,11 @@ pub enum SourceType {
     Later,
     /// Projected via @every-* pattern, read-only
     Recurring,
+    /// From external calendar (ICS), read-only
+    Calendar {
+        calendar_id: String,
+        calendar_name: String,
+    },
 }
 
 /// Raw entry as parsed from markdown, without location metadata.

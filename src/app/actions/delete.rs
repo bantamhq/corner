@@ -155,7 +155,7 @@ impl Action for RestoreEntries {
                                 content: entry.content.clone(),
                                 source_date: date,
                                 line_index: insert_idx,
-                                source_type: entry.source_type,
+                                source_type: entry.source_type.clone(),
                             };
                             lines.insert(insert_idx, Line::Entry(entry.to_raw()));
 

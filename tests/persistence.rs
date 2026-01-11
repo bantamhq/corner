@@ -19,7 +19,7 @@ fn edits_persist_after_app_reload() {
 
     let context = JournalContext::new(journal_path, None, JournalSlot::Hub);
     let config = Config::default();
-    let app = App::new_with_context(config, date, context).unwrap();
+    let app = App::new_with_context(config, date, context, None).unwrap();
 
     let has_entry = app.entry_indices.iter().any(|&i| {
         if let Line::Entry(e) = &app.lines[i] {
