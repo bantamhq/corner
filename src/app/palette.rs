@@ -80,6 +80,14 @@ impl App {
         self.input_mode = InputMode::CommandPalette(CommandPaletteState::new_with_mode(mode));
     }
 
+    pub fn toggle_command_palette(&mut self) {
+        if matches!(self.input_mode, InputMode::CommandPalette(_)) {
+            self.close_command_palette();
+        } else {
+            self.open_command_palette();
+        }
+    }
+
     pub fn close_command_palette(&mut self) {
         self.input_mode = InputMode::Normal;
     }

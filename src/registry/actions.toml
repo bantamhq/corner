@@ -156,7 +156,7 @@ contexts = ["shared_normal"]
 [[action]]
 key_action_id = "command_palette"
 default_keys = ["q"]
-contexts = ["shared_normal"]
+contexts = ["shared_normal", "command_palette"]
 
 [[action]]
 key_action_id = "filter_quick_add"

@@ -201,7 +201,7 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
             app.toggle_journal()?;
         }
         CommandPalette => {
-            app.open_command_palette();
+            app.toggle_command_palette();
         }
         ToggleCalendarSidebar => {
             if app.is_daily_view() {
@@ -306,6 +306,7 @@ pub fn handle_command_palette_key(app: &mut App, key: KeyEvent) -> io::Result<()
     if let Some(action) = app.keymap.get(KeyContext::CommandPalette, &spec) {
         match action {
             KeyActionId::Cancel => app.close_command_palette(),
+            KeyActionId::CommandPalette => app.toggle_command_palette(),
             KeyActionId::MoveUp => app.command_palette_select_prev(),
             KeyActionId::MoveDown => app.command_palette_select_next(),
             KeyActionId::MoveLeft => app.command_palette_prev_tab(),
