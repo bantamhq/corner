@@ -96,7 +96,7 @@ contexts = ["shared_normal", "selection"]
 [[action]]
 key_action_id = "delete"
 default_keys = ["d"]
-contexts = ["shared_normal", "selection"]
+contexts = ["shared_normal", "selection", "command_palette"]
 
 [[action]]
 key_action_id = "yank"
@@ -186,7 +186,7 @@ contexts = ["daily_normal"]
 [[action]]
 key_action_id = "hide"
 default_keys = ["z"]
-contexts = ["daily_normal"]
+contexts = ["daily_normal", "command_palette"]
 
 [[action]]
 key_action_id = "autocomplete"

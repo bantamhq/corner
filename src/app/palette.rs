@@ -1,8 +1,9 @@
 use std::io;
 
-use crate::registry::{COMMANDS, Command};
+use crate::registry::COMMANDS;
+use crate::storage::{ProjectInfo, ProjectRegistry, set_hide_from_registry};
 
-use super::{App, CommandPaletteMode, CommandPaletteState, InputMode};
+use super::{App, CommandPaletteMode, CommandPaletteState, ConfirmContext, InputMode};
 
 impl Default for CommandPaletteState {
     fn default() -> Self {
@@ -19,14 +20,6 @@ impl CommandPaletteState {
     #[must_use]
     pub fn new_with_mode(mode: CommandPaletteMode) -> Self {
         Self { mode, selected: 0 }
-    }
-
-    #[must_use]
-    pub fn filtered_commands(&self) -> Vec<&'static Command> {
-        if self.mode != CommandPaletteMode::Commands {
-            return Vec::new();
-        }
-        COMMANDS.iter().collect()
     }
 
     pub fn reset_selection(&mut self) {
@@ -64,11 +57,14 @@ impl CommandPaletteState {
             self.selected -= 1;
         }
     }
+}
 
-    pub fn selected_command(&self) -> Option<&'static Command> {
-        let commands = self.filtered_commands();
-        commands.get(self.selected).copied()
-    }
+fn visible_projects() -> Vec<ProjectInfo> {
+    ProjectRegistry::load()
+        .projects
+        .into_iter()
+        .filter(|p| !p.hide_from_registry)
+        .collect()
 }
 
 impl App {
@@ -77,6 +73,7 @@ impl App {
     }
 
     pub fn open_palette(&mut self, mode: super::CommandPaletteMode) {
+        self.refresh_tag_cache();
         self.input_mode = InputMode::CommandPalette(CommandPaletteState::new_with_mode(mode));
     }
 
@@ -105,9 +102,21 @@ impl App {
     }
 
     pub fn command_palette_select_next(&mut self) {
+        let mode = match &self.input_mode {
+            InputMode::CommandPalette(state) => state.mode,
+            _ => return,
+        };
+        let count = self.palette_item_count(mode);
         if let InputMode::CommandPalette(state) = &mut self.input_mode {
-            let count = state.filtered_commands().len();
             state.select_next(count);
+        }
+    }
+
+    fn palette_item_count(&self, mode: CommandPaletteMode) -> usize {
+        match mode {
+            CommandPaletteMode::Commands => COMMANDS.len(),
+            CommandPaletteMode::Projects => visible_projects().len(),
+            CommandPaletteMode::Tags => self.cached_journal_tags.len(),
         }
     }
 
@@ -117,14 +126,110 @@ impl App {
         }
     }
 
-    pub fn execute_selected_command(&mut self) -> io::Result<()> {
-        let command = match &self.input_mode {
-            InputMode::CommandPalette(state) => state.selected_command(),
-            _ => None,
+    pub fn execute_selected_palette_item(&mut self) -> io::Result<()> {
+        let (mode, selected) = match &self.input_mode {
+            InputMode::CommandPalette(state) => (state.mode, state.selected),
+            _ => return Ok(()),
         };
-        if let Some(command) = command {
-            self.execute_command(command)?;
+
+        match mode {
+            CommandPaletteMode::Commands => {
+                if let Some(command) = COMMANDS.get(selected) {
+                    self.execute_command(command)?;
+                }
+            }
+            CommandPaletteMode::Projects => {
+                self.execute_selected_project(selected)?;
+            }
+            CommandPaletteMode::Tags => {
+                self.execute_selected_tag(selected)?;
+            }
         }
+        Ok(())
+    }
+
+    fn execute_selected_project(&mut self, index: usize) -> io::Result<()> {
+        let projects = visible_projects();
+        if let Some(project) = projects.get(index) {
+            let journal_path = project.journal_path();
+            self.open_journal(&journal_path.to_string_lossy())?;
+        }
+        Ok(())
+    }
+
+    fn execute_selected_tag(&mut self, index: usize) -> io::Result<()> {
+        if let Some(tag) = self.cached_journal_tags.get(index) {
+            let query = format!("#{}", tag.name);
+            self.quick_filter(&query)?;
+        }
+        Ok(())
+    }
+
+    pub fn palette_delete_selected(&mut self) -> io::Result<()> {
+        let (mode, selected) = match &self.input_mode {
+            InputMode::CommandPalette(state) => (state.mode, state.selected),
+            _ => return Ok(()),
+        };
+
+        match mode {
+            CommandPaletteMode::Commands => {
+                // Commands cannot be deleted
+            }
+            CommandPaletteMode::Projects => {
+                self.palette_delete_project(selected)?;
+            }
+            CommandPaletteMode::Tags => {
+                self.palette_delete_tag(selected);
+            }
+        }
+        Ok(())
+    }
+
+    fn palette_delete_project(&mut self, index: usize) -> io::Result<()> {
+        let projects = visible_projects();
+        let Some(project) = projects.get(index) else {
+            return Ok(());
+        };
+
+        let mut registry = ProjectRegistry::load();
+        registry.remove(&project.id);
+        registry.save()?;
+        self.set_status(format!("Removed '{}' from registry", project.name));
+        self.close_command_palette();
+        Ok(())
+    }
+
+    fn palette_delete_tag(&mut self, index: usize) {
+        if let Some(tag) = self.cached_journal_tags.get(index) {
+            let tag_name = tag.name.clone();
+            self.close_command_palette();
+            self.input_mode = InputMode::Confirm(ConfirmContext::DeleteTag(tag_name));
+        }
+    }
+
+    pub fn palette_hide_selected(&mut self) -> io::Result<()> {
+        let (mode, selected) = match &self.input_mode {
+            InputMode::CommandPalette(state) => (state.mode, state.selected),
+            _ => return Ok(()),
+        };
+
+        if mode != CommandPaletteMode::Projects {
+            return Ok(());
+        }
+
+        let projects = visible_projects();
+        let Some(project) = projects.get(selected) else {
+            return Ok(());
+        };
+
+        if !project.available {
+            self.set_status("Cannot hide unavailable projects");
+            return Ok(());
+        }
+
+        set_hide_from_registry(&project.path, true)?;
+        self.set_status(format!("Hidden '{}' from palette", project.name));
+        self.close_command_palette();
         Ok(())
     }
 }

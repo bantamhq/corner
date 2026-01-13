@@ -312,8 +312,14 @@ pub fn handle_command_palette_key(app: &mut App, key: KeyEvent) -> io::Result<()
             KeyActionId::MoveLeft => app.command_palette_prev_tab(),
             KeyActionId::MoveRight => app.command_palette_next_tab(),
             KeyActionId::Submit => {
-                app.execute_selected_command()?;
+                app.execute_selected_palette_item()?;
                 app.close_command_palette();
+            }
+            KeyActionId::Delete => {
+                app.palette_delete_selected()?;
+            }
+            KeyActionId::Hide => {
+                app.palette_hide_selected()?;
             }
             _ => {}
         }

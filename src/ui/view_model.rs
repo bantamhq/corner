@@ -70,7 +70,10 @@ pub fn build_view_model(app: &App, context: &RenderContext, prep: RenderPrep) ->
             _ => None,
         },
         command_palette: match &app.input_mode {
-            InputMode::CommandPalette(state) => Some(CommandPaletteModel::new(state)),
+            InputMode::CommandPalette(state) => Some(CommandPaletteModel::new(
+                state,
+                &app.cached_journal_tags,
+            )),
             _ => None,
         },
     };

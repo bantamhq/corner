@@ -7,8 +7,9 @@ use ratatui::{
 };
 use unicode_width::UnicodeWidthStr;
 
-use crate::app::{CommandPaletteMode, CommandPaletteState, ConfirmContext};
+use crate::app::{CommandPaletteMode, CommandPaletteState, ConfirmContext, TagInfo};
 use crate::registry::{COMMANDS, Command, KeyActionId, KeyContext, get_keys_for_action};
+use crate::storage::ProjectRegistry;
 
 use super::footer::{centered_rect, centered_rect_max};
 use super::scroll_indicator::{ScrollIndicatorStyle, scroll_indicator_text};
@@ -30,6 +31,19 @@ pub struct ConfirmModel {
 pub struct CommandPaletteModel {
     pub mode: CommandPaletteMode,
     pub selected: usize,
+    pub projects: Vec<PaletteProject>,
+    pub tags: Vec<PaletteTag>,
+}
+
+pub struct PaletteProject {
+    pub name: String,
+    pub path: String,
+    pub available: bool,
+}
+
+pub struct PaletteTag {
+    pub name: String,
+    pub count: usize,
 }
 
 impl ConfirmModel {
@@ -41,10 +55,32 @@ impl ConfirmModel {
 
 impl CommandPaletteModel {
     #[must_use]
-    pub fn new(state: &CommandPaletteState) -> Self {
+    pub fn new(state: &CommandPaletteState, tags: &[TagInfo]) -> Self {
+        let registry = ProjectRegistry::load();
+        let projects = registry
+            .projects
+            .iter()
+            .filter(|p| !p.hide_from_registry)
+            .map(|p| PaletteProject {
+                name: p.name.clone(),
+                path: p.root.display().to_string(),
+                available: p.available,
+            })
+            .collect();
+
+        let tags = tags
+            .iter()
+            .map(|t| PaletteTag {
+                name: t.name.clone(),
+                count: t.count,
+            })
+            .collect();
+
         Self {
             mode: state.mode,
             selected: state.selected,
+            projects,
+            tags,
         }
     }
 }
@@ -119,8 +155,8 @@ fn filtered_commands(mode: CommandPaletteMode) -> Vec<&'static Command> {
 fn empty_message(mode: CommandPaletteMode) -> &'static str {
     match mode {
         CommandPaletteMode::Commands => "No commands available",
-        CommandPaletteMode::Projects => "Projects not available yet",
-        CommandPaletteMode::Tags => "Tags not available yet",
+        CommandPaletteMode::Projects => "No projects registered",
+        CommandPaletteMode::Tags => "No tags found",
     }
 }
 
@@ -130,6 +166,33 @@ fn tab_index(mode: CommandPaletteMode) -> usize {
         CommandPaletteMode::Projects => 1,
         CommandPaletteMode::Tags => 2,
     }
+}
+
+fn item_styles(is_selected: bool, is_available: bool) -> (Style, Style) {
+    let base_modifier = if is_available {
+        Modifier::empty()
+    } else {
+        Modifier::DIM
+    };
+
+    let name_style = if is_selected {
+        Style::default()
+            .add_modifier(Modifier::REVERSED | Modifier::BOLD | base_modifier)
+    } else {
+        Style::default()
+            .fg(theme::PALETTE_COMMAND)
+            .add_modifier(Modifier::BOLD | base_modifier)
+    };
+
+    let desc_style = if is_selected {
+        Style::default().add_modifier(Modifier::REVERSED | Modifier::DIM | base_modifier)
+    } else {
+        Style::default()
+            .fg(theme::PALETTE_COMMAND)
+            .add_modifier(Modifier::DIM | base_modifier)
+    };
+
+    (name_style, desc_style)
 }
 
 fn padded_line(text: &str, width: usize, padding: usize) -> String {
@@ -287,7 +350,6 @@ pub fn render_command_palette(f: &mut Frame<'_>, model: CommandPaletteModel, are
     let rule_line = RatatuiLine::from(rule_spans);
     f.render_widget(Paragraph::new(rule_line), tabs_layout[1]);
 
-    let commands = filtered_commands(model.mode);
     let list_width = list_area.width as usize;
     if list_width == 0 {
         return;
@@ -295,50 +357,88 @@ pub fn render_command_palette(f: &mut Frame<'_>, model: CommandPaletteModel, are
     let padding = 1usize;
     let mut lines = Vec::new();
     let mut selected_line = None;
-    let mut current_group = "";
 
-    for (index, command) in commands.iter().enumerate() {
-        if command.group != current_group {
-            if !lines.is_empty() {
-                lines.push(RatatuiLine::raw(""));
+    match model.mode {
+        CommandPaletteMode::Commands => {
+            let commands = filtered_commands(model.mode);
+            let mut current_group = "";
+
+            for (index, command) in commands.iter().enumerate() {
+                if command.group != current_group {
+                    if !lines.is_empty() {
+                        lines.push(RatatuiLine::raw(""));
+                    }
+                    current_group = command.group;
+                    let group_line = padded_line(command.group, list_width, padding);
+                    lines.push(RatatuiLine::from(Span::styled(
+                        group_line,
+                        Style::default()
+                            .fg(theme::PALETTE_GROUP)
+                            .bg(theme::PALETTE_BG)
+                            .add_modifier(Modifier::BOLD),
+                    )));
+                }
+
+                let is_selected = index == model.selected;
+                let (name_style, desc_style) = item_styles(is_selected, true);
+
+                if is_selected {
+                    selected_line = Some(lines.len());
+                }
+
+                let name_line = padded_line(&title_case(command.name), list_width, padding);
+                lines.push(RatatuiLine::from(Span::styled(name_line, name_style)));
+                let desc_line = padded_line(command.help, list_width, padding);
+                lines.push(RatatuiLine::from(Span::styled(desc_line, desc_style)));
             }
-            current_group = command.group;
-            let group_line = padded_line(command.group, list_width, padding);
-            lines.push(RatatuiLine::from(Span::styled(
-                group_line,
-                Style::default()
-                    .fg(theme::PALETTE_GROUP)
-                    .bg(theme::PALETTE_BG)
-                    .add_modifier(Modifier::BOLD),
-            )));
         }
+        CommandPaletteMode::Projects => {
+            for (index, project) in model.projects.iter().enumerate() {
+                let is_selected = index == model.selected;
+                let (name_style, desc_style) = item_styles(is_selected, project.available);
 
-        let is_selected = index == model.selected;
-        let selection_style = if is_selected {
-            Style::default().add_modifier(Modifier::REVERSED)
-        } else {
-            Style::default().fg(theme::PALETTE_COMMAND)
-        };
-        let desc_style = if is_selected {
-            Style::default().add_modifier(Modifier::REVERSED | Modifier::DIM)
-        } else {
-            Style::default()
-                .fg(theme::PALETTE_COMMAND)
-                .add_modifier(Modifier::DIM)
-        };
+                if is_selected {
+                    selected_line = Some(lines.len());
+                }
 
-        let name_line_index = lines.len();
-        if is_selected {
-            selected_line = Some(name_line_index);
+                let name_line = padded_line(&project.name, list_width, padding);
+                lines.push(RatatuiLine::from(Span::styled(name_line, name_style)));
+                let desc_line = padded_line(&project.path, list_width, padding);
+                lines.push(RatatuiLine::from(Span::styled(desc_line, desc_style)));
+            }
         }
+        CommandPaletteMode::Tags => {
+            for (index, tag) in model.tags.iter().enumerate() {
+                let is_selected = index == model.selected;
+                let (name_style, count_style) = item_styles(is_selected, true);
 
-        let name_line = padded_line(&title_case(command.name), list_width, padding);
-        lines.push(RatatuiLine::from(Span::styled(
-            name_line,
-            selection_style.add_modifier(Modifier::BOLD),
-        )));
-        let desc_line = padded_line(command.help, list_width, padding);
-        lines.push(RatatuiLine::from(Span::styled(desc_line, desc_style)));
+                if is_selected {
+                    selected_line = Some(lines.len());
+                }
+
+                let tag_name = format!("#{}", tag.name);
+                let count_str = format!("({})", tag.count);
+                let available = list_width.saturating_sub(padding * 2);
+                let name_width = tag_name.len();
+                let count_width = count_str.len();
+                let gap = available.saturating_sub(name_width + count_width);
+
+                lines.push(RatatuiLine::from(vec![
+                    Span::styled(
+                        format!("{}{}", " ".repeat(padding), tag_name),
+                        name_style,
+                    ),
+                    Span::styled(
+                        " ".repeat(gap),
+                        if is_selected { Style::default().add_modifier(Modifier::REVERSED) } else { Style::default() },
+                    ),
+                    Span::styled(
+                        format!("{}{}", count_str, " ".repeat(padding)),
+                        count_style.remove_modifier(Modifier::BOLD),
+                    ),
+                ]));
+            }
+        }
     }
 
     if lines.is_empty() {
@@ -379,19 +479,13 @@ pub fn render_command_palette(f: &mut Frame<'_>, model: CommandPaletteModel, are
     let list = Paragraph::new(visible_lines);
     f.render_widget(list, list_area);
 
-    let footer_content = match model.mode {
-        CommandPaletteMode::Commands => {
-            let can_scroll_up = offset > 0;
-            let can_scroll_down = offset + visible_height < total_lines;
-            scroll_indicator_text(
-                can_scroll_up,
-                can_scroll_down,
-                ScrollIndicatorStyle::Labeled,
-            )
-        }
-        CommandPaletteMode::Projects => Some("Project management coming soon".to_string()),
-        CommandPaletteMode::Tags => Some("Tag management coming soon".to_string()),
-    };
+    let can_scroll_up = offset > 0;
+    let can_scroll_down = offset + visible_height < total_lines;
+    let footer_content = scroll_indicator_text(
+        can_scroll_up,
+        can_scroll_down,
+        ScrollIndicatorStyle::Labeled,
+    );
 
     if let Some(content) = footer_content {
         let footer = Paragraph::new(RatatuiLine::from(Span::styled(
