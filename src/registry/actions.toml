@@ -1,32 +1,32 @@
 [[action]]
 key_action_id = "submit"
 default_keys = ["ret"]
-contexts = ["daily_normal", "filter_normal", "edit", "reorder"]
+contexts = ["daily_normal", "filter_normal", "edit", "reorder", "command_palette"]
 
 [[action]]
 key_action_id = "cancel"
 default_keys = ["esc"]
-contexts = ["shared_normal", "edit", "reorder", "selection"]
+contexts = ["shared_normal", "edit", "reorder", "selection", "command_palette"]
 
 [[action]]
 key_action_id = "move_down"
 default_keys = ["down", "j"]
-contexts = ["shared_normal", "reorder", "selection"]
+contexts = ["shared_normal", "reorder", "selection", "command_palette"]
 
 [[action]]
 key_action_id = "move_up"
 default_keys = ["up", "k"]
-contexts = ["shared_normal", "reorder", "selection"]
+contexts = ["shared_normal", "reorder", "selection", "command_palette"]
 
 [[action]]
 key_action_id = "move_left"
 default_keys = ["left", "h"]
-contexts = ["daily_normal"]
+contexts = ["daily_normal", "command_palette"]
 
 [[action]]
 key_action_id = "move_right"
 default_keys = ["right", "l"]
-contexts = ["daily_normal"]
+contexts = ["daily_normal", "command_palette"]
 
 [[action]]
 key_action_id = "jump_to_first"
@@ -151,6 +151,11 @@ contexts = ["daily_normal", "filter_normal"]
 [[action]]
 key_action_id = "toggle_journal"
 default_keys = ["`"]
+contexts = ["shared_normal"]
+
+[[action]]
+key_action_id = "command_palette"
+default_keys = ["q"]
 contexts = ["shared_normal"]
 
 [[action]]

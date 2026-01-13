@@ -160,6 +160,9 @@ fn run_app<B: ratatui::backend::Backend>(
                 InputMode::Reorder => handlers::handle_reorder_key(&mut app, key),
                 InputMode::Confirm(_) => handlers::handle_confirm_key(&mut app, key.code)?,
                 InputMode::Selection(_) => handlers::handle_selection_key(&mut app, key)?,
+                InputMode::CommandPalette(_) => {
+                    handlers::handle_command_palette_key(&mut app, key)?;
+                }
             }
         }
 

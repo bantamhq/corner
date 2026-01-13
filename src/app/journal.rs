@@ -16,7 +16,7 @@ impl App {
         Ok(())
     }
 
-    fn apply_config(&mut self, config: Config) {
+    pub(crate) fn apply_config(&mut self, config: Config) {
         self.keymap = Keymap::new(&config.keys).unwrap_or_default();
         self.hide_completed = config.hide_completed;
         self.config = config;

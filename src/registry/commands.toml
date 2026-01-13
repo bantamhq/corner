@@ -2,21 +2,36 @@
 # Each entry defines a command with its subargs and help text variants
 
 [[command]]
-name = "date"
-help = "Open date interface"
-
-[[command]]
-name = "project"
-help = "Open project interface"
-
-[[command]]
-name = "tag"
-help = "Open tag interface"
+name = "quit"
+group = "General"
+help = "Quit application"
 
 [[command]]
 name = "scratchpad"
+group = "General"
 help = "Open scratchpad for quick notes"
 
 [[command]]
-name = "quit"
-help = "Quit application"
+name = "open-config"
+group = "Configuration"
+help = "Open base config in default editor (creates if missing)"
+
+[[command]]
+name = "open-hub-config"
+group = "Configuration"
+help = "Open hub config in default editor (creates if missing)"
+
+[[command]]
+name = "open-project-config"
+group = "Configuration"
+help = "Open project config in default editor (creates if missing)"
+
+[[command]]
+name = "reload-config"
+group = "Configuration"
+help = "Reload configuration from disk"
+
+[[command]]
+name = "open-journal"
+group = "Journal"
+help = "Open current journal in default editor"

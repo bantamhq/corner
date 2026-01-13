@@ -48,3 +48,11 @@ pub fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
         ])
         .split(vertical[1])[1]
 }
+
+pub fn centered_rect_max(max_width: u16, max_height: u16, area: Rect) -> Rect {
+    let width = area.width.min(max_width);
+    let height = area.height.min(max_height);
+    let x = area.x + (area.width.saturating_sub(width)) / 2;
+    let y = area.y + (area.height.saturating_sub(height)) / 2;
+    Rect::new(x, y, width, height)
+}

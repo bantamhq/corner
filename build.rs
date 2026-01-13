@@ -29,6 +29,8 @@ struct SubArgDef {
 #[derive(Debug, Deserialize)]
 struct CommandDef {
     name: String,
+    #[serde(default)]
+    group: Option<String>,
     args: Option<String>,
     subargs: Option<Vec<SubArgDef>>,
     help: String,
@@ -73,6 +75,7 @@ const VALID_CONTEXTS: &[&str] = &[
     "edit",
     "reorder",
     "selection",
+    "command_palette",
 ];
 
 const VALID_DATE_SCOPES: &[&str] = &["entry", "filter"];
@@ -364,6 +367,7 @@ fn generate_commands_code(commands: &[CommandDef]) -> String {
     code.push_str("#[derive(Clone, Debug, PartialEq)]\n");
     code.push_str("pub struct Command {\n");
     code.push_str("    pub name: &'static str,\n");
+    code.push_str("    pub group: &'static str,\n");
     code.push_str("    pub args: Option<&'static str>,\n");
     code.push_str("    pub subargs: &'static [SubArg],\n");
     code.push_str("    pub help: &'static str,\n");
@@ -389,9 +393,10 @@ fn generate_commands_code(commands: &[CommandDef]) -> String {
             }
             None => "&[]".to_string(),
         };
+        let group = cmd.group.as_deref().unwrap_or("Commands");
         code.push_str(&format!(
-            "    Command {{\n        name: r#\"{}\"#,\n        args: {},\n        subargs: {},\n        help: r#\"{}\"#,\n    }},\n",
-            cmd.name, args, subargs, cmd.help
+            "    Command {{\n        name: r#\"{}\"#,\n        group: r#\"{}\"#,\n        args: {},\n        subargs: {},\n        help: r#\"{}\"#,\n    }},\n",
+            cmd.name, group, args, subargs, cmd.help
         ));
     }
     code.push_str("];\n\n");

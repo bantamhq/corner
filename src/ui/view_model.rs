@@ -6,7 +6,7 @@ use super::context::RenderContext;
 use super::header::HeaderModel;
 use super::layout::{LayoutNode, PanelId};
 use super::model::ListModel;
-use super::overlay::{ConfirmModel, OverlayModel};
+use super::overlay::{CommandPaletteModel, ConfirmModel, OverlayModel};
 use super::prep::RenderPrep;
 use super::scroll::CursorContext;
 use super::views::build_view_spec;
@@ -66,6 +66,10 @@ pub fn build_view_model(app: &App, context: &RenderContext, prep: RenderPrep) ->
     let overlays = OverlayModel {
         confirm: match &app.input_mode {
             InputMode::Confirm(confirm_context) => Some(ConfirmModel::new(confirm_context.clone())),
+            _ => None,
+        },
+        command_palette: match &app.input_mode {
+            InputMode::CommandPalette(state) => Some(CommandPaletteModel::new(state)),
             _ => None,
         },
     };

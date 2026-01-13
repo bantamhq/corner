@@ -310,11 +310,13 @@ Press `+` to open the project switcher.
 
 | Key | Action |
 |-----|--------|
-| `:date ` | Open date interface |
-| `:project ` | Open project interface |
-| `:tag ` | Open tag interface |
-| `:scratchpad ` | Open scratchpad for quick notes |
 | `:quit ` | Quit application |
+| `:scratchpad ` | Open scratchpad for quick notes |
+| `:open-config ` | Open base config in default editor (creates if missing) |
+| `:open-hub-config ` | Open hub config in default editor (creates if missing) |
+| `:open-project-config ` | Open project config in default editor (creates if missing) |
+| `:reload-config ` | Reload configuration from disk |
+| `:open-journal ` | Open current journal in default editor |
 
 
 ### Filter Syntax

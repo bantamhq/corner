@@ -7,6 +7,7 @@ mod filter_ops;
 pub mod hints;
 mod journal;
 mod navigation;
+mod palette;
 mod reorder;
 mod selection_ops;
 mod tag_ops;
@@ -75,6 +76,21 @@ pub struct FilterState {
     pub entries: Vec<Entry>,
     pub selected: usize,
     pub scroll_offset: usize,
+}
+
+/// Which palette is currently active
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum CommandPaletteMode {
+    Commands,
+    Projects,
+    Tags,
+}
+
+/// State for command palette input and selection
+#[derive(Clone, Debug)]
+pub struct CommandPaletteState {
+    pub mode: CommandPaletteMode,
+    pub selected: usize,
 }
 
 /// State for multi-select operations
@@ -208,6 +224,7 @@ pub enum InputMode {
     Reorder,
     Selection(SelectionState),
     Confirm(ConfirmContext),
+    CommandPalette(CommandPaletteState),
 }
 
 /// Where to insert a new entry
@@ -346,6 +363,12 @@ impl App {
         app.trigger_calendar_fetch();
 
         Ok(app)
+    }
+
+    /// Returns true if currently in Daily view
+    #[must_use]
+    pub fn is_daily_view(&self) -> bool {
+        matches!(self.view, ViewMode::Daily(_))
     }
 
     /// Returns the active journal path

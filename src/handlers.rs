@@ -48,6 +48,7 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
             }
             InputMode::Reorder => app.cancel_reorder_mode(),
             InputMode::Selection(_) => app.cancel_selection_mode(),
+            InputMode::CommandPalette(_) => app.close_command_palette(),
             InputMode::Normal | InputMode::Confirm(_) => {
                 if matches!(app.view, ViewMode::Filter(_)) {
                     app.cancel_filter();
@@ -65,12 +66,12 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
             _ => app.move_up(),
         },
         MoveLeft => {
-            if matches!(app.view, ViewMode::Daily(_)) {
+            if app.is_daily_view() {
                 app.prev_day()?;
             }
         }
         MoveRight => {
-            if matches!(app.view, ViewMode::Daily(_)) {
+            if app.is_daily_view() {
                 app.next_day()?;
             }
         }
@@ -83,37 +84,37 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
             _ => app.jump_to_last(),
         },
         PrevWeek => {
-            if matches!(app.view, ViewMode::Daily(_)) {
+            if app.is_daily_view() {
                 app.prev_week()?;
             }
         }
         NextWeek => {
-            if matches!(app.view, ViewMode::Daily(_)) {
+            if app.is_daily_view() {
                 app.next_week()?;
             }
         }
         PrevMonth => {
-            if matches!(app.view, ViewMode::Daily(_)) {
+            if app.is_daily_view() {
                 app.prev_month()?;
             }
         }
         NextMonth => {
-            if matches!(app.view, ViewMode::Daily(_)) {
+            if app.is_daily_view() {
                 app.next_month()?;
             }
         }
         PrevYear => {
-            if matches!(app.view, ViewMode::Daily(_)) {
+            if app.is_daily_view() {
                 app.prev_year()?;
             }
         }
         NextYear => {
-            if matches!(app.view, ViewMode::Daily(_)) {
+            if app.is_daily_view() {
                 app.next_year()?;
             }
         }
         GotoToday => {
-            if matches!(app.view, ViewMode::Daily(_)) {
+            if app.is_daily_view() {
                 app.goto_today()?;
             }
         }
@@ -126,7 +127,7 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
         }
         NewEntryAbove => app.new_task(InsertPosition::Above),
         Edit => {
-            if matches!(app.view, ViewMode::Daily(_)) {
+            if app.is_daily_view() {
                 app.edit_current_entry();
             }
         }
@@ -199,8 +200,11 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
         ToggleJournal => {
             app.toggle_journal()?;
         }
+        CommandPalette => {
+            app.open_command_palette();
+        }
         ToggleCalendarSidebar => {
-            if matches!(app.view, ViewMode::Daily(_)) {
+            if app.is_daily_view() {
                 app.toggle_calendar_sidebar();
             }
         }
@@ -297,6 +301,25 @@ pub fn handle_edit_key(app: &mut App, key: KeyEvent) {
     }
 }
 
+pub fn handle_command_palette_key(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    let spec = KeySpec::from_event(&key);
+    if let Some(action) = app.keymap.get(KeyContext::CommandPalette, &spec) {
+        match action {
+            KeyActionId::Cancel => app.close_command_palette(),
+            KeyActionId::MoveUp => app.command_palette_select_prev(),
+            KeyActionId::MoveDown => app.command_palette_select_next(),
+            KeyActionId::MoveLeft => app.command_palette_prev_tab(),
+            KeyActionId::MoveRight => app.command_palette_next_tab(),
+            KeyActionId::Submit => {
+                app.execute_selected_command()?;
+                app.close_command_palette();
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 pub fn handle_reorder_key(app: &mut App, key: KeyEvent) {
     let spec = KeySpec::from_event(&key);
     if let Some(action) = app.keymap.get(KeyContext::Reorder, &spec) {
@@ -304,7 +327,7 @@ pub fn handle_reorder_key(app: &mut App, key: KeyEvent) {
     }
 }
 
-fn handle_text_input(buffer: &mut CursorBuffer, key: KeyEvent) -> bool {
+pub(crate) fn handle_text_input(buffer: &mut CursorBuffer, key: KeyEvent) -> bool {
     let KeyEvent {
         code, modifiers, ..
     } = key;

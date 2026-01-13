@@ -55,6 +55,21 @@ pub const HINT_FILTER: Color = Color::Magenta;
 pub const HINT_DATE: Color = Color::Red;
 pub const HINT_SAVED_FILTER: Color = Color::Magenta;
 
+pub const PALETTE_BORDER: Color = Color::White;
+pub const PALETTE_BG: Color = Color::Reset;
+pub const PALETTE_HEADER: Color = Color::White;
+pub const PALETTE_HINT: Color = Color::Gray;
+pub const PALETTE_GROUP: Color = Color::Cyan;
+pub const PALETTE_COMMAND: Color = Color::White;
+pub const PALETTE_DESC: Color = Color::Gray;
+pub const PALETTE_SELECTED_BG: Color = Color::Reset;
+pub const PALETTE_SELECTED_FG: Color = Color::Reset;
+pub const PALETTE_TAB_ACTIVE_BG: Color = Color::Reset;
+pub const PALETTE_TAB_ACTIVE_FG: Color = Color::White;
+pub const PALETTE_TAB_INACTIVE: Color = Color::Gray;
+pub const PALETTE_TAB_RULE: Color = Color::DarkGray;
+pub const PALETTE_TAB_ACTIVE_RULE: Color = Color::Cyan;
+
 pub const POPUP_BORDER: Color = Color::Blue;
 pub const POPUP_TITLE: Color = Color::Blue;
 pub const POPUP_QUERY: Color = Color::Blue;
