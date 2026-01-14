@@ -11,6 +11,12 @@ use crate::storage::{self, EntryType, SourceType};
 use super::shared::truncate_text;
 use super::theme;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum AgendaVariant {
+    Mini, // compact, no times, no spacing - shown as "Upcoming" in calendar sidebar
+    Full, // spacious, with times, with spacing - shown as "Agenda" sidebar
+}
+
 #[derive(Clone)]
 pub struct AgendaDayModel {
     pub date: NaiveDate,
@@ -35,7 +41,7 @@ pub struct AgendaCache {
 pub struct AgendaWidgetModel<'a> {
     pub days: &'a [AgendaDayModel],
     pub width: usize,
-    pub show_times: bool,
+    pub variant: AgendaVariant,
 }
 
 impl AgendaWidgetModel<'_> {
@@ -49,7 +55,7 @@ impl AgendaWidgetModel<'_> {
         let content_width = self.width.saturating_sub(theme::AGENDA_BORDER_WIDTH);
 
         for (i, day) in self.days.iter().enumerate() {
-            if i > 0 {
+            if i > 0 && self.variant == AgendaVariant::Full {
                 lines.push(Line::from(""));
             }
             let date_str = day.date.format("%m/%d/%y").to_string();
@@ -62,10 +68,9 @@ impl AgendaWidgetModel<'_> {
                 let prefix = format!(" {} ", entry.prefix);
                 let prefix_width = prefix.width();
                 let max_text = content_width.saturating_sub(prefix_width);
-                let text = if self.show_times {
-                    entry.text_with_time.as_deref().unwrap_or(&entry.text)
-                } else {
-                    &entry.text
+                let text = match self.variant {
+                    AgendaVariant::Full => entry.text_with_time.as_deref().unwrap_or(&entry.text),
+                    AgendaVariant::Mini => &entry.text,
                 };
                 let text = truncate_text(text, max_text);
                 lines.push(Line::from(vec![
@@ -82,17 +87,16 @@ impl AgendaWidgetModel<'_> {
 pub fn build_agenda_widget<'a>(
     cache: &'a AgendaCache,
     width: usize,
-    show_times: bool,
+    variant: AgendaVariant,
 ) -> AgendaWidgetModel<'a> {
-    let max_width = if show_times {
-        cache.max_width_with_times
-    } else {
-        cache.max_width
+    let max_width = match variant {
+        AgendaVariant::Full => cache.max_width_with_times,
+        AgendaVariant::Mini => cache.max_width,
     };
     AgendaWidgetModel {
         days: &cache.days,
         width: width.min(max_width),
-        show_times,
+        variant,
     }
 }
 

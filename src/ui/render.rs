@@ -7,7 +7,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, SidebarType, ViewMode};
 
-use super::agenda_widget::build_agenda_widget;
+use super::agenda_widget::{AgendaVariant, build_agenda_widget};
 use super::autocomplete::render_autocomplete_dropdown;
 use super::calendar::{CalendarModel, render_calendar};
 use super::container::{ContainerConfig, render_container_in_area, render_list};
@@ -34,7 +34,7 @@ pub fn render_app(f: &mut Frame<'_>, app: &mut App) {
                 .width
                 .saturating_sub(theme::AGENDA_MIN_GUTTER);
             if let Some(ref cache) = app.agenda_cache {
-                let agenda = build_agenda_widget(cache, max_width as usize, true);
+                let agenda = build_agenda_widget(cache, max_width as usize, AgendaVariant::Full);
                 (agenda.required_width() as u16 + theme::AGENDA_BORDER_WIDTH as u16).min(max_width)
             } else {
                 0
@@ -266,7 +266,11 @@ fn render_calendar_sidebar(f: &mut Frame<'_>, app: &App, sidebar_area: Rect) {
 
     let upcoming_layout = render_container_in_area(f, upcoming_area, &upcoming_config, false);
     if let Some(ref cache) = app.agenda_cache {
-        let agenda = build_agenda_widget(cache, upcoming_layout.content_area.width as usize, false);
+        let agenda = build_agenda_widget(
+            cache,
+            upcoming_layout.content_area.width as usize,
+            AgendaVariant::Mini,
+        );
         let lines = agenda.render_lines();
         let content = Paragraph::new(lines);
         f.render_widget(content, upcoming_layout.content_area);
@@ -285,7 +289,11 @@ fn render_agenda_sidebar(f: &mut Frame<'_>, app: &App, sidebar_area: Rect) {
 
     let layout = render_container_in_area(f, sidebar_area, &config, false);
     if let Some(ref cache) = app.agenda_cache {
-        let agenda = build_agenda_widget(cache, layout.content_area.width as usize, true);
+        let agenda = build_agenda_widget(
+            cache,
+            layout.content_area.width as usize,
+            AgendaVariant::Full,
+        );
         let lines = agenda.render_lines();
         let content = Paragraph::new(lines);
         f.render_widget(content, layout.content_area);

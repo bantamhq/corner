@@ -126,11 +126,7 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
             }
         }
         NewEntryAbove => app.new_task(InsertPosition::Above),
-        Edit => {
-            if app.is_daily_view() {
-                app.edit_current_entry();
-            }
-        }
+        Edit => app.edit_current_entry(),
         ToggleComplete => {
             if matches!(app.input_mode, InputMode::Selection(_)) {
                 app.toggle_selected()?;
