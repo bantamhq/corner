@@ -3,6 +3,7 @@ use chrono_tz::Tz;
 use ical::parser::ical::IcalParser;
 use ical::parser::ical::component::IcalEvent;
 use ical::property::Property;
+use ratatui::style::Color;
 use rrule::{RRuleSet, Tz as RRuleTz};
 use std::collections::{HashMap, HashSet};
 use std::io::BufReader;
@@ -17,20 +18,20 @@ pub struct IcsParseResult {
     pub events: Vec<CalendarEvent>,
 }
 
-pub fn parse_ics(
-    content: &str,
-    calendar_id: &str,
-    calendar_name: &str,
-    range_start: NaiveDate,
-    range_end: NaiveDate,
-    display_cancelled: bool,
-    display_declined: bool,
-) -> Result<IcsParseResult, String> {
+pub struct ParseContext<'a> {
+    pub calendar_id: &'a str,
+    pub calendar_name: &'a str,
+    pub range_start: NaiveDate,
+    pub range_end: NaiveDate,
+    pub display_cancelled: bool,
+    pub display_declined: bool,
+    pub color: Color,
+}
+
+pub fn parse_ics(content: &str, ctx: &ParseContext<'_>) -> Result<IcsParseResult, String> {
     let reader = BufReader::new(content.as_bytes());
     let parser = IcalParser::new(reader);
 
-    // First pass: collect all RECURRENCE-ID exceptions per UID
-    // These are instances that override a specific occurrence of a recurring event
     let mut recurrence_exceptions: HashMap<String, HashSet<NaiveDate>> = HashMap::new();
     let mut all_events: Vec<IcalEvent> = Vec::new();
 
@@ -41,7 +42,6 @@ pub fn parse_ics(
             if let Some(uid) = get_property(&event, "UID")
                 && let Some(recurrence_id) = get_property(&event, "RECURRENCE-ID")
             {
-                // Extract date from RECURRENCE-ID (can be date or datetime)
                 let date_str = &recurrence_id[..8.min(recurrence_id.len())];
                 if let Ok(date) = NaiveDate::parse_from_str(date_str, "%Y%m%d") {
                     recurrence_exceptions.entry(uid).or_default().insert(date);
@@ -51,20 +51,9 @@ pub fn parse_ics(
         }
     }
 
-    // Second pass: parse events, skipping recurrence dates that have exceptions
     let mut events = Vec::new();
-
     for event in &all_events {
-        if let Some(parsed) = parse_event(
-            event,
-            calendar_id,
-            calendar_name,
-            range_start,
-            range_end,
-            &recurrence_exceptions,
-            display_cancelled,
-            display_declined,
-        )? {
+        if let Some(parsed) = parse_event(event, ctx, &recurrence_exceptions)? {
             events.extend(parsed);
         }
     }
@@ -72,16 +61,10 @@ pub fn parse_ics(
     Ok(IcsParseResult { events })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn parse_event(
     event: &IcalEvent,
-    calendar_id: &str,
-    calendar_name: &str,
-    range_start: NaiveDate,
-    range_end: NaiveDate,
+    ctx: &ParseContext<'_>,
     recurrence_exceptions: &HashMap<String, HashSet<NaiveDate>>,
-    display_cancelled: bool,
-    display_declined: bool,
 ) -> Result<Option<Vec<CalendarEvent>>, String> {
     let uid = get_property(event, "UID").unwrap_or_default();
     let summary = get_property(event, "SUMMARY").unwrap_or_default();
@@ -92,12 +75,12 @@ fn parse_event(
 
     let is_cancelled =
         get_property(event, "STATUS").is_some_and(|s| s.eq_ignore_ascii_case("CANCELLED"));
-    if is_cancelled && !display_cancelled {
+    if is_cancelled && !ctx.display_cancelled {
         return Ok(None);
     }
 
     let is_declined = has_declined_attendee(event);
-    if is_declined && !display_declined {
+    if is_declined && !ctx.display_declined {
         return Ok(None);
     }
 
@@ -127,10 +110,10 @@ fn parse_event(
     }
 
     let occurrences = if let Some(rrule) = rrule_str {
-        expand_rrule(&start, &rrule, &exdates, range_start, range_end)?
+        expand_rrule(&start, &rrule, &exdates, ctx.range_start, ctx.range_end)?
     } else {
         let start_date = start.date_naive();
-        if start_date >= range_start && start_date <= range_end {
+        if start_date >= ctx.range_start && start_date <= ctx.range_end {
             vec![start]
         } else {
             vec![]
@@ -155,35 +138,37 @@ fn parse_event(
                 let day_start = occ_start + Duration::days(i64::from(day_num));
                 let day_date = day_start.date_naive();
 
-                if day_date >= range_start && day_date <= range_end {
+                if day_date >= ctx.range_start && day_date <= ctx.range_end {
                     result.push(CalendarEvent {
                         id: format!("{uid}_{day_date}"),
                         title: summary.clone(),
-                        calendar_id: calendar_id.to_string(),
-                        calendar_name: calendar_name.to_string(),
+                        calendar_id: ctx.calendar_id.to_string(),
+                        calendar_name: ctx.calendar_name.to_string(),
                         start: day_start,
                         end: day_start + Duration::days(1),
                         is_all_day: true,
                         multi_day_info: Some((day_num + 1, total_days)),
                         is_cancelled,
                         is_declined,
+                        color: ctx.color,
                     });
                 }
             }
         } else {
             let start_date = occ_start.date_naive();
-            if start_date >= range_start && start_date <= range_end {
+            if start_date >= ctx.range_start && start_date <= ctx.range_end {
                 result.push(CalendarEvent {
                     id: uid.clone(),
                     title: summary.clone(),
-                    calendar_id: calendar_id.to_string(),
-                    calendar_name: calendar_name.to_string(),
+                    calendar_id: ctx.calendar_id.to_string(),
+                    calendar_name: ctx.calendar_name.to_string(),
                     start: occ_start,
                     end: occ_end,
                     is_all_day,
                     multi_day_info: None,
                     is_cancelled,
                     is_declined,
+                    color: ctx.color,
                 });
             }
         }

@@ -1,4 +1,5 @@
 use chrono::{DateTime, Local, NaiveDate};
+use ratatui::style::Color;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -13,6 +14,7 @@ pub struct CalendarEvent {
     pub multi_day_info: Option<(u8, u8)>,
     pub is_cancelled: bool,
     pub is_declined: bool,
+    pub color: Color,
 }
 
 #[derive(Debug, Clone, Default)]

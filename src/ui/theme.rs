@@ -62,10 +62,20 @@ pub const GLYPH_PROJECTED_LATER: &str = "↪";
 pub const GLYPH_PROJECTED_RECURRING: &str = "↺";
 pub const GLYPH_PROJECTED_CALENDAR: &str = "○";
 
+// Default color cycle for calendars (based on config order)
+pub const CALENDAR_COLORS: &[Color] = &[
+    Color::LightMagenta,
+    Color::LightCyan,
+    Color::LightBlue,
+    Color::LightYellow,
+    Color::LightRed,
+    Color::LightGreen,
+];
+
 pub const GLYPH_SCROLL_UP: &str = "▲";
 pub const GLYPH_SCROLL_DOWN: &str = "▼";
 pub const GLYPH_SCROLL_BOTH: &str = "▲▼";
-pub const GLYPH_AGENDA_CALENDAR: char = '○';
+pub const GLYPH_CALENDAR: char = '●';
 pub const GLYPH_AGENDA_EVENT: char = '*';
 pub const GLYPH_AGENDA_RECURRING: char = '↪';
 pub const GLYPH_AGENDA_FALLBACK: char = '•';

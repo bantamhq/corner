@@ -23,7 +23,7 @@ pub fn build_calendar_row(
 ) -> RowModel {
     let prefix = "* ";
     let prefix_width = prefix.width();
-    let indicator = theme::GLYPH_UNSELECTED;
+    let indicator = theme::GLYPH_CALENDAR.to_string();
 
     let content = format_calendar_event(event, show_calendar_name);
     let available = width.saturating_sub(prefix_width);
@@ -37,10 +37,7 @@ pub fn build_calendar_row(
     let (_, rest_of_prefix) = split_prefix(prefix);
 
     RowModel::new(
-        Some(Span::styled(
-            indicator.to_string(),
-            Style::default().fg(theme::CALENDAR_ENTRY),
-        )),
+        Some(Span::styled(indicator, Style::default().fg(event.color))),
         Some(Span::styled(rest_of_prefix, content_style)),
         style_content(&display_text, content_style),
         None,
@@ -370,28 +367,19 @@ fn format_calendar_event(event: &CalendarEvent, show_calendar_name: bool) -> Str
         let end_hour = event.end.hour();
         let same_period = (start_hour < 12) == (end_hour < 12);
 
-        let time_str = if same_period {
-            let start_time = event.start.format("%-I:%M").to_string();
-            let end_time = event.end.format("%-I:%M%P").to_string();
-            format!("{start_time}-{end_time}")
-        } else {
-            let start_time = event.start.format("%-I:%M%P").to_string();
-            let end_time = event.end.format("%-I:%M%P").to_string();
-            format!("{start_time}-{end_time}")
-        };
+        let start_fmt = if same_period { "%-I:%M" } else { "%-I:%M%P" };
+        let time_str = format!(
+            "{}-{}",
+            event.start.format(start_fmt),
+            event.end.format("%-I:%M%P")
+        );
         parts.push(time_str);
     }
 
+    let main_text = parts.join(" - ");
     if show_calendar_name {
-        parts.push(format!("({})", event.calendar_name));
-    }
-
-    if parts.len() == 1 {
-        parts.into_iter().next().unwrap()
-    } else if show_calendar_name && parts.len() > 1 {
-        let last = parts.pop().unwrap();
-        format!("{} {last}", parts.join(" - "))
+        format!("{main_text} ({})", event.calendar_name)
     } else {
-        parts.join(" - ")
+        main_text
     }
 }

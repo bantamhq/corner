@@ -3,7 +3,7 @@ mod parse;
 mod store;
 
 pub use fetch::fetch_calendar;
-pub use parse::{IcsParseResult, parse_ics};
+pub use parse::{IcsParseResult, ParseContext, parse_ics};
 pub use store::{CalendarEvent, CalendarFetchStatus, CalendarStore};
 
 use chrono::{Duration, Local, NaiveDate};
@@ -57,7 +57,16 @@ pub async fn fetch_all_calendars(config: &Config, visible_ids: &[String]) -> Cal
             continue;
         };
 
-        match fetch_and_parse_calendar(cal_id, cal_config, range_start, range_end, visibility).await
+        let color = config.calendar_color(cal_id);
+        match fetch_and_parse_calendar(
+            cal_id,
+            cal_config,
+            range_start,
+            range_end,
+            visibility,
+            color,
+        )
+        .await
         {
             Ok(events) => all_events.extend(events),
             Err(e) => errors.push((cal_id.clone(), e)),
@@ -77,18 +86,19 @@ async fn fetch_and_parse_calendar(
     range_start: NaiveDate,
     range_end: NaiveDate,
     visibility: &CalendarVisibilityConfig,
+    color: ratatui::style::Color,
 ) -> Result<Vec<CalendarEvent>, String> {
     let ics_content = fetch_calendar(&config.url).await?;
-    let result = parse_ics(
-        &ics_content,
-        cal_id,
-        cal_id,
+    let ctx = ParseContext {
+        calendar_id: cal_id,
+        calendar_name: cal_id,
         range_start,
         range_end,
-        visibility.display_cancelled,
-        visibility.display_declined,
-    )?;
-
+        display_cancelled: visibility.display_cancelled,
+        display_declined: visibility.display_declined,
+        color,
+    };
+    let result = parse_ics(&ics_content, &ctx)?;
     Ok(result.events)
 }
 

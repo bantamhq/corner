@@ -159,26 +159,23 @@ fn run_app<B: ratatui::backend::Backend>(
 
         app.poll_calendar_results();
 
-        if event::poll(std::time::Duration::from_millis(16))? {
-            match event::read()? {
-                Event::Key(key) => {
-                    app.status_message = None;
+        if event::poll(std::time::Duration::from_millis(16))?
+            && let Event::Key(key) = event::read()?
+        {
+            app.status_message = None;
 
-                    match &app.input_mode {
-                        InputMode::Normal => handlers::handle_normal_key(&mut app, key)?,
-                        InputMode::Edit(_) => handlers::handle_edit_key(&mut app, key),
-                        InputMode::Reorder => handlers::handle_reorder_key(&mut app, key),
-                        InputMode::Confirm(_) => handlers::handle_confirm_key(&mut app, key.code)?,
-                        InputMode::Selection(_) => handlers::handle_selection_key(&mut app, key)?,
-                        InputMode::CommandPalette(_) => {
-                            handlers::handle_command_palette_key(&mut app, key)?;
-                        }
-                        InputMode::FilterPrompt => {
-                            handlers::handle_filter_prompt_key(&mut app, key)?;
-                        }
-                    }
+            match &app.input_mode {
+                InputMode::Normal => handlers::handle_normal_key(&mut app, key)?,
+                InputMode::Edit(_) => handlers::handle_edit_key(&mut app, key),
+                InputMode::Reorder => handlers::handle_reorder_key(&mut app, key),
+                InputMode::Confirm(_) => handlers::handle_confirm_key(&mut app, key.code)?,
+                InputMode::Selection(_) => handlers::handle_selection_key(&mut app, key)?,
+                InputMode::CommandPalette(_) => {
+                    handlers::handle_command_palette_key(&mut app, key)?;
                 }
-                _ => {}
+                InputMode::FilterPrompt => {
+                    handlers::handle_filter_prompt_key(&mut app, key)?;
+                }
             }
         }
 

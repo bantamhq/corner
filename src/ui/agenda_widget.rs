@@ -75,7 +75,7 @@ impl AgendaWidgetModel<'_> {
                 let text = truncate_text(text, max_text);
                 lines.push(Line::from(vec![
                     Span::styled(prefix, entry.style),
-                    Span::styled(text, entry.style),
+                    Span::raw(text),
                 ]));
             }
         }
@@ -116,7 +116,11 @@ pub fn collect_agenda_cache(calendar_store: &CalendarStore, path: &Path) -> Agen
             let text_with_time = if event.is_all_day {
                 None
             } else {
-                Some(format!("{} {}", event.start.format("%l:%M%P"), event.title))
+                Some(format!(
+                    "{} {}",
+                    event.start.format("%-I:%M%P"),
+                    event.title
+                ))
             };
             let entry_width = text.width() + theme::AGENDA_ENTRY_PADDING;
             max_width = max_width.max(entry_width);
@@ -125,10 +129,10 @@ pub fn collect_agenda_cache(calendar_store: &CalendarStore, path: &Path) -> Agen
                 .map_or(entry_width, |t| t.width() + theme::AGENDA_ENTRY_PADDING);
             max_width_with_times = max_width_with_times.max(time_width);
             entries.push(AgendaEntryModel {
-                prefix: theme::GLYPH_AGENDA_CALENDAR,
+                prefix: theme::GLYPH_CALENDAR,
                 text,
                 text_with_time,
-                style: Style::default(),
+                style: Style::default().fg(event.color),
             });
         }
 

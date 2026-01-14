@@ -3,6 +3,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
 use crate::storage::find_git_root;
@@ -17,6 +18,46 @@ pub struct CalendarConfig {
     /// Whether this calendar is enabled (defaults to true)
     #[serde(default = "default_true")]
     pub enabled: bool,
+    /// Optional color override (ANSI color name)
+    #[serde(default, skip_serializing, deserialize_with = "deserialize_color")]
+    pub color: Option<Color>,
+}
+
+fn deserialize_color<'de, D>(deserializer: D) -> Result<Option<Color>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    match opt {
+        None => Ok(None),
+        Some(s) => parse_ansi_color(&s)
+            .map(Some)
+            .ok_or_else(|| serde::de::Error::custom(format!("invalid color: {s}"))),
+    }
+}
+
+/// Parse an ANSI color name (case-insensitive).
+#[must_use]
+pub fn parse_ansi_color(s: &str) -> Option<Color> {
+    match s.to_lowercase().as_str() {
+        "black" => Some(Color::Black),
+        "red" => Some(Color::Red),
+        "green" => Some(Color::Green),
+        "yellow" => Some(Color::Yellow),
+        "blue" => Some(Color::Blue),
+        "magenta" => Some(Color::Magenta),
+        "cyan" => Some(Color::Cyan),
+        "gray" | "grey" => Some(Color::Gray),
+        "darkgray" | "darkgrey" => Some(Color::DarkGray),
+        "lightred" => Some(Color::LightRed),
+        "lightgreen" => Some(Color::LightGreen),
+        "lightyellow" => Some(Color::LightYellow),
+        "lightblue" => Some(Color::LightBlue),
+        "lightmagenta" => Some(Color::LightMagenta),
+        "lightcyan" => Some(Color::LightCyan),
+        "white" => Some(Color::White),
+        _ => None,
+    }
 }
 
 fn default_true() -> bool {
@@ -258,6 +299,25 @@ impl Config {
     #[must_use]
     pub fn get_calendar(&self, id: &str) -> Option<&CalendarConfig> {
         self.calendars.get(id)
+    }
+
+    /// Get the color for a calendar, using explicit color or cycling through defaults.
+    #[must_use]
+    pub fn calendar_color(&self, id: &str) -> Color {
+        use crate::ui::theme::CALENDAR_COLORS;
+
+        if let Some(cfg) = self.calendars.get(id)
+            && let Some(color) = cfg.color
+        {
+            return color;
+        }
+
+        // Sort calendar IDs for deterministic ordering
+        let mut sorted_ids: Vec<_> = self.calendars.keys().collect();
+        sorted_ids.sort();
+
+        let index = sorted_ids.iter().position(|&k| k == id).unwrap_or(0);
+        CALENDAR_COLORS[index % CALENDAR_COLORS.len()]
     }
 
     /// Check if any calendars are configured.
