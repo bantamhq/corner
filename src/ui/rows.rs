@@ -39,7 +39,7 @@ pub fn build_calendar_row(
     RowModel::new(
         Some(Span::styled(
             indicator.to_string(),
-            Style::default().fg(theme::CALENDAR_INDICATOR),
+            Style::default().fg(theme::CALENDAR_ENTRY),
         )),
         Some(Span::styled(rest_of_prefix, content_style)),
         style_content(&display_text, content_style),
@@ -154,7 +154,7 @@ fn build_entry_row(app: &App, spec: EntryRowSpec<'_>) -> RowModel {
         EntryIndicator::Daily => resolver.entry_indicator(
             spec.is_selected,
             spec.visible_idx,
-            theme::ENTRY_CURSOR,
+            resolver.cursor_color(),
             &first_char,
             content_style,
         ),
@@ -259,16 +259,21 @@ impl<'a> IndicatorResolver<'a> {
         }
     }
 
+    fn cursor_color(&self) -> Color {
+        let in_filter = matches!(self.app.view, crate::app::ViewMode::Filter(_));
+        theme::context_primary(self.app.active_journal(), in_filter)
+    }
+
     fn filter_cursor_indicator(&self, index: usize) -> Span<'static> {
         if self.selection_active(index) {
             Span::styled(
                 theme::GLYPH_SELECTED,
-                Style::default().fg(theme::ENTRY_SELECTION),
+                Style::default().fg(theme::EDIT_PRIMARY),
             )
         } else {
             Span::styled(
                 theme::GLYPH_CURSOR,
-                Style::default().fg(theme::ENTRY_CURSOR),
+                Style::default().fg(self.cursor_color()),
             )
         }
     }
@@ -282,7 +287,7 @@ impl<'a> IndicatorResolver<'a> {
         if self.selection_active(index) {
             Span::styled(
                 theme::GLYPH_UNSELECTED,
-                Style::default().fg(theme::ENTRY_SELECTION),
+                Style::default().fg(theme::EDIT_PRIMARY),
             )
         } else {
             Span::styled(first_char.to_string(), content_style)
@@ -298,15 +303,9 @@ impl<'a> IndicatorResolver<'a> {
         };
 
         if is_cursor {
-            Span::styled(
-                indicator,
-                Style::default().fg(theme::ENTRY_PROJECTED_ACTIVE),
-            )
+            Span::styled(indicator, Style::default().fg(self.cursor_color()))
         } else {
-            Span::styled(
-                indicator,
-                Style::default().fg(theme::ENTRY_PROJECTED_INACTIVE),
-            )
+            Span::styled(indicator, Style::default().fg(theme::PROJECTED_DATE))
         }
     }
 
@@ -324,18 +323,18 @@ impl<'a> IndicatorResolver<'a> {
             if matches!(self.app.input_mode, InputMode::Reorder) {
                 Span::styled(
                     theme::GLYPH_REORDER,
-                    Style::default().fg(theme::ENTRY_SELECTION),
+                    Style::default().fg(theme::EDIT_PRIMARY),
                 )
             } else if matches!(self.app.input_mode, InputMode::Selection(_)) {
                 if is_selected_in_selection {
                     Span::styled(
                         theme::GLYPH_SELECTED,
-                        Style::default().fg(theme::ENTRY_SELECTION),
+                        Style::default().fg(theme::EDIT_PRIMARY),
                     )
                 } else {
                     Span::styled(
                         theme::GLYPH_CURSOR,
-                        Style::default().fg(theme::ENTRY_CURSOR),
+                        Style::default().fg(self.cursor_color()),
                     )
                 }
             } else {
@@ -344,7 +343,7 @@ impl<'a> IndicatorResolver<'a> {
         } else if is_selected_in_selection {
             Span::styled(
                 theme::GLYPH_UNSELECTED,
-                Style::default().fg(theme::ENTRY_SELECTION),
+                Style::default().fg(theme::EDIT_PRIMARY),
             )
         } else {
             Span::styled(default_first_char.to_string(), default_style)

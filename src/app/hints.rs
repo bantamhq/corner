@@ -619,11 +619,11 @@ impl HintContext {
         };
 
         match effective {
-            Self::Tags { .. } => theme::HINT_TAG,
-            Self::Commands { .. } => theme::HINT_COMMAND,
-            Self::FilterTypes { .. } | Self::DateOps { .. } => theme::HINT_FILTER,
-            Self::DateValues { .. } => theme::HINT_DATE,
-            Self::SavedFilters { .. } => theme::HINT_SAVED_FILTER,
+            Self::Tags { .. } => theme::TAG,
+            Self::Commands { .. } => theme::HUB_PRIMARY,
+            Self::FilterTypes { .. } | Self::DateOps { .. } => theme::FILTER_PRIMARY,
+            Self::DateValues { .. } => theme::PROJECTED_DATE,
+            Self::SavedFilters { .. } => theme::FILTER_PRIMARY,
             Self::Inactive | Self::GuidanceMessage { .. } | Self::Negation { .. } => Color::Reset,
         }
     }

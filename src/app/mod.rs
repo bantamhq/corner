@@ -287,6 +287,7 @@ pub struct App {
     pub runtime_handle: Option<Handle>,
     pub calendar_rx: Option<mpsc::Receiver<crate::calendar::CalendarFetchResult>>,
     pub calendar_tx: Option<mpsc::Sender<crate::calendar::CalendarFetchResult>>,
+    pub(crate) surface: crate::ui::surface::Surface,
 }
 
 impl App {
@@ -294,7 +295,7 @@ impl App {
         Self::new_with_date(config, Local::now().date_naive())
     }
 
-    /// Creates a new App with a specific date, detecting paths from config
+    /// Creates a new App with a specific date, detecting paths from config.
     pub fn new_with_date(config: Config, date: NaiveDate) -> io::Result<Self> {
         let hub_path = config
             .hub_file
@@ -303,7 +304,8 @@ impl App {
             .unwrap_or_else(crate::config::get_default_journal_path);
         let project_path = storage::detect_project_journal();
         let context = JournalContext::new(hub_path, project_path, JournalSlot::Hub);
-        Self::new_with_context(config, date, context, None)
+        let surface = crate::ui::surface::Surface::default();
+        Self::new_with_context(config, date, context, None, surface)
     }
 
     /// Creates a new App with explicit context (for testing and main)
@@ -312,6 +314,7 @@ impl App {
         date: NaiveDate,
         journal_context: JournalContext,
         runtime_handle: Option<Handle>,
+        surface: crate::ui::surface::Surface,
     ) -> io::Result<Self> {
         let path = journal_context.active_path().to_path_buf();
         let lines = storage::load_day_lines(date, &path)?;
@@ -362,6 +365,7 @@ impl App {
             runtime_handle,
             calendar_rx,
             calendar_tx,
+            surface,
         };
 
         if hide_completed {

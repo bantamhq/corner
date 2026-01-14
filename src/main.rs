@@ -12,6 +12,7 @@ use ratatui::{Terminal, backend::CrosstermBackend};
 use caliber::app::{App, InputMode};
 use caliber::config::{self, Config, resolve_path};
 use caliber::storage::{JournalContext, JournalSlot};
+use caliber::ui::surface::Surface;
 use caliber::{handlers, storage, ui};
 
 fn main() -> Result<(), io::Error> {
@@ -43,13 +44,15 @@ fn main() -> Result<(), io::Error> {
 
     let journal_context = JournalContext::new(hub_path, project_path.clone(), active_slot);
 
+    let surface = Surface::from_terminal();
+
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let res = run_app(&mut terminal, config, journal_context);
+    let res = run_app(&mut terminal, config, journal_context, surface);
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
@@ -89,6 +92,7 @@ fn run_app<B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     config: Config,
     journal_context: JournalContext,
+    surface: Surface,
 ) -> io::Result<()> {
     let date = chrono::Local::now().date_naive();
 
@@ -96,7 +100,7 @@ fn run_app<B: ratatui::backend::Backend>(
         .map_err(|e| io::Error::other(format!("Failed to create tokio runtime: {e}")))?;
     let runtime_handle = Some(runtime.handle().clone());
 
-    let mut app = App::new_with_context(config, date, journal_context, runtime_handle)?;
+    let mut app = App::new_with_context(config, date, journal_context, runtime_handle, surface)?;
 
     // Project initialization flow for git repositories
     if app.in_git_repo

@@ -51,13 +51,13 @@ pub fn render_calendar(f: &mut Frame<'_>, model: &CalendarModel<'_>, area: Rect)
         }
         if info.has_entries || info.has_calendar_events {
             let style = if info.has_incomplete_tasks {
-                Style::new().fg(theme::DATE_TASK).not_dim()
+                Style::new().fg(theme::CALENDAR_TASK).not_dim()
             } else if info.has_events {
-                Style::new().fg(theme::DATE_EVENT).not_dim()
+                Style::new().fg(theme::CALENDAR_EVENT).not_dim()
             } else if info.has_calendar_events {
-                Style::new().fg(theme::DATE_CALENDAR).not_dim()
+                Style::new().fg(theme::CALENDAR_ENTRY).not_dim()
             } else {
-                Style::new().fg(theme::DATE_OTHER).not_dim()
+                Style::new().fg(theme::CALENDAR_OTHER).not_dim()
             };
             events.add(to_time_date(*date), style);
         }
@@ -69,25 +69,25 @@ pub fn render_calendar(f: &mut Frame<'_>, model: &CalendarModel<'_>, area: Rect)
     {
         events.add(
             to_time_date(today),
-            Style::new().fg(theme::DATE_TODAY).not_dim(),
+            Style::new().fg(theme::CALENDAR_TODAY).not_dim(),
         );
     }
 
     let selected_info = model.day_cache.get(&model.selected);
     let selected_style = if model.selected == today {
-        Style::new().fg(theme::DATE_TODAY).reversed().not_dim()
+        Style::new().fg(theme::CALENDAR_TODAY).reversed().not_dim()
     } else if selected_info
         .map(|i| i.has_incomplete_tasks)
         .unwrap_or(false)
     {
-        Style::new().fg(theme::DATE_TASK).reversed().not_dim()
+        Style::new().fg(theme::CALENDAR_TASK).reversed().not_dim()
     } else if selected_info.map(|i| i.has_events).unwrap_or(false) {
-        Style::new().fg(theme::DATE_EVENT).reversed().not_dim()
+        Style::new().fg(theme::CALENDAR_EVENT).reversed().not_dim()
     } else if selected_info
         .map(|i| i.has_calendar_events)
         .unwrap_or(false)
     {
-        Style::new().fg(theme::DATE_CALENDAR).reversed().not_dim()
+        Style::new().fg(theme::CALENDAR_ENTRY).reversed().not_dim()
     } else {
         Style::new().reversed().not_dim()
     };
@@ -101,8 +101,8 @@ pub fn render_calendar(f: &mut Frame<'_>, model: &CalendarModel<'_>, area: Rect)
     };
 
     let calendar = Monthly::new(to_time_date(model.display_month), events)
-        .show_weekdays_header(Style::new().fg(theme::DATE_OTHER).dim().bold())
-        .default_style(Style::new().fg(theme::DATE_OTHER).dim());
+        .show_weekdays_header(Style::new().fg(theme::CALENDAR_OTHER).dim().bold())
+        .default_style(Style::new().fg(theme::CALENDAR_OTHER).dim());
 
     f.render_widget(calendar, calendar_area);
 }

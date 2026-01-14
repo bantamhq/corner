@@ -85,10 +85,10 @@ pub fn style_content(text: &str, base_style: Style) -> Vec<Span<'static>> {
         }
     };
 
-    collect_matches(&TAG_REGEX, theme::ENTRY_TAG, &mut matches);
-    collect_matches(&LATER_DATE_REGEX, theme::ENTRY_DATE, &mut matches);
-    collect_matches(&RELATIVE_DATE_REGEX, theme::ENTRY_DATE, &mut matches);
-    collect_matches(&RECURRING_REGEX, theme::ENTRY_DATE, &mut matches);
+    collect_matches(&TAG_REGEX, theme::TAG, &mut matches);
+    collect_matches(&LATER_DATE_REGEX, theme::PROJECTED_DATE, &mut matches);
+    collect_matches(&RELATIVE_DATE_REGEX, theme::PROJECTED_DATE, &mut matches);
+    collect_matches(&RECURRING_REGEX, theme::PROJECTED_DATE, &mut matches);
 
     matches.sort_by_key(|(start, _, _)| *start);
 

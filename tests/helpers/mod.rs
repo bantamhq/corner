@@ -11,6 +11,7 @@ use caliber::config::Config;
 use caliber::handlers;
 use caliber::storage::{JournalContext, JournalSlot};
 use caliber::ui;
+use caliber::ui::surface::Surface;
 
 pub struct TestContext {
     pub app: App,
@@ -40,7 +41,8 @@ impl TestContext {
         let context = JournalContext::new(journal_path, None, JournalSlot::Hub);
 
         let config = Config::default();
-        let app = App::new_with_context(config, date, context, None).expect("Failed to create app");
+        let app = App::new_with_context(config, date, context, None, Surface::default())
+            .expect("Failed to create app");
 
         Self { app, temp_dir }
     }
@@ -60,7 +62,8 @@ impl TestContext {
         std::fs::write(&journal_path, content).expect("Failed to write journal");
 
         let context = JournalContext::new(journal_path, None, JournalSlot::Hub);
-        let app = App::new_with_context(config, date, context, None).expect("Failed to create app");
+        let app = App::new_with_context(config, date, context, None, Surface::default())
+            .expect("Failed to create app");
 
         Self { app, temp_dir }
     }

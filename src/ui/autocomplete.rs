@@ -1,6 +1,6 @@
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Style, Stylize};
+use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::{Line as RatatuiLine, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
@@ -8,7 +8,6 @@ use unicode_width::UnicodeWidthStr;
 use crate::app::{App, HintContext, HintItem};
 
 use super::scroll::CursorContext;
-use super::theme;
 
 const DROPDOWN_TEXT_WIDTH: usize = 15;
 
@@ -153,7 +152,7 @@ pub fn build_dropdown_lines(
 pub fn render_dropdown_box(f: &mut Frame<'_>, area: Rect, lines: Vec<RatatuiLine<'static>>) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme::HINT_BORDER));
+        .border_style(Style::default().fg(Color::Gray));
 
     f.render_widget(Clear, area);
     f.render_widget(block.clone(), area);

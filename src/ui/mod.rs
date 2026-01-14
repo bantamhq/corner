@@ -18,6 +18,7 @@ mod rows;
 mod scroll;
 mod scroll_indicator;
 mod shared;
+pub mod surface;
 pub(crate) mod theme;
 mod view_model;
 mod views;

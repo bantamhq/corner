@@ -110,6 +110,7 @@ dependencies = [
  "crossterm",
  "dirs",
  "ical",
+ "libc",
  "ratatui",
  "regex",
  "reqwest",

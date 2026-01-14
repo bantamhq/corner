@@ -1,7 +1,7 @@
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line as RatatuiLine, Span},
     widgets::{Block, Borders, Clear, Paragraph, Tabs},
 };
@@ -109,7 +109,7 @@ pub fn render_confirm_modal(f: &mut Frame<'_>, model: ConfirmModel, area: Rect) 
     let confirm_block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme::CONFIRM_BORDER));
+        .border_style(Style::default().fg(Color::Blue));
 
     let inner_area = confirm_block.inner(popup_area);
     f.render_widget(confirm_block, popup_area);
@@ -179,7 +179,7 @@ fn item_styles(is_selected: bool, is_available: bool) -> (Style, Style) {
         Style::default().add_modifier(Modifier::REVERSED | Modifier::BOLD | base_modifier)
     } else {
         Style::default()
-            .fg(theme::PALETTE_COMMAND)
+            .fg(Color::White)
             .add_modifier(Modifier::BOLD | base_modifier)
     };
 
@@ -187,7 +187,7 @@ fn item_styles(is_selected: bool, is_available: bool) -> (Style, Style) {
         Style::default().add_modifier(Modifier::REVERSED | Modifier::DIM | base_modifier)
     } else {
         Style::default()
-            .fg(theme::PALETTE_COMMAND)
+            .fg(Color::White)
             .add_modifier(Modifier::DIM | base_modifier)
     };
 
@@ -231,7 +231,7 @@ pub fn render_command_palette(f: &mut Frame<'_>, model: CommandPaletteModel, are
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(ratatui::widgets::BorderType::Rounded)
-        .border_style(Style::default().fg(theme::PALETTE_BORDER));
+        .border_style(Style::default().fg(Color::White));
     let inner_area = block.inner(popup_area);
     f.render_widget(block, popup_area);
 
@@ -268,14 +268,14 @@ pub fn render_command_palette(f: &mut Frame<'_>, model: CommandPaletteModel, are
         .select(tab_index(model.mode))
         .style(
             Style::default()
-                .fg(theme::PALETTE_TAB_INACTIVE)
-                .bg(theme::PALETTE_BG)
+                .fg(Color::Gray)
+                .bg(Color::Reset)
                 .add_modifier(Modifier::DIM),
         )
         .highlight_style(
             Style::default()
-                .fg(theme::PALETTE_TAB_ACTIVE_FG)
-                .bg(theme::PALETTE_TAB_ACTIVE_BG)
+                .fg(Color::White)
+                .bg(Color::Reset)
                 .add_modifier(Modifier::BOLD)
                 .remove_modifier(Modifier::DIM),
         )
@@ -289,9 +289,7 @@ pub fn render_command_palette(f: &mut Frame<'_>, model: CommandPaletteModel, are
         .unwrap_or("esc");
     let cancel_hint = Paragraph::new(RatatuiLine::from(Span::styled(
         cancel_key,
-        Style::default()
-            .fg(theme::PALETTE_HINT)
-            .bg(theme::PALETTE_BG),
+        Style::default().fg(Color::Gray).bg(Color::Reset),
     )))
     .alignment(Alignment::Right);
     f.render_widget(cancel_hint, tabs_row[1]);
@@ -325,25 +323,19 @@ pub fn render_command_palette(f: &mut Frame<'_>, model: CommandPaletteModel, are
     if before_len > 0 {
         rule_spans.push(Span::styled(
             "─".repeat(before_len),
-            Style::default()
-                .fg(theme::PALETTE_TAB_RULE)
-                .bg(theme::PALETTE_BG),
+            Style::default().fg(Color::DarkGray).bg(Color::Reset),
         ));
     }
     if highlight_len > 0 {
         rule_spans.push(Span::styled(
             "─".repeat(highlight_len),
-            Style::default()
-                .fg(theme::PALETTE_TAB_ACTIVE_RULE)
-                .bg(theme::PALETTE_BG),
+            Style::default().fg(Color::Cyan).bg(Color::Reset),
         ));
     }
     if after_len > 0 {
         rule_spans.push(Span::styled(
             "─".repeat(after_len),
-            Style::default()
-                .fg(theme::PALETTE_TAB_RULE)
-                .bg(theme::PALETTE_BG),
+            Style::default().fg(Color::DarkGray).bg(Color::Reset),
         ));
     }
     let rule_line = RatatuiLine::from(rule_spans);
@@ -372,8 +364,8 @@ pub fn render_command_palette(f: &mut Frame<'_>, model: CommandPaletteModel, are
                     lines.push(RatatuiLine::from(Span::styled(
                         group_line,
                         Style::default()
-                            .fg(theme::PALETTE_GROUP)
-                            .bg(theme::PALETTE_BG)
+                            .fg(Color::Cyan)
+                            .bg(Color::Reset)
                             .add_modifier(Modifier::BOLD),
                     )));
                 }
@@ -445,9 +437,7 @@ pub fn render_command_palette(f: &mut Frame<'_>, model: CommandPaletteModel, are
         let empty_line = padded_line(empty_message(model.mode), list_width, padding);
         lines.push(RatatuiLine::from(Span::styled(
             empty_line,
-            Style::default()
-                .fg(theme::PALETTE_DESC)
-                .bg(theme::PALETTE_BG),
+            Style::default().fg(Color::Gray).bg(Color::Reset),
         )));
     }
 
@@ -490,7 +480,7 @@ pub fn render_command_palette(f: &mut Frame<'_>, model: CommandPaletteModel, are
     if let Some(content) = footer_content {
         let footer = Paragraph::new(RatatuiLine::from(Span::styled(
             content,
-            Style::default().fg(theme::PALETTE_HINT),
+            Style::default().fg(Color::Gray),
         )))
         .alignment(Alignment::Right);
         f.render_widget(footer, footer_area);

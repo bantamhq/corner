@@ -1,10 +1,11 @@
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Modifier, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line as RatatuiLine, Span};
 use ratatui::widgets::{Borders, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
+use super::surface::Surface;
 use crate::app::{App, InputMode, SidebarType, ViewMode};
 
 use super::agenda_widget::{AgendaVariant, build_agenda_widget};
@@ -99,8 +100,8 @@ pub fn render_app(f: &mut Frame<'_>, app: &mut App) {
     };
     let journal_name = app.journal_display_name();
     let journal_color = match app.active_journal() {
-        crate::storage::JournalSlot::Hub => theme::JOURNAL_HUB,
-        crate::storage::JournalSlot::Project => theme::JOURNAL_PROJECT,
+        crate::storage::JournalSlot::Hub => theme::HUB_PRIMARY,
+        crate::storage::JournalSlot::Project => theme::PROJECT_PRIMARY,
     };
     render_footer_bar(
         f,
@@ -108,6 +109,7 @@ pub fn render_app(f: &mut Frame<'_>, app: &mut App) {
         selected_tab,
         &journal_name,
         journal_color,
+        &app.surface,
     );
 
     render_overlays(
@@ -125,6 +127,7 @@ fn render_footer_bar(
     selected_tab: usize,
     journal_name: &str,
     journal_color: ratatui::style::Color,
+    surface: &Surface,
 ) {
     use ratatui::style::Color;
 
@@ -155,6 +158,32 @@ fn render_footer_bar(
     let left_line = RatatuiLine::from(left_spans);
     f.render_widget(Paragraph::new(left_line), padded_area);
 
+    // Surface color palette for testing
+    let bg_indicator = match surface.background {
+        Color::Reset => Span::styled("??", Style::default().fg(Color::Red)),
+        Color::Rgb(r, g, b) => Span::styled(
+            "bg",
+            Style::default().bg(Color::Rgb(r, g, b)).fg(Color::White),
+        ),
+        _ => Span::raw("--"),
+    };
+    let palette_spans = vec![
+        bg_indicator,
+        Span::raw(" "),
+        Span::styled("  ", Style::default().bg(surface.gray1)),
+        Span::styled("  ", Style::default().bg(surface.gray2)),
+        Span::styled("  ", Style::default().bg(surface.gray3)),
+        Span::styled("  ", Style::default().bg(surface.gray4)),
+        Span::styled("  ", Style::default().bg(surface.gray5)),
+        Span::raw(" "),
+        Span::styled("txt", Style::default().fg(surface.muted_text)),
+    ];
+    let palette_line = RatatuiLine::from(palette_spans);
+    f.render_widget(
+        Paragraph::new(palette_line).alignment(ratatui::layout::Alignment::Center),
+        padded_area,
+    );
+
     let journal_label = format!("[{}]", journal_name);
     let right_line = RatatuiLine::from(Span::styled(
         journal_label,
@@ -181,7 +210,8 @@ fn render_view_heading(f: &mut Frame<'_>, context: &RenderContext, app: &App) {
         ViewMode::Daily(_) => {
             let date_label =
                 super::shared::format_date_smart(app.current_date, &app.config.header_date_format);
-            (date_label, theme::MODE_DAILY)
+            let color = theme::context_primary(app.active_journal(), false);
+            (date_label, color)
         }
         ViewMode::Filter(state) => {
             let query_text = if is_filter_prompt {
@@ -190,7 +220,7 @@ fn render_view_heading(f: &mut Frame<'_>, context: &RenderContext, app: &App) {
                 state.query.clone()
             };
             let filter_label = format!("Filter: {}", query_text);
-            (filter_label, theme::MODE_FILTER)
+            (filter_label, theme::FILTER_PRIMARY)
         }
     };
 
@@ -224,7 +254,7 @@ fn render_view_heading(f: &mut Frame<'_>, context: &RenderContext, app: &App) {
     if highlight_start > 0 {
         rule_spans.push(Span::styled(
             "─".repeat(highlight_start),
-            Style::default().fg(theme::PALETTE_TAB_RULE),
+            Style::default().fg(Color::DarkGray),
         ));
     }
     if highlight_len > 0 {
@@ -236,7 +266,7 @@ fn render_view_heading(f: &mut Frame<'_>, context: &RenderContext, app: &App) {
     if after_len > 0 {
         rule_spans.push(Span::styled(
             "─".repeat(after_len),
-            Style::default().fg(theme::PALETTE_TAB_RULE),
+            Style::default().fg(Color::DarkGray),
         ));
     }
 
@@ -262,7 +292,7 @@ fn render_calendar_sidebar(f: &mut Frame<'_>, app: &App, sidebar_area: Rect) {
         title: Some(RatatuiLine::from(
             calendar_state.display_month.format(" %B %Y ").to_string(),
         )),
-        border_color: theme::BORDER_DAILY,
+        border_color: Color::White,
         focused_border_color: None,
         padded: false,
         borders: Borders::ALL,
@@ -279,7 +309,7 @@ fn render_calendar_sidebar(f: &mut Frame<'_>, app: &App, sidebar_area: Rect) {
 
     let upcoming_config = ContainerConfig {
         title: Some(RatatuiLine::from(" Upcoming ")),
-        border_color: theme::BORDER_DAILY,
+        border_color: Color::White,
         focused_border_color: None,
         padded: false,
         borders: Borders::ALL,
@@ -302,7 +332,7 @@ fn render_calendar_sidebar(f: &mut Frame<'_>, app: &App, sidebar_area: Rect) {
 fn render_agenda_sidebar(f: &mut Frame<'_>, app: &App, sidebar_area: Rect) {
     let config = ContainerConfig {
         title: Some(RatatuiLine::from(" Agenda ")),
-        border_color: theme::BORDER_DAILY,
+        border_color: Color::White,
         focused_border_color: None,
         padded: false,
         borders: Borders::ALL,
