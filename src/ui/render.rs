@@ -81,13 +81,7 @@ pub fn render_app(f: &mut Frame<'_>, app: &mut App) {
 
     if let (Some(cursor), Some(content_area)) = (view_model.cursor.edit.as_ref(), list_content_area)
     {
-        set_edit_cursor(
-            f,
-            cursor,
-            app.scroll_offset_mut(),
-            content_area.height as usize,
-            content_area,
-        );
+        set_edit_cursor(f, cursor, app.scroll_offset(), content_area);
         render_autocomplete_dropdown(f, app, cursor, content_area);
     }
 
@@ -275,6 +269,7 @@ fn render_calendar_sidebar(f: &mut Frame<'_>, app: &App, sidebar_area: Rect) {
         padded: false,
         borders: Borders::ALL,
         rounded: true,
+        bottom_buffer: 0,
     };
 
     let calendar_layout = render_container_in_area(f, calendar_area, &calendar_config, false);
@@ -292,6 +287,7 @@ fn render_calendar_sidebar(f: &mut Frame<'_>, app: &App, sidebar_area: Rect) {
         padded: false,
         borders: Borders::ALL,
         rounded: true,
+        bottom_buffer: 0,
     };
 
     let upcoming_layout = render_container_in_area(f, upcoming_area, &upcoming_config, false);
@@ -315,6 +311,7 @@ fn render_agenda_sidebar(f: &mut Frame<'_>, app: &App, sidebar_area: Rect) {
         padded: false,
         borders: Borders::ALL,
         rounded: true,
+        bottom_buffer: 0,
     };
 
     let layout = render_container_in_area(f, sidebar_area, &config, false);

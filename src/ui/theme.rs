@@ -80,6 +80,9 @@ pub const HEADING_PADDING: usize = 2;
 pub const CALENDAR_PANEL_HEIGHT: u16 = 10;
 pub const UPCOMING_MIN_HEIGHT: u16 = 3;
 
+// Entry list buffer (rows reserved at bottom for scroll indicator)
+pub const ENTRY_LIST_BOTTOM_BUFFER: u16 = 2;
+
 // Agenda widget
 pub const AGENDA_MIN_ENTRIES: usize = 7;
 pub const AGENDA_MAX_DAYS_SEARCH: i64 = 365;

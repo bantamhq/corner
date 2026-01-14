@@ -46,15 +46,20 @@ pub fn layout_nodes(area: Rect, node: &LayoutNode) -> Vec<(PanelId, Rect)> {
     }
 }
 
-pub fn padded_content_area(inner: Rect) -> Rect {
-    Layout::default()
+pub fn padded_content_area_with_buffer(inner: Rect, bottom_buffer: u16) -> Rect {
+    let horizontally_padded = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Length(2),
             Constraint::Min(1),
             Constraint::Length(2),
         ])
-        .split(inner)[1]
+        .split(inner)[1];
+
+    Rect {
+        height: horizontally_padded.height.saturating_sub(bottom_buffer),
+        ..horizontally_padded
+    }
 }
 
 fn split_children(

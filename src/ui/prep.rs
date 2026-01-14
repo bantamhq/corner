@@ -4,7 +4,7 @@ use crate::storage::Line;
 use unicode_width::UnicodeWidthStr;
 
 use super::context::RenderContext;
-use super::scroll::{CursorContext, ensure_selected_visible};
+use super::scroll::{CursorContext, ensure_line_visible, ensure_selected_visible};
 use super::views::{
     list_content_height_for_daily, list_content_height_for_filter, list_content_width_for_daily,
     list_content_width_for_filter,
@@ -132,6 +132,20 @@ pub fn prepare_render(app: &mut App, layout: &RenderContext) -> RenderPrep {
     } else {
         None
     };
+
+    if let Some(ref cursor) = edit_cursor {
+        let cursor_line = cursor.entry_start_line + cursor.cursor_row;
+        match &mut app.view {
+            ViewMode::Filter(state) => {
+                let scroll_height = list_content_height_for_filter(layout);
+                ensure_line_visible(&mut state.scroll_offset, cursor_line, scroll_height);
+            }
+            ViewMode::Daily(state) => {
+                let scroll_height = list_content_height_for_daily(layout);
+                ensure_line_visible(&mut state.scroll_offset, cursor_line, scroll_height);
+            }
+        }
+    }
 
     RenderPrep { edit_cursor }
 }

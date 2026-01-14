@@ -8,7 +8,7 @@ use ratatui::{
 use unicode_width::UnicodeWidthStr;
 
 use super::context::RenderContext;
-use super::layout::padded_content_area;
+use super::layout::padded_content_area_with_buffer;
 use super::model::ListModel;
 use super::scroll_indicator::{ScrollIndicatorStyle, scroll_indicator_text};
 
@@ -19,6 +19,7 @@ pub struct ContainerConfig {
     pub padded: bool,
     pub borders: Borders,
     pub rounded: bool,
+    pub bottom_buffer: u16,
 }
 
 /// Shared container config for view content panels (no borders, with padding).
@@ -31,6 +32,7 @@ pub fn view_content_container_config(border_color: Color) -> ContainerConfig {
         padded: true,
         borders: Borders::NONE,
         rounded: false,
+        bottom_buffer: super::theme::ENTRY_LIST_BOTTOM_BUFFER,
     }
 }
 
@@ -89,7 +91,12 @@ pub fn render_container_in_area(
 pub fn content_area_for(area: Rect, config: &ContainerConfig) -> Rect {
     let inner = Block::default().borders(config.borders).inner(area);
     if config.padded {
-        padded_content_area(inner)
+        padded_content_area_with_buffer(inner, config.bottom_buffer)
+    } else if config.bottom_buffer > 0 {
+        Rect {
+            height: inner.height.saturating_sub(config.bottom_buffer),
+            ..inner
+        }
     } else {
         inner
     }
