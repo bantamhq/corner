@@ -27,4 +27,6 @@ fn core_workflow_creates_toggles_filters_deletes_undoes() {
 
     let journal = ctx.read_journal();
     assert!(journal.contains("Smoke test entry"));
+
+    ctx.verify_invariants();
 }

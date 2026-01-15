@@ -179,6 +179,49 @@ impl TestContext {
     pub fn entry_count(&self) -> usize {
         self.app.entry_indices.len()
     }
+
+    /// Verify invariants that must always hold after any operation.
+    /// Call this at the end of every test.
+    pub fn verify_invariants(&mut self) {
+        self.verify_selection_bounds();
+        self.verify_cursor_bounds();
+        self.verify_mode_consistency();
+    }
+
+    fn verify_selection_bounds(&self) {
+        let count = self.entry_count();
+        let selected = self.selected_index();
+        if count > 0 {
+            assert!(
+                selected < count,
+                "Selection {} out of bounds (entry_count={})",
+                selected,
+                count
+            );
+        }
+    }
+
+    fn verify_cursor_bounds(&self) {
+        if let Some(buffer) = &self.app.edit_buffer {
+            let cursor = buffer.cursor_char_pos();
+            let len = buffer.content().chars().count();
+            assert!(
+                cursor <= len,
+                "Cursor {} beyond text length {}",
+                cursor,
+                len
+            );
+        }
+    }
+
+    fn verify_mode_consistency(&self) {
+        if matches!(self.app.input_mode, InputMode::Edit(_)) {
+            assert!(
+                self.app.edit_buffer.is_some(),
+                "Edit mode but no edit_buffer"
+            );
+        }
+    }
 }
 
 impl Drop for TestContext {
