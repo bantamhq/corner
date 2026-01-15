@@ -326,13 +326,13 @@ impl App {
 
         match storage::update_entry_content(date, &path, line_index, new_content.clone()) {
             Ok(false) => {
-                self.set_status(format!(
+                self.set_error(format!(
                     "Failed to update: no entry at index {line_index} for {date}"
                 ));
                 None
             }
             Err(e) => {
-                self.set_status(format!("Failed to save: {e}"));
+                self.set_error(format!("Failed to save: {e}"));
                 None
             }
             Ok(true) if original_content != new_content => Some((entry_type, new_content)),

@@ -151,7 +151,7 @@ impl TestContext {
         self.app
             .status_message
             .as_ref()
-            .is_some_and(|s| s.contains(text))
+            .is_some_and(|s| s.text.contains(text))
     }
 
     pub fn journal_path(&self) -> PathBuf {

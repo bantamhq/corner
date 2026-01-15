@@ -1,3 +1,6 @@
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line as RatatuiLine, Span};
+
 use crate::app::{App, InputMode};
 
 use super::container::ContainerConfig;
@@ -76,7 +79,7 @@ pub fn build_view_model(app: &App, context: &RenderContext, prep: RenderPrep) ->
     };
 
     let view_spec = build_view_spec(app, context);
-    let header = build_header(app);
+    let header = build_header();
 
     ViewModel {
         layout: view_spec.layout,
@@ -91,9 +94,15 @@ pub fn build_view_model(app: &App, context: &RenderContext, prep: RenderPrep) ->
     }
 }
 
-fn build_header(_app: &App) -> HeaderModel {
+fn build_header() -> HeaderModel {
+    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
     HeaderModel {
         left: None,
-        right: None,
+        right: Some(RatatuiLine::from(Span::styled(
+            version,
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM),
+        ))),
     }
 }

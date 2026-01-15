@@ -29,7 +29,7 @@ use crate::ui::agenda_widget::{AgendaCache, collect_agenda_cache};
 
 use self::calendar::CalendarState;
 
-use crate::config::Config;
+use crate::config::{Config, SidebarDefault};
 use crate::cursor::CursorBuffer;
 use crate::dispatch::Keymap;
 use crate::storage::{
@@ -245,6 +245,13 @@ pub enum SidebarType {
     Agenda,
 }
 
+/// Status message with error flag for styling
+#[derive(Clone)]
+pub struct StatusMessage {
+    pub text: String,
+    pub is_error: bool,
+}
+
 /// The currently selected item, accounting for hidden completed entries
 pub enum SelectedItem<'a> {
     Projected {
@@ -273,7 +280,7 @@ pub struct App {
     pub edit_buffer: Option<CursorBuffer>,
     pub should_quit: bool,
     pub needs_redraw: bool,
-    pub status_message: Option<String>,
+    pub status_message: Option<StatusMessage>,
     pub last_filter_query: Option<String>,
     pub config: Config,
     pub journal_context: JournalContext,
@@ -328,6 +335,7 @@ impl App {
         let in_git_repo = storage::find_git_root().is_some();
         let cached_journal_tags = Vec::new();
         let hide_completed = config.hide_completed;
+        let sidebar_default = config.sidebar_default;
 
         let keymap = Keymap::new(&config.keys).unwrap_or_else(|e| {
             eprintln!("Invalid key config: {e}");
@@ -364,7 +372,11 @@ impl App {
             original_edit_content: None,
             calendar_store: CalendarStore::new(),
             calendar_state: CalendarState::new(date),
-            active_sidebar: Some(SidebarType::Calendar),
+            active_sidebar: match sidebar_default {
+                SidebarDefault::None => None,
+                SidebarDefault::Agenda => Some(SidebarType::Agenda),
+                SidebarDefault::Calendar => Some(SidebarType::Calendar),
+            },
             agenda_cache: None,
             runtime_handle,
             calendar_rx,
@@ -519,7 +531,17 @@ impl App {
     }
 
     pub fn set_status(&mut self, msg: impl Into<String>) {
-        self.status_message = Some(msg.into());
+        self.status_message = Some(StatusMessage {
+            text: msg.into(),
+            is_error: false,
+        });
+    }
+
+    pub fn set_error(&mut self, msg: impl Into<String>) {
+        self.status_message = Some(StatusMessage {
+            text: msg.into(),
+            is_error: true,
+        });
     }
 
     pub fn execute_action(&mut self, action: Box<dyn actions::Action>) -> io::Result<()> {

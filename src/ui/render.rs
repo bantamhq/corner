@@ -54,6 +54,7 @@ pub fn render_app(f: &mut Frame<'_>, app: &mut App) {
     render_view_heading(f, &context, app);
 
     let mut list_content_area = None;
+    let mut primary_panel_area = None;
 
     for (panel_id, rect) in layout_nodes(context.content_area, &view_model.layout) {
         if let Some(panel) = view_model.panels.get(panel_id) {
@@ -61,6 +62,7 @@ pub fn render_app(f: &mut Frame<'_>, app: &mut App) {
             let container_layout = render_container_in_area(f, rect, &panel.config, focused);
             if view_model.primary_list_panel == Some(panel_id) {
                 list_content_area = Some(container_layout.content_area);
+                primary_panel_area = Some(container_layout.main_area);
             }
             match &panel.content {
                 PanelContent::EntryList(list) => {
@@ -69,6 +71,10 @@ pub fn render_app(f: &mut Frame<'_>, app: &mut App) {
                 PanelContent::Empty => {}
             }
         }
+    }
+
+    if let Some(main_area) = primary_panel_area {
+        render_status_indicator(f, app, main_area);
     }
 
     if let Some(sidebar_area) = context.sidebar_area {
@@ -325,6 +331,37 @@ fn render_agenda_sidebar(f: &mut Frame<'_>, app: &App, sidebar_area: Rect) {
         let content = Paragraph::new(lines);
         f.render_widget(content, layout.content_area);
     }
+}
+
+fn render_status_indicator(f: &mut Frame<'_>, app: &App, main_area: Rect) {
+    let Some(ref status) = app.status_message else {
+        return;
+    };
+
+    let bg_color = theme::panel_bg(&app.surface);
+    let border_color = if status.is_error {
+        theme::STATUS_ERROR
+    } else {
+        theme::context_primary(app.active_journal())
+    };
+
+    let bg_style = Style::default().bg(bg_color);
+    let border_span = Span::styled("▌", Style::default().fg(border_color).bg(bg_color));
+    let text_span = Span::styled(
+        status.text.clone(),
+        Style::default().fg(theme::STATUS_TEXT).bg(bg_color),
+    );
+    let padding_span = Span::styled(" ", bg_style);
+    let line = RatatuiLine::from(vec![border_span, text_span, padding_span]);
+
+    let status_area = Rect {
+        x: main_area.x + 1,
+        y: main_area.y + main_area.height.saturating_sub(2),
+        width: main_area.width.saturating_sub(2),
+        height: 1,
+    };
+
+    f.render_widget(Paragraph::new(line), status_area);
 }
 
 fn render_filter_prompt_autocomplete(f: &mut Frame<'_>, app: &App, context: &RenderContext) {

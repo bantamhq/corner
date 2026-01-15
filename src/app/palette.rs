@@ -223,7 +223,7 @@ impl App {
         };
 
         if !project.available {
-            self.set_status("Cannot hide unavailable projects");
+            self.set_error("Cannot hide unavailable projects");
             return Ok(());
         }
 

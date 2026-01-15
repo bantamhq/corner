@@ -317,6 +317,7 @@ Press `+` to open the project switcher.
 | `:open-project-config ` | Open project config in default editor (creates if missing) |
 | `:reload-config ` | Reload configuration from disk |
 | `:open-journal ` | Open current journal in default editor |
+| `:add-gitignore ` | Add .caliber to project's .gitignore |
 
 
 ### Filter Syntax

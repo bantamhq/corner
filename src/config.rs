@@ -75,6 +75,19 @@ pub enum CalendarVisibilityMode {
     None,
 }
 
+/// Default sidebar to show on launch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum SidebarDefault {
+    /// No sidebar on launch
+    None,
+    /// Agenda sidebar
+    Agenda,
+    /// Calendar sidebar (default)
+    #[default]
+    Calendar,
+}
+
 /// Global calendar visibility settings.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CalendarVisibilityConfig {
@@ -152,6 +165,9 @@ pub struct Config {
     /// Calendar visibility settings
     #[serde(default)]
     pub calendar_visibility: CalendarVisibilityConfig,
+    /// Default sidebar to show on launch
+    #[serde(default)]
+    pub sidebar_default: SidebarDefault,
 }
 
 /// Raw config for deserialization - all fields are Option to distinguish "not set" from "set to default"
@@ -172,6 +188,8 @@ struct RawConfig {
     pub calendars: Option<HashMap<String, CalendarConfig>>,
     /// Calendar visibility settings
     pub calendar_visibility: Option<CalendarVisibilityConfig>,
+    /// Default sidebar to show on launch
+    pub sidebar_default: Option<SidebarDefault>,
 }
 
 impl RawConfig {
@@ -194,6 +212,7 @@ impl RawConfig {
                 .unwrap_or_else(default_auto_init_project),
             calendars: self.calendars.unwrap_or_default(),
             calendar_visibility: self.calendar_visibility.unwrap_or_default(),
+            sidebar_default: self.sidebar_default.unwrap_or_default(),
         }
     }
 
@@ -219,6 +238,7 @@ impl RawConfig {
             auto_init_project: base.auto_init_project,
             calendars: base.calendars,
             calendar_visibility: base.calendar_visibility,
+            sidebar_default: base.sidebar_default,
         }
     }
 }

@@ -5,7 +5,7 @@ use super::{App, InputMode, SelectedItem, ViewMode};
 impl App {
     pub fn enter_reorder_mode(&mut self) {
         if matches!(self.get_selected_item(), SelectedItem::Projected { .. }) {
-            self.set_status("Cannot reorder projected entries");
+            self.set_error("Cannot reorder projected entries");
             return;
         }
 

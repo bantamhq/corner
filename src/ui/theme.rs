@@ -23,6 +23,10 @@ pub const CALENDAR_OTHER: Color = Color::Gray;
 pub const CONFIRM_YES: Color = Color::Green;
 pub const CONFIRM_NO: Color = Color::Red;
 
+// Status indicator
+pub const STATUS_TEXT: Color = Color::Gray;
+pub const STATUS_ERROR: Color = Color::Red;
+
 /// Returns the appropriate primary color based on journal context.
 /// Used for cursor, headings, and other context-aware elements.
 #[must_use]

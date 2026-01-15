@@ -380,7 +380,7 @@ impl App {
         };
 
         if super::actions::is_recurring_entry(&target.location) {
-            self.set_status("Cannot defer recurring entries");
+            self.set_error("Cannot defer recurring entries");
             return Ok(());
         }
 
@@ -434,7 +434,7 @@ impl App {
         let text = match Self::read_from_clipboard() {
             Ok(t) => t,
             Err(e) => {
-                self.set_status(format!("Failed to read clipboard: {e}"));
+                self.set_error(format!("Failed to read clipboard: {e}"));
                 return Ok(());
             }
         };
@@ -445,7 +445,7 @@ impl App {
     pub fn paste_entries_from_text(&mut self, text: &str) -> io::Result<()> {
         let raw_entries = Self::parse_paste_raw(text);
         if raw_entries.is_empty() {
-            self.set_status("Nothing to paste");
+            self.set_error("Nothing to paste");
             return Ok(());
         }
 

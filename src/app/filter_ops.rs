@@ -72,17 +72,22 @@ impl App {
         };
 
         let filter = storage::parse_filter_query(&state.query);
-
-        if !filter.invalid_tokens.is_empty() {
-            self.status_message = Some(format!(
+        let error_msg = if filter.invalid_tokens.is_empty() {
+            None
+        } else {
+            Some(format!(
                 "Unknown filter: {}",
                 filter.invalid_tokens.join(", ")
-            ));
-        }
+            ))
+        };
 
         state.entries = storage::collect_filtered_entries(&filter, &path)?;
         state.selected = state.selected.min(state.entries.len().saturating_sub(1));
         state.scroll_offset = 0;
+
+        if let Some(msg) = error_msg {
+            self.set_error(msg);
+        }
         Ok(())
     }
 

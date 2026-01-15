@@ -406,7 +406,7 @@ pub fn handle_confirm_key(app: &mut App, key: KeyCode) -> io::Result<()> {
 
                 let caliber_dir = root.join(".caliber");
                 if let Err(e) = std::fs::create_dir_all(&caliber_dir) {
-                    app.set_status(format!("Failed to create project: {e}"));
+                    app.set_error(format!("Failed to create project: {e}"));
                     app.input_mode = InputMode::Normal;
                     return Ok(());
                 }
@@ -420,12 +420,12 @@ pub fn handle_confirm_key(app: &mut App, key: KeyCode) -> io::Result<()> {
                     if let Some(parent) = journal_path.parent()
                         && let Err(e) = std::fs::create_dir_all(parent)
                     {
-                        app.set_status(format!("Failed to create journal directory: {e}"));
+                        app.set_error(format!("Failed to create journal directory: {e}"));
                         app.input_mode = InputMode::Normal;
                         return Ok(());
                     }
                     if let Err(e) = std::fs::write(&journal_path, "") {
-                        app.set_status(format!("Failed to create journal: {e}"));
+                        app.set_error(format!("Failed to create journal: {e}"));
                         app.input_mode = InputMode::Normal;
                         return Ok(());
                     }

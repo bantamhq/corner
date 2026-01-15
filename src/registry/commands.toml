@@ -35,3 +35,8 @@ help = "Reload configuration from disk"
 name = "open-journal"
 group = "Journal"
 help = "Open current journal in default editor"
+
+[[command]]
+name = "add-gitignore"
+group = "Project"
+help = "Add .caliber to project's .gitignore"
