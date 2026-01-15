@@ -1,5 +1,3 @@
-use chrono::Local;
-
 use crate::cursor::CursorBuffer;
 use crate::storage::{self, Entry, EntryType, Line, RawEntry, SourceType};
 
@@ -7,14 +5,6 @@ use super::actions::{CreateEntry, CreateTarget, EditEntry, EditTarget};
 use super::{App, EditContext, EntryLocation, InputMode, InsertPosition, ViewMode};
 
 impl App {
-    pub(super) fn preprocess_content(&self, content: &str) -> (String, Option<String>) {
-        let content = storage::expand_favorite_tags(content, &self.config.favorite_tags);
-        let content = storage::normalize_relative_dates(&content, Local::now().date_naive());
-        let (content, warning) = storage::normalize_entry_structure(&content);
-        (content.trim_end().to_string(), warning)
-    }
-
-    /// Cycle entry type while editing (BackTab)
     pub fn cycle_edit_entry_type(&mut self) {
         match &mut self.input_mode {
             InputMode::Edit(EditContext::Daily { entry_index }) => {
@@ -67,14 +57,12 @@ impl App {
         }
     }
 
-    /// Save current edit buffer. Returns (context, had_content) or None if no buffer.
     fn save_current_edit(&mut self) -> Option<(EditContext, bool)> {
         let buffer = self.edit_buffer.take()?;
-        let (new_content, preprocess_warning) = self.preprocess_content(&buffer.into_content());
+        let (new_content, warning) = self.normalize_content(&buffer.into_content());
         let had_content = !new_content.trim().is_empty();
 
-        // Show warning if preprocessing stripped extra dates
-        if let Some(warning) = preprocess_warning {
+        if let Some(warning) = warning {
             self.set_status(warning);
         }
         let original_content = self.original_edit_content.take().unwrap_or_default();
@@ -126,7 +114,6 @@ impl App {
         Some((context, had_content))
     }
 
-    /// Save and exit edit mode (Enter)
     pub fn exit_edit(&mut self) {
         if self.save_current_edit().is_none() {
             self.input_mode = InputMode::Normal;
@@ -146,7 +133,6 @@ impl App {
         };
 
         if new_content.trim().is_empty() {
-            // Empty content - delete the entry (no action for new empty entries)
             self.delete_at_index_daily(entry_index);
             if let ViewMode::Daily(state) = &mut self.view {
                 state.scroll_offset = 0;
@@ -154,22 +140,18 @@ impl App {
             return;
         }
 
-        // Get entry type before modifying
         let entry_type = if let Line::Entry(entry) = &self.lines[line_idx] {
             entry.entry_type.clone()
         } else {
             return;
         };
 
-        // Save the content
         if let Some(entry) = self.get_daily_entry_mut(entry_index) {
             entry.content = new_content.clone();
             self.save();
         }
 
-        // Create appropriate action
         if is_new_entry {
-            // Get the full entry after saving
             if let Line::Entry(raw_entry) = &self.lines[line_idx] {
                 let entry =
                     Entry::from_raw(raw_entry, self.current_date, line_idx, SourceType::Local);
@@ -254,7 +236,6 @@ impl App {
             lines.push(Line::Entry(raw_entry));
             let _ = storage::save_day_lines(date, &path, &lines);
 
-            // Create action for the new entry
             let entry = Entry {
                 entry_type,
                 content,
@@ -316,8 +297,6 @@ impl App {
         self.refresh_projected_entries();
     }
 
-    /// Updates an entry on a remote date (not current_date).
-    /// Returns Some((entry_type, new_content)) if content changed, None otherwise.
     fn update_remote_entry(
         &mut self,
         date: chrono::NaiveDate,
@@ -360,7 +339,6 @@ impl App {
         }
     }
 
-    /// Save and add new entry (Tab)
     pub fn commit_and_add_new(&mut self) {
         let Some((context, had_content)) = self.save_current_edit() else {
             return;
@@ -428,7 +406,6 @@ impl App {
             state.selected = visible_index;
         }
 
-        // Mark as new entry for action tracking
         self.original_edit_content = Some(String::new());
         self.edit_buffer = Some(CursorBuffer::empty());
         self.input_mode = InputMode::Edit(EditContext::Daily { entry_index });

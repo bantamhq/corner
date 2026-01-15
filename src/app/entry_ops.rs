@@ -465,7 +465,7 @@ impl App {
         }
 
         for entry in &mut raw_entries {
-            let (normalized, warning) = self.preprocess_content(&entry.content);
+            let (normalized, warning) = self.normalize_content(&entry.content);
             entry.content = normalized;
             if let Some(warn) = warning {
                 self.set_status(warn);

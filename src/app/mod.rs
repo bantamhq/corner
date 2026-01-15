@@ -1,6 +1,7 @@
 pub mod actions;
 mod calendar;
 mod command;
+mod content;
 mod date_picker;
 mod edit_mode;
 mod entry_ops;
