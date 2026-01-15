@@ -223,6 +223,113 @@ pub fn normalize_relative_dates(content: &str, today: NaiveDate) -> String {
         .into_owned()
 }
 
+/// Normalizes entry structure to: [content] [recurring_dates] [later_date] [#tags]
+///
+/// - Trailing section = contiguous dates/tags at end (only whitespace between them)
+/// - Inline #tags (in content section) have # stripped
+/// - All @dates are extracted from anywhere and moved to structure
+/// - Non-date @patterns (like @bob) are left as-is
+/// - Returns (normalized_content, optional_warning for stripped extra dates)
+#[must_use]
+pub fn normalize_entry_structure(content: &str) -> (String, Option<String>) {
+    let later_dates: Vec<_> = LATER_DATE_REGEX.find_iter(content).collect();
+    let recurring_dates: Vec<_> = RECURRING_REGEX.find_iter(content).collect();
+    let tags: Vec<_> = TAG_REGEX.find_iter(content).collect();
+
+    if later_dates.is_empty() && recurring_dates.is_empty() && tags.is_empty() {
+        return (content.to_string(), None);
+    }
+
+    let trailing_start = find_trailing_section_start(content, &later_dates, &recurring_dates, &tags);
+
+    let (trailing_tags, inline_tags): (Vec<&regex::Match>, Vec<&regex::Match>) =
+        tags.iter().partition(|t| t.start() >= trailing_start);
+
+    let warning = (later_dates.len() > 1).then(|| {
+        let extras: Vec<_> = later_dates[1..].iter().map(|m| m.as_str()).collect();
+        format!("Stripped extra dates: {}", extras.join(", "))
+    });
+
+    // Removals: (start, end, replacement) - replacement None means delete
+    let mut removals: Vec<(usize, usize, Option<&str>)> = Vec::new();
+    for m in later_dates.iter().chain(recurring_dates.iter()) {
+        removals.push((m.start(), m.end(), None));
+    }
+    for m in &trailing_tags {
+        removals.push((m.start(), m.end(), None));
+    }
+    for m in &inline_tags {
+        removals.push((m.start(), m.end(), Some(&m.as_str()[1..])));
+    }
+
+    // Sort descending so we can modify from end to start without invalidating positions
+    removals.sort_by(|a, b| b.0.cmp(&a.0));
+
+    let mut result = content.to_string();
+    for (start, end, replacement) in removals {
+        result.replace_range(start..end, replacement.unwrap_or(""));
+    }
+
+    let result = result.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    // Reconstruct: [content] [recurring] [later] [tags]
+    let mut final_parts = vec![result];
+    for m in &recurring_dates {
+        final_parts.push(m.as_str().trim().to_string());
+    }
+    if let Some(m) = later_dates.first() {
+        final_parts.push(m.as_str().to_string());
+    }
+    for m in &trailing_tags {
+        final_parts.push(m.as_str().to_string());
+    }
+
+    (final_parts.join(" "), warning)
+}
+
+/// Find the byte position where the trailing section starts.
+/// Trailing section = contiguous sequence of dates and tags at the end,
+/// with only whitespace between them.
+fn find_trailing_section_start(
+    content: &str,
+    later_dates: &[regex::Match],
+    recurring_dates: &[regex::Match],
+    tags: &[regex::Match],
+) -> usize {
+    let mut patterns: Vec<(usize, usize)> = later_dates
+        .iter()
+        .chain(recurring_dates.iter())
+        .chain(tags.iter())
+        .map(|m| (m.start(), m.end()))
+        .collect();
+
+    if patterns.is_empty() {
+        return content.len();
+    }
+
+    patterns.sort_by_key(|p| p.0);
+
+    let content_bytes = content.as_bytes();
+    let mut trailing_start = content.len();
+
+    // Walk backwards, including patterns that connect to trailing section via whitespace only
+    for &(pat_start, pat_end) in patterns.iter().rev() {
+        let gap = &content_bytes[pat_end..trailing_start];
+        if gap.iter().all(|&b| b.is_ascii_whitespace()) {
+            trailing_start = pat_start;
+        } else {
+            break;
+        }
+    }
+
+    // Trim any whitespace before the first trailing pattern
+    if trailing_start > 0 && trailing_start < content.len() {
+        trailing_start = content[..trailing_start].trim_end().len();
+    }
+
+    trailing_start
+}
+
 /// Replaces favorite tag shortcuts (#0 through #9) with actual tags from config.
 /// Tags that don't exist in config are left unchanged.
 #[must_use]
@@ -352,6 +459,19 @@ pub fn remove_date(content: &str) -> Option<String> {
         result.replace_range(m.range(), "");
         result
     })
+}
+
+/// Sets or replaces the @date to today's date.
+/// If entry has an @date, replaces it with today. Otherwise appends today's date.
+#[must_use]
+pub fn bring_to_today(content: &str, today: NaiveDate) -> String {
+    let today_str = format!("@{}/{}", today.month(), today.day());
+
+    if let Some(without_date) = remove_date(content) {
+        format!("{} {}", without_date.trim_end(), today_str)
+    } else {
+        format!("{} {}", content.trim_end(), today_str)
+    }
 }
 
 /// Collects all projected entries (both @later and @recurring) for the target date.

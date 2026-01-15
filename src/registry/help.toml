@@ -95,6 +95,11 @@ actions = "remove_date"
 description = "Remove date from entry"
 category = "dates"
 
+[[help]]
+actions = "bring_to_today"
+description = "Set entry date to today"
+category = "dates"
+
 # =============================================================================
 # Clipboard & Undo
 # =============================================================================

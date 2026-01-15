@@ -322,6 +322,7 @@ impl App {
         if let ViewMode::Daily(state) = &mut self.view {
             state.projected_entries = projected;
         }
+        self.clamp_selection_to_visible();
     }
 
     /// Shared cleanup for all view switches - resets input mode and clears undo/redo.

@@ -109,6 +109,11 @@ default_keys = ["D"]
 contexts = ["shared_normal", "selection"]
 
 [[action]]
+key_action_id = "bring_to_today"
+default_keys = ["T"]
+contexts = ["shared_normal", "selection"]
+
+[[action]]
 key_action_id = "yank"
 default_keys = ["y"]
 contexts = ["shared_normal", "selection"]
@@ -195,7 +200,7 @@ contexts = ["daily_normal"]
 
 [[action]]
 key_action_id = "tidy_entries"
-default_keys = ["T"]
+default_keys = ["s"]
 contexts = ["daily_normal"]
 
 [[action]]

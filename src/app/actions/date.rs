@@ -1,7 +1,7 @@
 use std::io;
 
 use crate::app::{App, EntryLocation};
-use crate::storage::{SourceType, defer_date, remove_date};
+use crate::storage::{SourceType, bring_to_today, defer_date, remove_date};
 
 use super::content_ops::{
     ContentTarget, execute_content_operation, get_entry_content, set_entry_content,
@@ -10,6 +10,22 @@ use super::types::{Action, ActionDescription, StatusVisibility};
 
 /// Target for date operations (type alias for ContentTarget)
 pub type DateTarget = ContentTarget;
+
+fn date_action_description(count: usize, singular: &str, plural: &str) -> ActionDescription {
+    if count == 1 {
+        ActionDescription {
+            past: singular.to_string(),
+            past_reversed: "Restored date".to_string(),
+            visibility: StatusVisibility::Always,
+        }
+    } else {
+        ActionDescription {
+            past: format!("{plural} {count} entries"),
+            past_reversed: format!("Restored dates on {count} entries"),
+            visibility: StatusVisibility::Always,
+        }
+    }
+}
 
 /// Action to defer the @date by 1 day
 pub struct DeferDate {
@@ -45,20 +61,7 @@ impl Action for DeferDate {
     }
 
     fn description(&self) -> ActionDescription {
-        let count = self.targets.len();
-        if count == 1 {
-            ActionDescription {
-                past: "Deferred date".to_string(),
-                past_reversed: "Restored date".to_string(),
-                visibility: StatusVisibility::Always,
-            }
-        } else {
-            ActionDescription {
-                past: format!("Deferred dates on {} entries", count),
-                past_reversed: format!("Restored dates on {} entries", count),
-                visibility: StatusVisibility::Always,
-            }
-        }
+        date_action_description(self.targets.len(), "Deferred date", "Deferred dates on")
     }
 }
 
@@ -95,20 +98,47 @@ impl Action for RemoveDate {
     }
 
     fn description(&self) -> ActionDescription {
-        let count = self.targets.len();
-        if count == 1 {
-            ActionDescription {
-                past: "Removed date".to_string(),
-                past_reversed: "Restored date".to_string(),
-                visibility: StatusVisibility::Always,
-            }
-        } else {
-            ActionDescription {
-                past: format!("Removed dates from {} entries", count),
-                past_reversed: format!("Restored dates on {} entries", count),
-                visibility: StatusVisibility::Always,
-            }
+        date_action_description(self.targets.len(), "Removed date", "Removed dates from")
+    }
+}
+
+/// Action to set @date to today
+pub struct BringToToday {
+    targets: Vec<DateTarget>,
+}
+
+impl BringToToday {
+    #[must_use]
+    pub fn new(targets: Vec<DateTarget>) -> Self {
+        Self { targets }
+    }
+
+    #[must_use]
+    pub fn single(location: EntryLocation, original_content: String) -> Self {
+        Self::new(vec![DateTarget {
+            location,
+            original_content,
+        }])
+    }
+}
+
+impl Action for BringToToday {
+    fn execute(&mut self, app: &mut App) -> io::Result<Box<dyn Action>> {
+        let today = chrono::Local::now().date_naive();
+        for target in &self.targets {
+            execute_content_operation(app, &target.location, |content| {
+                Some(bring_to_today(content, today))
+            })?;
         }
+
+        Ok(Box::new(RestoreDate::new(
+            self.targets.clone(),
+            DateOperation::BringToToday,
+        )))
+    }
+
+    fn description(&self) -> ActionDescription {
+        date_action_description(self.targets.len(), "Set date to today", "Set date to today on")
     }
 }
 
@@ -117,6 +147,7 @@ impl Action for RemoveDate {
 enum DateOperation {
     Defer,
     Remove,
+    BringToToday,
 }
 
 /// Action to restore original content (reverse of date operations)
@@ -143,6 +174,7 @@ impl Action for RestoreDate {
         let redo_action: Box<dyn Action> = match &self.operation {
             DateOperation::Defer => Box::new(DeferDate::new(new_targets)),
             DateOperation::Remove => Box::new(RemoveDate::new(new_targets)),
+            DateOperation::BringToToday => Box::new(BringToToday::new(new_targets)),
         };
 
         Ok(redo_action)
@@ -150,36 +182,23 @@ impl Action for RestoreDate {
 
     fn description(&self) -> ActionDescription {
         let count = self.targets.len();
-        match &self.operation {
-            DateOperation::Defer => {
-                if count == 1 {
-                    ActionDescription {
-                        past: "Restored date".to_string(),
-                        past_reversed: "Deferred date".to_string(),
-                        visibility: StatusVisibility::Always,
-                    }
-                } else {
-                    ActionDescription {
-                        past: format!("Restored dates on {} entries", count),
-                        past_reversed: format!("Deferred dates on {} entries", count),
-                        visibility: StatusVisibility::Always,
-                    }
-                }
+        let (singular, plural) = match &self.operation {
+            DateOperation::Defer => ("Deferred date", "Deferred dates on"),
+            DateOperation::Remove => ("Removed date", "Removed dates from"),
+            DateOperation::BringToToday => ("Set date to today", "Set date to today on"),
+        };
+
+        if count == 1 {
+            ActionDescription {
+                past: "Restored date".to_string(),
+                past_reversed: singular.to_string(),
+                visibility: StatusVisibility::Always,
             }
-            DateOperation::Remove => {
-                if count == 1 {
-                    ActionDescription {
-                        past: "Restored date".to_string(),
-                        past_reversed: "Removed date".to_string(),
-                        visibility: StatusVisibility::Always,
-                    }
-                } else {
-                    ActionDescription {
-                        past: format!("Restored dates on {} entries", count),
-                        past_reversed: format!("Removed dates from {} entries", count),
-                        visibility: StatusVisibility::Always,
-                    }
-                }
+        } else {
+            ActionDescription {
+                past: format!("Restored dates on {count} entries"),
+                past_reversed: format!("{plural} {count} entries"),
+                visibility: StatusVisibility::Always,
             }
         }
     }

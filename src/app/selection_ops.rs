@@ -424,6 +424,22 @@ impl App {
         self.execute_action(Box::new(action))
     }
 
+    /// Set the @date to today on all selected entries
+    pub fn bring_to_today_selected(&mut self) -> io::Result<()> {
+        let targets: Vec<_> = self
+            .collect_content_targets_from_selected()
+            .into_iter()
+            .filter(|t| !super::actions::is_recurring_entry(&t.location))
+            .collect();
+
+        if targets.is_empty() {
+            return Ok(());
+        }
+
+        let action = super::actions::BringToToday::new(targets);
+        self.execute_action(Box::new(action))
+    }
+
     /// Check if in selection mode and get selection state
     pub fn get_selection_state(&self) -> Option<&SelectionState> {
         if let InputMode::Selection(ref state) = self.input_mode {

@@ -12,7 +12,7 @@ mod types;
 pub use content_ops::ContentTarget;
 pub use create::{CreateEntry, CreateTarget};
 pub use cycle_type::{CycleEntryType, CycleTarget};
-pub use date::{DateTarget, DeferDate, RemoveDate, is_recurring_entry};
+pub use date::{BringToToday, DateTarget, DeferDate, RemoveDate, is_recurring_entry};
 pub use delete::{DeleteEntries, RestoreEntries};
 pub use edit::{EditEntry, EditTarget};
 pub use executor::ActionExecutor;

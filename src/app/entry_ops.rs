@@ -397,6 +397,21 @@ impl App {
         self.execute_action(Box::new(action))
     }
 
+    /// Set the @date to today on the current entry
+    pub fn bring_to_today_current_entry(&mut self) -> io::Result<()> {
+        let Some(target) = self.extract_content_target_from_current() else {
+            return Ok(());
+        };
+
+        if super::actions::is_recurring_entry(&target.location) {
+            self.set_error("Cannot modify recurring entries");
+            return Ok(());
+        }
+
+        let action = super::actions::BringToToday::single(target.location, target.original_content);
+        self.execute_action(Box::new(action))
+    }
+
     /// Cycle entry type on the current entry
     pub fn cycle_current_entry_type(&mut self) -> io::Result<()> {
         let Some(target) = self.extract_cycle_target_from_current() else {
@@ -443,10 +458,18 @@ impl App {
 
     /// Paste text as entries below current selection (used by bracketed paste)
     pub fn paste_entries_from_text(&mut self, text: &str) -> io::Result<()> {
-        let raw_entries = Self::parse_paste_raw(text);
+        let mut raw_entries = Self::parse_paste_raw(text);
         if raw_entries.is_empty() {
             self.set_error("Nothing to paste");
             return Ok(());
+        }
+
+        for entry in &mut raw_entries {
+            let (normalized, warning) = self.preprocess_content(&entry.content);
+            entry.content = normalized;
+            if let Some(warn) = warning {
+                self.set_status(warn);
+            }
         }
 
         let (date, insert_after) = match self.get_selected_item() {

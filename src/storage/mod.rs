@@ -29,10 +29,11 @@ pub use date_parsing::{ParseContext, parse_date, parse_weekday};
 pub use filter::{
     FAVORITE_TAG_REGEX, Filter, FilterType, LAST_TRAILING_TAG_REGEX, LATER_DATE_REGEX,
     RECURRING_REGEX, RELATIVE_DATE_REGEX, SAVED_FILTER_REGEX, TAG_CHAR_CLASS, TAG_REGEX,
-    TRAILING_TAGS_REGEX, collect_filtered_entries, collect_journal_tags,
+    TRAILING_TAGS_REGEX, bring_to_today, collect_filtered_entries, collect_journal_tags,
     collect_projected_entries_for_date, create_tag_delete_regex, create_tag_match_regex,
     defer_date, expand_favorite_tags, expand_saved_filters, extract_recurring_pattern,
-    extract_tags, extract_target_date, normalize_relative_dates, parse_filter_date,
+    extract_tags, extract_target_date, normalize_entry_structure, normalize_relative_dates,
+    parse_filter_date,
     parse_filter_query, parse_natural_date, parse_recurring_pattern, remove_date,
     strip_recurring_tags,
 };

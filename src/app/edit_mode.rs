@@ -7,12 +7,11 @@ use super::actions::{CreateEntry, CreateTarget, EditEntry, EditTarget};
 use super::{App, EditContext, EntryLocation, InputMode, InsertPosition, ViewMode};
 
 impl App {
-    /// Preprocesses content before saving: expands favorite tags, normalizes dates, and trims trailing whitespace.
-    fn preprocess_content(&self, content: &str) -> String {
+    pub(super) fn preprocess_content(&self, content: &str) -> (String, Option<String>) {
         let content = storage::expand_favorite_tags(content, &self.config.favorite_tags);
-        storage::normalize_relative_dates(&content, Local::now().date_naive())
-            .trim_end()
-            .to_string()
+        let content = storage::normalize_relative_dates(&content, Local::now().date_naive());
+        let (content, warning) = storage::normalize_entry_structure(&content);
+        (content.trim_end().to_string(), warning)
     }
 
     /// Cycle entry type while editing (BackTab)
@@ -71,8 +70,13 @@ impl App {
     /// Save current edit buffer. Returns (context, had_content) or None if no buffer.
     fn save_current_edit(&mut self) -> Option<(EditContext, bool)> {
         let buffer = self.edit_buffer.take()?;
-        let new_content = self.preprocess_content(&buffer.into_content());
+        let (new_content, preprocess_warning) = self.preprocess_content(&buffer.into_content());
         let had_content = !new_content.trim().is_empty();
+
+        // Show warning if preprocessing stripped extra dates
+        if let Some(warning) = preprocess_warning {
+            self.set_status(warning);
+        }
         let original_content = self.original_edit_content.take().unwrap_or_default();
         let is_new_entry = original_content.is_empty();
 

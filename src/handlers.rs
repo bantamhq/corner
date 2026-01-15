@@ -166,6 +166,13 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
                 app.remove_date_from_current_entry()?;
             }
         }
+        BringToToday => {
+            if matches!(app.input_mode, InputMode::Selection(_)) {
+                app.bring_to_today_selected()?;
+            } else {
+                app.bring_to_today_current_entry()?;
+            }
+        }
         Yank => {
             if matches!(app.input_mode, InputMode::Selection(_)) {
                 app.yank_selected();
