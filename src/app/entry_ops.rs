@@ -1,5 +1,7 @@
 use std::io;
 
+use chrono::{Days, NaiveDate};
+
 use crate::cursor::CursorBuffer;
 use crate::storage::{
     self, Entry, EntryType, RawEntry, SourceType, parse_to_raw_entry, strip_recurring_tags,
@@ -9,7 +11,7 @@ use super::{App, EditContext, InputMode, Line, SelectedItem, ViewMode};
 
 /// Target for delete operations - Entry carries all location info
 pub enum DeleteTarget {
-    /// Projected entry (Later/Recurring) - Entry has source_date, line_index, source_type
+    /// Projected entry (Recurring) - Entry has source_date, line_index, source_type
     Projected(Entry),
     /// Local entry in daily view - line_idx is index in self.lines
     Daily { line_idx: usize, entry: Entry },
@@ -21,7 +23,7 @@ pub enum DeleteTarget {
 /// Shared between ToggleTarget and TagRemovalTarget since they have identical structure.
 #[derive(Clone)]
 pub enum EntryLocation {
-    /// Projected entry (Later/Recurring) - Entry has source_date, line_index, source_type
+    /// Projected entry (Recurring) - Entry has source_date, line_index, source_type
     Projected(Entry),
     /// Local entry in daily view - line_idx is index in self.lines
     Daily { line_idx: usize },
@@ -72,11 +74,9 @@ impl App {
     }
 
     /// Delete the currently selected entry (view-aware, yanks to clipboard first)
-    /// Later entries are deletable (deletes source), Recurring entries are read-only.
+    /// Projected entries (recurring) are read-only - must go to source.
     pub fn delete_current_entry(&mut self) -> io::Result<()> {
-        if let SelectedItem::Projected { entry, .. } = self.get_selected_item()
-            && !matches!(entry.source_type, SourceType::Later)
-        {
+        if let SelectedItem::Projected { .. } = self.get_selected_item() {
             self.set_status("Press o to go to source");
             return Ok(());
         }
@@ -131,31 +131,20 @@ impl App {
         let path = self.active_path().to_path_buf();
         match target {
             ToggleTarget::Projected(entry) => {
-                match entry.source_type {
-                    SourceType::Later => {
-                        storage::toggle_entry_complete(entry.source_date, &path, entry.line_index)?;
-                    }
-                    SourceType::Recurring => {
-                        // Materialize: create completed copy on today instead of toggling source
-                        // Add ↺ prefix for matching when hiding done-today recurring entries
-                        let content =
-                            storage::get_entry_content(entry.source_date, &path, entry.line_index)
-                                .map(|c| format!("↺ {}", strip_recurring_tags(&c)))
-                                .unwrap_or_default();
+                // Materialize: create completed copy on today instead of toggling source
+                // Add ↺ prefix for matching when hiding done-today recurring entries
+                let content =
+                    storage::get_entry_content(entry.source_date, &path, entry.line_index)
+                        .map(|c| format!("↺ {}", strip_recurring_tags(&c)))
+                        .unwrap_or_default();
 
-                        let raw_entry = RawEntry {
-                            entry_type: EntryType::Task { completed: true },
-                            content,
-                        };
-                        self.lines.push(Line::Entry(raw_entry));
-                        self.entry_indices = Self::compute_entry_indices(&self.lines);
-                        self.save();
-                    }
-                    SourceType::Local => unreachable!("projected entries are never Local"),
-                    SourceType::Calendar { .. } => {
-                        unreachable!("calendar entries are never toggled")
-                    }
-                }
+                let raw_entry = RawEntry {
+                    entry_type: EntryType::Task { completed: true },
+                    content,
+                };
+                self.lines.push(Line::Entry(raw_entry));
+                self.entry_indices = Self::compute_entry_indices(&self.lines);
+                self.save();
                 self.refresh_projected_entries();
             }
             ToggleTarget::Daily { line_idx } => {
@@ -191,21 +180,12 @@ impl App {
     }
 
     /// Start editing the current entry (view-aware)
-    /// Later entries are editable (edits source), Recurring entries are read-only.
+    /// Projected entries (recurring) are read-only - must go to source.
     pub fn edit_current_entry(&mut self) {
         let (ctx, content) = match self.get_selected_item() {
-            SelectedItem::Projected { entry, .. } => {
-                if !matches!(entry.source_type, SourceType::Later) {
-                    self.set_status("Press o to go to source");
-                    return;
-                }
-                (
-                    EditContext::LaterEdit {
-                        source_date: entry.source_date,
-                        line_index: entry.line_index,
-                    },
-                    entry.content.clone(),
-                )
+            SelectedItem::Projected { .. } => {
+                self.set_status("Press o to go to source");
+                return;
             }
             SelectedItem::Daily { index, entry, .. } => (
                 EditContext::Daily { entry_index: index },
@@ -373,45 +353,6 @@ impl App {
         self.execute_action(Box::new(action))
     }
 
-    /// Defer the @date on the current entry by 1 day
-    pub fn defer_current_entry(&mut self) -> io::Result<()> {
-        let Some(target) = self.extract_content_target_from_current() else {
-            return Ok(());
-        };
-
-        if super::actions::is_recurring_entry(&target.location) {
-            self.set_error("Cannot defer recurring entries");
-            return Ok(());
-        }
-
-        let action = super::actions::DeferDate::single(target.location, target.original_content);
-        self.execute_action(Box::new(action))
-    }
-
-    /// Remove the @date from the current entry
-    pub fn remove_date_from_current_entry(&mut self) -> io::Result<()> {
-        let Some(target) = self.extract_content_target_from_current() else {
-            return Ok(());
-        };
-        let action = super::actions::RemoveDate::single(target.location, target.original_content);
-        self.execute_action(Box::new(action))
-    }
-
-    /// Set the @date to today on the current entry
-    pub fn bring_to_today_current_entry(&mut self) -> io::Result<()> {
-        let Some(target) = self.extract_content_target_from_current() else {
-            return Ok(());
-        };
-
-        if super::actions::is_recurring_entry(&target.location) {
-            self.set_error("Cannot modify recurring entries");
-            return Ok(());
-        }
-
-        let action = super::actions::BringToToday::single(target.location, target.original_content);
-        self.execute_action(Box::new(action))
-    }
-
     /// Cycle entry type on the current entry
     pub fn cycle_current_entry_type(&mut self) -> io::Result<()> {
         let Some(target) = self.extract_cycle_target_from_current() else {
@@ -531,5 +472,78 @@ impl App {
         self.lines.remove(line_idx);
         self.entry_indices = Self::compute_entry_indices(&self.lines);
         self.clamp_daily_selection();
+    }
+
+    /// Move the current entry to a different date
+    fn move_current_entry_to_date(&mut self, target_date: NaiveDate) -> io::Result<()> {
+        // Projected entries cannot be moved - must go to source
+        if let SelectedItem::Projected { .. } = self.get_selected_item() {
+            self.set_status("Press o to go to source");
+            return Ok(());
+        }
+
+        // Get entry info before deleting
+        let (source_date, raw_entry) = match self.get_selected_item() {
+            SelectedItem::Daily { entry, .. } => (self.current_date, entry.clone()),
+            SelectedItem::Filter { entry, .. } => {
+                let content =
+                    storage::get_entry_content(entry.source_date, self.active_path(), entry.line_index)
+                        .unwrap_or_default();
+                (
+                    entry.source_date,
+                    RawEntry {
+                        entry_type: entry.entry_type.clone(),
+                        content,
+                    },
+                )
+            }
+            SelectedItem::Projected { .. } | SelectedItem::None => return Ok(()),
+        };
+
+        // Don't move if already on target date
+        if source_date == target_date {
+            self.set_status("Entry already on target date");
+            return Ok(());
+        }
+
+        let path = self.active_path().to_path_buf();
+
+        // Delete from source
+        let Some(delete_target) = self.extract_delete_target_from_current() else {
+            return Ok(());
+        };
+        let delete_action = super::actions::DeleteEntries::single(delete_target);
+        self.execute_action(Box::new(delete_action))?;
+
+        // Add to target date
+        let mut target_lines = storage::load_day_lines(target_date, &path)?;
+        target_lines.push(Line::Entry(raw_entry));
+        storage::save_day_lines(target_date, &path, &target_lines)?;
+
+        // Refresh views
+        if target_date == self.current_date {
+            self.reload_current_day()?;
+        }
+        if let ViewMode::Filter(_) = &self.view {
+            let _ = self.refresh_filter();
+        }
+
+        self.set_status(format!("Moved to {}", target_date.format("%m/%d")));
+        Ok(())
+    }
+
+    /// Move the current entry to today
+    pub fn move_current_entry_to_today(&mut self) -> io::Result<()> {
+        let today = chrono::Local::now().date_naive();
+        self.move_current_entry_to_date(today)
+    }
+
+    /// Move the current entry to tomorrow
+    pub fn move_current_entry_to_tomorrow(&mut self) -> io::Result<()> {
+        let tomorrow = chrono::Local::now()
+            .date_naive()
+            .checked_add_days(Days::new(1))
+            .expect("tomorrow should be valid");
+        self.move_current_entry_to_date(tomorrow)
     }
 }

@@ -111,23 +111,6 @@ pub fn prepare_render(app: &mut App, layout: &RenderContext) -> RenderPrep {
                         + app.visible_entries_before(*entry_index);
                     build_cursor_context(buffer, prefix_width, available_width, entry_start_line)
                 }),
-            EditContext::LaterEdit { .. } => {
-                if let ViewMode::Daily(state) = &app.view {
-                    state.projected_entries.get(state.selected).map(|entry| {
-                        let prefix_width = entry.entry_type.prefix().len();
-                        let available_width = list_content_width_for_daily(layout);
-                        let entry_start_line = calendar_event_count + state.selected;
-                        build_cursor_context(
-                            buffer,
-                            prefix_width,
-                            available_width,
-                            entry_start_line,
-                        )
-                    })
-                } else {
-                    None
-                }
-            }
         }
     } else {
         None

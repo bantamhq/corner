@@ -54,16 +54,6 @@ help = "Between two dates"
 # =============================================================================
 
 [[filter]]
-syntax = "@overdue"
-category = "content_pattern"
-help = "Incomplete tasks with past @date"
-
-[[filter]]
-syntax = "@later"
-category = "content_pattern"
-help = "Entries with @date patterns"
-
-[[filter]]
 syntax = "@recurring"
 category = "content_pattern"
 help = "Show recurring entries (hidden by default)"

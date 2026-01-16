@@ -107,7 +107,6 @@ Press `/` to search across your entire journal. Filter by entry type, tags, date
 | `!tasks #work` | Incomplete tasks tagged #work |
 | `@after:yesterday @before:tomorrow` | Entries from today |
 | `@recurring` | All recurring entries |
-| `@later` | All entries with @date patterns |
 | `meeting #standup` | Entries containing "meeting" with #standup tag |
 | `not:#work` | Entries without #work tag |
 
@@ -154,23 +153,6 @@ Press `v` to enter selection mode for batch operations. Select multiple entries,
 ### Tags
 
 Add tags anywhere in an entry with `#tagname`. Tags must start with a letter and may include letters, digits, `_`, or `-`. Remove the last tag from an entry with `x`, or all tags with `X`.
-
-### Scheduling
-
-Use `@date` to schedule an entry for a future day:
-
-```markdown
-- [ ] Review quarterly report @1/15
-- [ ] Send birthday card @fri
-```
-
-Relative date shortcuts are converted when you save:
-
-- `@today`, `@tomorrow`, `@yesterday`
-- `@mon`, `@fri` (next Monday, next Friday)
-- `@d3` (3 days from now)
-
-The entry appears in the "Later" section when you view the target date.
 
 ### Recurring Entries
 

@@ -1,6 +1,8 @@
 use std::io;
 
-use crate::storage::{Entry, EntryType, RawEntry, SourceType};
+use chrono::{Days, NaiveDate};
+
+use crate::storage::{self, Entry, EntryType, RawEntry, SourceType};
 
 use super::{
     App, DeleteTarget, InputMode, Line, SelectionState, TagRemovalTarget, ToggleTarget, ViewMode,
@@ -134,7 +136,7 @@ impl App {
         None
     }
 
-    /// Get daily entry at visible entry index (after later entries)
+    /// Get daily entry at visible entry index (after projected entries)
     fn get_daily_at_visible_entry_index(
         &self,
         visible_entry_idx: usize,
@@ -397,49 +399,6 @@ impl App {
         self.execute_action(Box::new(action))
     }
 
-    /// Defer the @date by 1 day on all selected entries (skips recurring entries)
-    pub fn defer_selected(&mut self) -> io::Result<()> {
-        let targets: Vec<_> = self
-            .collect_content_targets_from_selected()
-            .into_iter()
-            .filter(|t| !super::actions::is_recurring_entry(&t.location))
-            .collect();
-
-        if targets.is_empty() {
-            return Ok(());
-        }
-
-        let action = super::actions::DeferDate::new(targets);
-        self.execute_action(Box::new(action))
-    }
-
-    /// Remove the @date from all selected entries
-    pub fn remove_date_from_selected(&mut self) -> io::Result<()> {
-        let targets = self.collect_content_targets_from_selected();
-        if targets.is_empty() {
-            return Ok(());
-        }
-
-        let action = super::actions::RemoveDate::new(targets);
-        self.execute_action(Box::new(action))
-    }
-
-    /// Set the @date to today on all selected entries
-    pub fn bring_to_today_selected(&mut self) -> io::Result<()> {
-        let targets: Vec<_> = self
-            .collect_content_targets_from_selected()
-            .into_iter()
-            .filter(|t| !super::actions::is_recurring_entry(&t.location))
-            .collect();
-
-        if targets.is_empty() {
-            return Ok(());
-        }
-
-        let action = super::actions::BringToToday::new(targets);
-        self.execute_action(Box::new(action))
-    }
-
     /// Check if in selection mode and get selection state
     pub fn get_selection_state(&self) -> Option<&SelectionState> {
         if let InputMode::Selection(ref state) = self.input_mode {
@@ -447,5 +406,100 @@ impl App {
         } else {
             None
         }
+    }
+
+    /// Collect raw entries from selected entries for move operations
+    fn collect_raw_entries_from_selected(&self) -> Vec<RawEntry> {
+        self.collect_targets_from_selected(|entry| match entry {
+            SelectedEntry::Projected(projected) => {
+                // Skip read-only recurring entries
+                if matches!(projected.source_type, SourceType::Recurring) {
+                    return None;
+                }
+                Some(RawEntry {
+                    entry_type: projected.entry_type.clone(),
+                    content: projected.content.clone(),
+                })
+            }
+            SelectedEntry::Daily { entry, .. } => Some(entry.clone()),
+            SelectedEntry::Filter { entry, .. } => {
+                let content = storage::get_entry_content(
+                    entry.source_date,
+                    self.active_path(),
+                    entry.line_index,
+                )
+                .unwrap_or_default();
+                Some(RawEntry {
+                    entry_type: entry.entry_type.clone(),
+                    content,
+                })
+            }
+        })
+    }
+
+    /// Move all selected entries to a target date
+    fn move_selected_to_date(&mut self, target_date: NaiveDate) -> io::Result<()> {
+        let raw_entries = self.collect_raw_entries_from_selected();
+        if raw_entries.is_empty() {
+            self.cancel_selection_mode();
+            self.set_status("No movable entries selected");
+            return Ok(());
+        }
+
+        let count = raw_entries.len();
+
+        // Yank before deleting (like Vim)
+        let yank_targets = self.collect_yank_targets_from_selected();
+        if !yank_targets.is_empty() {
+            let contents: Vec<&str> = yank_targets.iter().map(Self::yank_target_content).collect();
+            let combined = contents.join("\n");
+            let _ = Self::copy_to_clipboard(&combined);
+        }
+
+        // Delete from sources
+        let delete_targets = self.collect_delete_targets_from_selected();
+        if !delete_targets.is_empty() {
+            let action = super::actions::DeleteEntries::new(delete_targets);
+            self.execute_action(Box::new(action))?;
+        }
+
+        // Add to target date
+        let path = self.active_path().to_path_buf();
+        let mut target_lines = storage::load_day_lines(target_date, &path)?;
+        for entry in raw_entries {
+            target_lines.push(Line::Entry(entry));
+        }
+        storage::save_day_lines(target_date, &path, &target_lines)?;
+
+        // Refresh views
+        if target_date == self.current_date {
+            self.reload_current_day()?;
+        }
+        if let ViewMode::Filter(_) = &self.view {
+            let _ = self.refresh_filter();
+        }
+
+        self.cancel_selection_mode();
+        self.set_status(format!(
+            "Moved {} entries to {}",
+            count,
+            target_date.format("%m/%d")
+        ));
+        Ok(())
+    }
+
+    /// Move all selected entries to today
+    pub fn move_selected_to_today(&mut self) -> io::Result<()> {
+        let today = chrono::Local::now().date_naive();
+        self.move_selected_to_date(today)
+    }
+
+    /// Move all selected entries to tomorrow
+    pub fn move_selected_to_tomorrow(&mut self) -> io::Result<()> {
+        let tomorrow = chrono::Local::now()
+            .date_naive()
+            .checked_add_days(Days::new(1))
+            .expect("tomorrow should be valid");
+        self.move_selected_to_date(tomorrow)
     }
 }

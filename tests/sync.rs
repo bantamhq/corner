@@ -104,29 +104,3 @@ fn scroll_keeps_selection_visible() {
 
     ctx.verify_invariants();
 }
-
-#[test]
-fn later_entry_edit_syncs_to_source() {
-    let date = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
-    let content = "# 2026/01/15\n- [ ] Later task @01/20\n# 2026/01/20\n- [ ] Local task\n";
-    let mut ctx = TestContext::with_journal_content(date, content);
-
-    // The later entry should appear on 01/20
-    assert!(ctx.screen_contains("Later task"));
-
-    // Toggle the later entry (simpler than editing)
-    ctx.press(KeyCode::Char('g')); // Go to first (later entry)
-    ctx.press(KeyCode::Char(' ')); // Toggle complete
-
-    // Verify the source day (01/15) has the toggle
-    let journal = ctx.read_journal();
-    assert!(journal.contains("[x] Later task"));
-
-    // The change should be in the 01/15 section
-    let idx_15 = journal.find("# 2026/01/15").unwrap();
-    let idx_20 = journal.find("# 2026/01/20").unwrap();
-    let idx_toggled = journal.find("[x] Later task").unwrap();
-    assert!(idx_toggled > idx_15 && idx_toggled < idx_20);
-
-    ctx.verify_invariants();
-}

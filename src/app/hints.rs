@@ -46,7 +46,7 @@ pub enum HintContext {
         selected: usize,
         scroll_offset: usize,
     },
-    /// Date operation hints (@on:, @before:, @after:, @overdue)
+    /// Content pattern hints (@recurring)
     DateOps {
         prefix: String,
         matches: Vec<&'static FilterSyntax>,
@@ -427,7 +427,7 @@ impl HintContext {
             };
         }
 
-        // Content pattern filters: @overdue, @later, @recurring
+        // Content pattern filters: @recurring
         if let Some(content_prefix) = token.strip_prefix('@') {
             let matches: Vec<&'static FilterSyntax> = FILTER_SYNTAX
                 .iter()

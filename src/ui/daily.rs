@@ -40,35 +40,13 @@ pub fn build_daily_list(app: &App, width: usize) -> ListModel {
         visible_projected_idx += 1;
 
         let visible_idx = visible_projected_idx - 1;
-        let is_editing = is_selected
-            && matches!(
-                app.input_mode,
-                InputMode::Edit(EditContext::LaterEdit { .. })
-            );
-
-        if is_editing {
-            let content_style = entry_style(&projected_entry.entry_type);
-            let text = edit_text(app, true, &projected_entry.content);
-            let prefix = projected_entry.entry_type.prefix();
-            let prefix_width = prefix.width();
-            let text_width = width.saturating_sub(prefix_width);
-            rows.extend(build_edit_rows_with_prefix_width(
-                prefix,
-                prefix_width,
-                content_style,
-                &text,
-                text_width,
-                None,
-            ));
-        } else {
-            rows.push(rows::build_projected_row(
-                app,
-                projected_entry,
-                is_selected,
-                visible_idx,
-                width,
-            ));
-        }
+        rows.push(rows::build_projected_row(
+            app,
+            projected_entry,
+            is_selected,
+            visible_idx,
+            width,
+        ));
     }
 
     let mut visible_entry_idx = 0;

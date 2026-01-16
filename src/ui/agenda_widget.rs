@@ -136,13 +136,9 @@ pub fn collect_agenda_cache(calendar_store: &CalendarStore, path: &Path) -> Agen
             });
         }
 
+        // Show recurring events in agenda (all projected entries are now recurring)
         if let Ok(projected) = storage::collect_projected_entries_for_date(date, path) {
-            for entry in projected.iter() {
-                let is_recurring = entry.source_type == SourceType::Recurring;
-                let is_event = entry.entry_type == EntryType::Event;
-                if !is_recurring && !is_event {
-                    continue;
-                }
+            for entry in projected.iter().filter(|e| e.entry_type == EntryType::Event) {
                 let (prefix, style) =
                     projected_entry_prefix_and_style(&entry.source_type, &entry.entry_type);
                 let text = truncate_to_first_tag(&entry.content);

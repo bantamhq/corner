@@ -1,24 +1,18 @@
 use std::io;
 
-use chrono::Local;
-
-use crate::storage::{
-    self, expand_favorite_tags, normalize_entry_structure, normalize_relative_dates, Line,
-};
+use crate::storage::{self, expand_favorite_tags, normalize_entry_structure, Line};
 
 use super::{App, EntryLocation, ViewMode};
 
 impl App {
     /// Normalize content with all preprocessing steps:
     /// 1. Expand favorite tags (#0-9 -> configured tags)
-    /// 2. Normalize relative dates (@tomorrow -> @MM/DD)
-    /// 3. Normalize entry structure ([content] [recurring] [later] [#tags])
+    /// 2. Normalize entry structure ([content] [recurring] [#tags])
     ///
     /// Returns (normalized_content, optional_warning).
     #[must_use]
     pub fn normalize_content(&self, content: &str) -> (String, Option<String>) {
         let content = expand_favorite_tags(content, &self.config.favorite_tags);
-        let content = normalize_relative_dates(&content, Local::now().date_naive());
         let (content, warning) = normalize_entry_structure(&content);
         (content.trim_end().to_string(), warning)
     }

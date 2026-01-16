@@ -13,5 +13,5 @@ description = "today, tomorrow, yesterday, [mon-sun], d[1-999] (+/- for directio
 
 [[help_entry]]
 section = "date_syntax"
-key = "Recurring"
+key = "Recurring (entries)"
 description = "every-[mon-sun], every-[1-31], every-day, every-weekday"

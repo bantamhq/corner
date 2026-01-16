@@ -3,7 +3,7 @@ use std::io;
 use std::path::Path;
 use std::sync::LazyLock;
 
-use chrono::{Datelike, NaiveDate};
+use chrono::NaiveDate;
 use regex::Regex;
 
 use super::date_parsing::{ParseContext, parse_date, parse_weekday};
@@ -28,8 +28,6 @@ pub struct Filter {
     pub exclude_types: Vec<FilterType>,
     pub before_date: Option<NaiveDate>,
     pub after_date: Option<NaiveDate>,
-    pub overdue: bool,
-    pub later: bool,
     pub recurring: bool,
     pub invalid_tokens: Vec<String>,
 }
@@ -57,21 +55,6 @@ pub static TRAILING_TAGS_REGEX: LazyLock<Regex> =
 /// Matches the last trailing tag at end of line
 pub static LAST_TRAILING_TAG_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(&format!(r"\s+#[a-zA-Z]{}*\s*$", TAG_CHAR_CLASS)).unwrap());
-
-/// Matches @date patterns:
-/// - @MM/DD (e.g., @1/9, @01/09)
-/// - @MM/DD/YY (e.g., @1/9/26, @01/09/26)
-/// - @MM/DD/YYYY (e.g., @1/9/2026, @01/09/2026)
-/// - @YYYY/MM/DD (ISO format, e.g., @2026/1/9)
-pub static LATER_DATE_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"@(\d{4}/\d{1,2}/\d{1,2}|\d{1,2}/\d{1,2}(?:/\d{2,4})?)").unwrap());
-
-/// Matches relative date patterns for entries (future by default):
-/// @today, @tomorrow, @yesterday, @d7 (7 days, max 999), @mon (next Monday)
-pub static RELATIVE_DATE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)@(today|tomorrow|yesterday|d[1-9]\d{0,2}|mon|tue|wed|thu|fri|sat|sun)")
-        .unwrap()
-});
 
 /// Matches favorite tag shortcuts: #1 through #9 and #0
 pub static FAVORITE_TAG_REGEX: LazyLock<Regex> =
@@ -198,61 +181,28 @@ pub fn parse_filter_date(input: &str, today: NaiveDate) -> Option<NaiveDate> {
     parse_date(input, ParseContext::Filter, today)
 }
 
-/// Replaces relative date patterns (@today, @tomorrow, @yesterday, @d7, @mon) with @MM/DD format.
-#[must_use]
-pub fn normalize_relative_dates(content: &str, today: NaiveDate) -> String {
-    RELATIVE_DATE_REGEX
-        .replace_all(content, |caps: &regex::Captures| {
-            let natural_str = &caps[1];
-            parse_natural_date(natural_str, today).map_or_else(
-                || caps[0].to_string(),
-                |date| {
-                    if natural_str.eq_ignore_ascii_case("today") {
-                        format!(
-                            "@{}/{}/{}",
-                            date.format("%m"),
-                            date.format("%d"),
-                            date.format("%y")
-                        )
-                    } else {
-                        format!("@{}/{}", date.format("%m"), date.format("%d"))
-                    }
-                },
-            )
-        })
-        .into_owned()
-}
-
-/// Normalizes entry structure to: [content] [recurring_dates] [later_date] [#tags]
+/// Normalizes entry structure to: [content] [recurring_dates] [#tags]
 ///
 /// - Trailing section = contiguous dates/tags at end (only whitespace between them)
 /// - Inline #tags (in content section) have # stripped
-/// - All @dates are extracted from anywhere and moved to structure
-/// - Non-date @patterns (like @bob) are left as-is
-/// - Returns (normalized_content, optional_warning for stripped extra dates)
+/// - @every-* patterns are extracted from anywhere and moved to structure
 #[must_use]
 pub fn normalize_entry_structure(content: &str) -> (String, Option<String>) {
-    let later_dates: Vec<_> = LATER_DATE_REGEX.find_iter(content).collect();
     let recurring_dates: Vec<_> = RECURRING_REGEX.find_iter(content).collect();
     let tags: Vec<_> = TAG_REGEX.find_iter(content).collect();
 
-    if later_dates.is_empty() && recurring_dates.is_empty() && tags.is_empty() {
+    if recurring_dates.is_empty() && tags.is_empty() {
         return (content.to_string(), None);
     }
 
-    let trailing_start = find_trailing_section_start(content, &later_dates, &recurring_dates, &tags);
+    let trailing_start = find_trailing_section_start(content, &recurring_dates, &tags);
 
     let (trailing_tags, inline_tags): (Vec<&regex::Match>, Vec<&regex::Match>) =
         tags.iter().partition(|t| t.start() >= trailing_start);
 
-    let warning = (later_dates.len() > 1).then(|| {
-        let extras: Vec<_> = later_dates[1..].iter().map(|m| m.as_str()).collect();
-        format!("Stripped extra dates: {}", extras.join(", "))
-    });
-
     // Removals: (start, end, replacement) - replacement None means delete
     let mut removals: Vec<(usize, usize, Option<&str>)> = Vec::new();
-    for m in later_dates.iter().chain(recurring_dates.iter()) {
+    for m in &recurring_dates {
         removals.push((m.start(), m.end(), None));
     }
     for m in &trailing_tags {
@@ -272,33 +222,28 @@ pub fn normalize_entry_structure(content: &str) -> (String, Option<String>) {
 
     let result = result.split_whitespace().collect::<Vec<_>>().join(" ");
 
-    // Reconstruct: [content] [recurring] [later] [tags]
+    // Reconstruct: [content] [recurring] [tags]
     let mut final_parts = vec![result];
     for m in &recurring_dates {
         final_parts.push(m.as_str().trim().to_string());
-    }
-    if let Some(m) = later_dates.first() {
-        final_parts.push(m.as_str().to_string());
     }
     for m in &trailing_tags {
         final_parts.push(m.as_str().to_string());
     }
 
-    (final_parts.join(" "), warning)
+    (final_parts.join(" "), None)
 }
 
 /// Find the byte position where the trailing section starts.
-/// Trailing section = contiguous sequence of dates and tags at the end,
+/// Trailing section = contiguous sequence of recurring patterns and tags at the end,
 /// with only whitespace between them.
 fn find_trailing_section_start(
     content: &str,
-    later_dates: &[regex::Match],
     recurring_dates: &[regex::Match],
     tags: &[regex::Match],
 ) -> usize {
-    let mut patterns: Vec<(usize, usize)> = later_dates
+    let mut patterns: Vec<(usize, usize)> = recurring_dates
         .iter()
-        .chain(recurring_dates.iter())
         .chain(tags.iter())
         .map(|m| (m.start(), m.end()))
         .collect();
@@ -409,74 +354,8 @@ pub fn extract_recurring_pattern(content: &str) -> Option<RecurringPattern> {
         .and_then(|m| parse_recurring_pattern(m.as_str()))
 }
 
-/// Extracts the target date from entry content if it contains an @date pattern.
-/// Uses Entry context (future bias) since entry @dates are forward-looking.
-#[must_use]
-pub fn extract_target_date(content: &str, today: NaiveDate) -> Option<NaiveDate> {
-    LATER_DATE_REGEX
-        .captures(content)
-        .and_then(|cap| cap.get(1))
-        .and_then(|m| parse_date(m.as_str(), ParseContext::Entry, today))
-}
-
-/// Extracts target date preferring past interpretation (for overdue checking).
-/// Uses Filter context (past bias) to interpret @12/30 on 1/1 as last year.
-#[must_use]
-fn extract_target_date_prefer_past(content: &str, today: NaiveDate) -> Option<NaiveDate> {
-    LATER_DATE_REGEX
-        .captures(content)
-        .and_then(|cap| cap.get(1))
-        .and_then(|m| parse_date(m.as_str(), ParseContext::Filter, today))
-}
-
-/// Defers the first @date pattern by 1 day (e.g., @1/15 → @1/16).
-/// Returns Some(new_content) if an @date was found and modified, None otherwise.
-#[must_use]
-pub fn defer_date(content: &str, today: NaiveDate) -> Option<String> {
-    let caps = LATER_DATE_REGEX.captures(content)?;
-    let date_match = caps.get(0)?;
-    let date_str = caps.get(1)?;
-
-    let date = parse_date(date_str.as_str(), ParseContext::Entry, today)?;
-    let new_date = date + chrono::Duration::days(1);
-    let new_date_str = format!("@{}/{}", new_date.month(), new_date.day());
-
-    let mut result = content.to_string();
-    result.replace_range(date_match.range(), &new_date_str);
-    Some(result)
-}
-
-/// Removes the first @date pattern from content (including any preceding space).
-/// Returns Some(new_content) if an @date was found and removed, None otherwise.
-#[must_use]
-pub fn remove_date(content: &str) -> Option<String> {
-    static REMOVE_DATE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"\s?@(\d{4}/\d{1,2}/\d{1,2}|\d{1,2}/\d{1,2}(?:/\d{2,4})?)").unwrap()
-    });
-
-    REMOVE_DATE_REGEX.find(content).map(|m| {
-        let mut result = content.to_string();
-        result.replace_range(m.range(), "");
-        result
-    })
-}
-
-/// Sets or replaces the @date to today's date.
-/// If entry has an @date, replaces it with today. Otherwise appends today's date.
-#[must_use]
-pub fn bring_to_today(content: &str, today: NaiveDate) -> String {
-    let today_str = format!("@{}/{}", today.month(), today.day());
-
-    if let Some(without_date) = remove_date(content) {
-        format!("{} {}", without_date.trim_end(), today_str)
-    } else {
-        format!("{} {}", content.trim_end(), today_str)
-    }
-}
-
-/// Collects all projected entries (both @later and @recurring) for the target date.
+/// Collects all recurring projected entries for the target date.
 /// Entries from the target date itself are excluded (they're regular entries).
-/// Returns entries with appropriate SourceType (Later or Recurring).
 pub fn collect_projected_entries_for_date(
     target_date: NaiveDate,
     path: &Path,
@@ -502,19 +381,9 @@ pub fn collect_projected_entries_for_date(
 
             let parsed = parse_lines(line);
             if let Some(Line::Entry(raw_entry)) = parsed.first() {
-                if let Some(entry_target) = extract_target_date(&raw_entry.content, source_date)
-                    && entry_target == target_date
-                {
-                    entries.push(Entry::from_raw(
-                        raw_entry,
-                        source_date,
-                        line_index_in_day,
-                        SourceType::Later,
-                    ));
-                }
                 // Check for @recurring pattern (repeating projection)
                 // Only project to dates on or after the source date
-                else if let Some(pattern) = extract_recurring_pattern(&raw_entry.content)
+                if let Some(pattern) = extract_recurring_pattern(&raw_entry.content)
                     && target_date >= source_date
                     && pattern.matches(target_date)
                 {
@@ -530,16 +399,8 @@ pub fn collect_projected_entries_for_date(
         }
     }
 
-    // Sort: Recurring first, then Later, each group by source_date
-    entries.sort_by(|a, b| {
-        let a_recurring = matches!(a.source_type, SourceType::Recurring);
-        let b_recurring = matches!(b.source_type, SourceType::Recurring);
-        match (a_recurring, b_recurring) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.source_date.cmp(&b.source_date),
-        }
-    });
+    // Sort by source_date
+    entries.sort_by_key(|e| e.source_date);
     Ok(entries)
 }
 
@@ -575,15 +436,7 @@ pub fn parse_filter_query(query: &str) -> Filter {
             continue;
         }
 
-        // Content-based filters: @overdue, @later, @recurring
-        if token == "@overdue" {
-            filter.overdue = true;
-            continue;
-        }
-        if token == "@later" {
-            filter.later = true;
-            continue;
-        }
+        // Content-based filters: @recurring
         if token == "@recurring" {
             filter.recurring = true;
             continue;
@@ -656,7 +509,6 @@ pub fn collect_filtered_entries(filter: &Filter, path: &Path) -> io::Result<Vec<
     let mut entries = Vec::new();
     let mut current_date: Option<NaiveDate> = None;
     let mut line_index_in_day: usize = 0;
-    let today = chrono::Local::now().date_naive();
 
     for line in journal.lines() {
         if let Some(date) = parse_day_header(line) {
@@ -682,27 +534,6 @@ pub fn collect_filtered_entries(filter: &Filter, path: &Path) -> io::Result<Vec<
 
             let parsed = parse_lines(line);
             if let Some(Line::Entry(raw_entry)) = parsed.first() {
-                // Overdue filter: entry must be an incomplete task with @date before today
-                if filter.overdue {
-                    let is_incomplete_task =
-                        matches!(raw_entry.entry_type, EntryType::Task { completed: false });
-                    let target = extract_target_date_prefer_past(&raw_entry.content, today);
-                    let is_overdue = is_incomplete_task && target.is_some_and(|d| d < today);
-                    if !is_overdue {
-                        line_index_in_day += 1;
-                        continue;
-                    }
-                }
-
-                // Later filter: entry must have a @date pattern
-                if filter.later
-                    && !LATER_DATE_REGEX.is_match(&raw_entry.content)
-                    && !RELATIVE_DATE_REGEX.is_match(&raw_entry.content)
-                {
-                    line_index_in_day += 1;
-                    continue;
-                }
-
                 // @recurring shows only recurring; otherwise recurring entries are excluded
                 let is_recurring = RECURRING_REGEX.is_match(&raw_entry.content);
                 if filter.recurring != is_recurring {

@@ -8,8 +8,7 @@ use super::theme;
 use unicode_width::UnicodeWidthStr;
 
 use crate::storage::{
-    EntryType, LAST_TRAILING_TAG_REGEX, LATER_DATE_REGEX, RECURRING_REGEX, RELATIVE_DATE_REGEX,
-    TAG_REGEX, TRAILING_TAGS_REGEX,
+    EntryType, LAST_TRAILING_TAG_REGEX, RECURRING_REGEX, TAG_REGEX, TRAILING_TAGS_REGEX,
 };
 
 #[must_use]
@@ -86,8 +85,6 @@ pub fn style_content(text: &str, base_style: Style) -> Vec<Span<'static>> {
     };
 
     collect_matches(&TAG_REGEX, theme::TAG, &mut matches);
-    collect_matches(&LATER_DATE_REGEX, theme::PROJECTED_DATE, &mut matches);
-    collect_matches(&RELATIVE_DATE_REGEX, theme::PROJECTED_DATE, &mut matches);
     collect_matches(&RECURRING_REGEX, theme::PROJECTED_DATE, &mut matches);
 
     matches.sort_by_key(|(start, _, _)| *start);

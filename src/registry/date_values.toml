@@ -1,10 +1,12 @@
 # Date value definitions for autocomplete
-# Used in entry @dates and filter @on:/@before:/@after: values
+# Used in entry @dates (recurring only) and filter date range values
 #
 # Fields:
 # - syntax: Identifier for the entry (used for display grouping)
 # - display: What appears in hint overlay
 # - scopes: Where this date value is valid ["entry", "filter"]
+#           entry = recurring patterns only (@every-*)
+#           filter = relative dates for date range queries
 # - values: (optional) Enumerated valid completions - input matches if prefix of any value
 # - pattern: (optional) Regex for validation - input matches if it could complete to match
 # - help: Short help text
@@ -12,13 +14,13 @@
 # - completion_hint: Description shown during autocomplete
 
 # =============================================================================
-# Literal Dates (simple prefix matching against syntax)
+# Filter-only: Literal Dates (simple prefix matching against syntax)
 # =============================================================================
 
 [[date_value]]
 syntax = "today"
 display = "today"
-scopes = ["entry", "filter"]
+scopes = ["filter"]
 help = "Today"
 readme = "Today's date."
 completion_hint = "Today's date."
@@ -26,7 +28,7 @@ completion_hint = "Today's date."
 [[date_value]]
 syntax = "tomorrow"
 display = "tomorrow"
-scopes = ["entry", "filter"]
+scopes = ["filter"]
 help = "Tomorrow"
 readme = "Tomorrow's date."
 completion_hint = "Tomorrow's date."
@@ -34,39 +36,39 @@ completion_hint = "Tomorrow's date."
 [[date_value]]
 syntax = "yesterday"
 display = "yesterday"
-scopes = ["entry", "filter"]
+scopes = ["filter"]
 help = "Yesterday"
 readme = "Yesterday's date."
 completion_hint = "Yesterday's date."
 
 # =============================================================================
-# Grouped Dates (values-based matching)
+# Filter-only: Grouped Dates (values-based matching)
 # =============================================================================
 
 [[date_value]]
 syntax = "[mon-sun]"
 display = "[mon-sun]"
 values = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-scopes = ["entry", "filter"]
+scopes = ["filter"]
 help = "Day of week"
 readme = "Day of week (mon, tue, wed, thu, fri, sat, sun)."
-completion_hint = "Day of week. In entries: next occurrence. In filters: use +/- for direction."
+completion_hint = "Day of week. Use +/- suffix for direction."
 
 # =============================================================================
-# Pattern-based Dates (regex validation)
+# Filter-only: Pattern-based Dates (regex validation)
 # =============================================================================
 
 [[date_value]]
 syntax = "d[1-999]"
 display = "d[1-999][+/-]"
 pattern = "^d[1-9][0-9]{0,2}$"
-scopes = ["entry", "filter"]
+scopes = ["filter"]
 help = "Relative days"
 readme = "Relative day offsets (d1, d7, d30)."
 completion_hint = "Relative days (d1, d7, d30). Use +/- suffix for direction."
 
 # =============================================================================
-# Recurring Patterns (entry only)
+# Entry-only: Recurring Patterns
 # =============================================================================
 
 [[date_value]]

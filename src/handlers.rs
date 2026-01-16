@@ -152,25 +152,18 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
                 app.delete_current_entry()?;
             }
         }
-        DeferDate => {
+        MoveToToday => {
             if matches!(app.input_mode, InputMode::Selection(_)) {
-                app.defer_selected()?;
+                app.move_selected_to_today()?;
             } else {
-                app.defer_current_entry()?;
+                app.move_current_entry_to_today()?;
             }
         }
-        RemoveDate => {
+        MoveToTomorrow => {
             if matches!(app.input_mode, InputMode::Selection(_)) {
-                app.remove_date_from_selected()?;
+                app.move_selected_to_tomorrow()?;
             } else {
-                app.remove_date_from_current_entry()?;
-            }
-        }
-        BringToToday => {
-            if matches!(app.input_mode, InputMode::Selection(_)) {
-                app.bring_to_today_selected()?;
-            } else {
-                app.bring_to_today_current_entry()?;
+                app.move_current_entry_to_tomorrow()?;
             }
         }
         Yank => {

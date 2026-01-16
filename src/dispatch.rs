@@ -476,8 +476,6 @@ fn parse_action_id(s: &str) -> Option<KeyActionId> {
         "edit" => Some(KeyActionId::Edit),
         "toggle_complete" => Some(KeyActionId::ToggleComplete),
         "delete" => Some(KeyActionId::Delete),
-        "defer_date" => Some(KeyActionId::DeferDate),
-        "remove_date" => Some(KeyActionId::RemoveDate),
         "yank" => Some(KeyActionId::Yank),
         "paste" => Some(KeyActionId::Paste),
         "undo" => Some(KeyActionId::Undo),

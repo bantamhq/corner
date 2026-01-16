@@ -75,7 +75,6 @@ pub const GLYPH_CURSOR: &str = "→";
 pub const GLYPH_SELECTED: &str = "◉";
 pub const GLYPH_UNSELECTED: &str = "○";
 pub const GLYPH_REORDER: &str = "↕";
-pub const GLYPH_PROJECTED_LATER: &str = "↪";
 pub const GLYPH_PROJECTED_RECURRING: &str = "↺";
 pub const GLYPH_PROJECTED_CALENDAR: &str = "○";
 

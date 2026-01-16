@@ -2,13 +2,14 @@ use std::io;
 
 use chrono::{Days, Local, Months, NaiveDate};
 
-use crate::storage::{self, Entry, EntryType, Line, RawEntry, SourceType, strip_recurring_tags};
+use crate::storage::{self, Entry, EntryType, Line, RawEntry, strip_recurring_tags};
 
 use super::{App, DailyState, InputMode, SelectedItem, ViewMode};
 
 /// Filter out recurring entries that have been "done today" (have a matching ↺ entry).
+/// When a recurring entry is toggled complete, a materialized copy with ↺ prefix is created.
+/// This hides the projected recurring entry if such a copy exists.
 pub(super) fn filter_done_today_recurring(projected: Vec<Entry>, lines: &[Line]) -> Vec<Entry> {
-    // Collect local entry contents for matching
     let local_contents: Vec<&str> = lines
         .iter()
         .filter_map(|line| match line {
@@ -20,12 +21,6 @@ pub(super) fn filter_done_today_recurring(projected: Vec<Entry>, lines: &[Line])
     projected
         .into_iter()
         .filter(|entry| {
-            // Only filter recurring entries
-            if entry.source_type != SourceType::Recurring {
-                return true;
-            }
-
-            // Check if a matching ↺ entry exists in local entries
             let expected_content = format!("↺ {}", strip_recurring_tags(&entry.content));
             !local_contents.iter().any(|&c| c == expected_content)
         })

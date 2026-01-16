@@ -47,23 +47,16 @@ pub fn render_calendar(f: &mut Frame<'_>, model: &CalendarModel<'_>, area: Rect)
     let context_primary = theme::context_primary(model.journal_slot);
     let mut events = CalendarEventStore::default();
 
-    // Style non-selected, non-today days
-    // Priority (highest to lowest):
-    //   3. Today - context primary color
-    //   2. Overdue tasks - PROJECTED_DATE (red)
-    //   1. Has content - white
-    //   0. No content - dimmed (default_style)
+    // Style non-selected, non-today days with content
     for (date, info) in model.day_cache {
         if *date == model.selected || *date == today {
             continue;
         }
         if info.has_entries || info.has_calendar_events {
-            let style = if info.has_overdue_tasks {
-                Style::default().fg(theme::PROJECTED_DATE).not_dim()
-            } else {
-                Style::default().fg(theme::CALENDAR_TEXT).not_dim()
-            };
-            events.add(to_time_date(*date), style);
+            events.add(
+                to_time_date(*date),
+                Style::default().fg(theme::CALENDAR_TEXT).not_dim(),
+            );
         }
     }
 
@@ -78,15 +71,10 @@ pub fn render_calendar(f: &mut Frame<'_>, model: &CalendarModel<'_>, area: Rect)
         );
     }
 
-    // Selected day - same priority logic but reversed
+    // Selected day styling
     let selected_info = model.day_cache.get(&model.selected);
     let selected_style = if model.selected == today {
         Style::default().fg(context_primary).reversed().not_dim()
-    } else if selected_info.is_some_and(|i| i.has_overdue_tasks) {
-        Style::default()
-            .fg(theme::PROJECTED_DATE)
-            .reversed()
-            .not_dim()
     } else if selected_info.is_some_and(|i| i.has_entries || i.has_calendar_events) {
         Style::default()
             .fg(theme::CALENDAR_TEXT)

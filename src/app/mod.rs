@@ -243,11 +243,6 @@ pub enum EditContext {
         date: NaiveDate,
         entry_type: EntryType,
     },
-    /// Editing a Later projected entry (edits source, refreshes projection)
-    LaterEdit {
-        source_date: NaiveDate,
-        line_index: usize,
-    },
 }
 
 /// Context for confirmation dialogs

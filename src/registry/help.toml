@@ -77,28 +77,14 @@ description = "Delete selected entry"
 category = "entries"
 
 [[help]]
+actions = ["move_to_today", "move_to_tomorrow"]
+description = "Move entry to today/tomorrow"
+category = "entries"
+
+[[help]]
 actions = "cycle_entry_type"
 description = "Cycle entry type (task/note/event)"
 category = "entries"
-
-# =============================================================================
-# Date Operations
-# =============================================================================
-
-[[help]]
-actions = "defer_date"
-description = "Defer entry to a future date"
-category = "dates"
-
-[[help]]
-actions = "remove_date"
-description = "Remove date from entry"
-category = "dates"
-
-[[help]]
-actions = "bring_to_today"
-description = "Set entry date to today"
-category = "dates"
 
 # =============================================================================
 # Clipboard & Undo
