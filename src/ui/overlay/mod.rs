@@ -122,6 +122,13 @@ pub fn render_confirm_modal(f: &mut Frame<'_>, area: Rect, model: ConfirmModel) 
                 "This cannot be undone.".to_string(),
             ],
         ),
+        ConfirmContext::DeleteTagFromCompleted(tag) => (
+            " Remove from Completed ",
+            vec![
+                format!("Remove #{} from completed tasks?", tag),
+                "This cannot be undone.".to_string(),
+            ],
+        ),
     };
 
     let popup_area = centered_rect(50, 30, area);

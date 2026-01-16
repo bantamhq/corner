@@ -99,6 +99,11 @@ default_keys = ["d"]
 contexts = ["shared_normal", "selection", "command_palette"]
 
 [[action]]
+key_action_id = "delete_from_completed"
+default_keys = ["D"]
+contexts = ["command_palette"]
+
+[[action]]
 key_action_id = "move_to_today"
 default_keys = ["T"]
 contexts = ["shared_normal", "selection"]

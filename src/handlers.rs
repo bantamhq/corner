@@ -348,6 +348,9 @@ pub fn handle_command_palette_key(app: &mut App, key: KeyEvent) -> io::Result<()
             KeyActionId::Delete => {
                 app.palette_delete_selected()?;
             }
+            KeyActionId::DeleteFromCompleted => {
+                app.palette_delete_tag_from_completed();
+            }
             KeyActionId::Hide => {
                 app.palette_hide_selected()?;
             }
@@ -470,13 +473,16 @@ pub fn handle_confirm_key(app: &mut App, key: KeyCode) -> io::Result<()> {
             ConfirmContext::DeleteTag(tag) => {
                 app.confirm_delete_tag(&tag)?;
             }
+            ConfirmContext::DeleteTagFromCompleted(tag) => {
+                app.confirm_delete_tag_from_completed(&tag)?;
+            }
         },
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => match context {
             ConfirmContext::CreateProjectJournal => {
                 app.set_status("Staying on Hub journal");
                 app.input_mode = InputMode::Normal;
             }
-            ConfirmContext::DeleteTag(_) => {
+            ConfirmContext::DeleteTag(_) | ConfirmContext::DeleteTagFromCompleted(_) => {
                 app.open_palette(CommandPaletteMode::Tags);
             }
         },

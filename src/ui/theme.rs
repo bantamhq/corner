@@ -70,6 +70,11 @@ pub fn secondary_text(surface: &Surface) -> Color {
     surface.muted_text
 }
 
+#[must_use]
+pub fn scroll_indicator(surface: &Surface) -> Color {
+    surface.muted_text
+}
+
 // Glyphs
 pub const GLYPH_CURSOR: &str = "→";
 pub const GLYPH_SELECTED: &str = "◉";
@@ -88,9 +93,9 @@ pub const CALENDAR_COLORS: &[Color] = &[
     Color::LightGreen,
 ];
 
-pub const GLYPH_SCROLL_UP: &str = "▲";
-pub const GLYPH_SCROLL_DOWN: &str = "▼";
-pub const GLYPH_SCROLL_BOTH: &str = "▲▼";
+pub const GLYPH_SCROLL_UP: &str = "ᐃ";
+pub const GLYPH_SCROLL_DOWN: &str = "ᐁ";
+pub const GLYPH_SCROLL_BOTH: &str = "ᐃᐁ";
 pub const GLYPH_CALENDAR: char = '●';
 pub const GLYPH_CALENDAR_PAST: char = '○';
 pub const GLYPH_AGENDA_EVENT: char = '*';
@@ -107,8 +112,8 @@ pub const HEADING_PADDING: usize = 2;
 pub const CALENDAR_PANEL_HEIGHT: u16 = 10;
 pub const UPCOMING_MIN_HEIGHT: u16 = 3;
 
-// Entry list buffer (rows reserved at bottom for scroll indicator)
-pub const ENTRY_LIST_BOTTOM_BUFFER: u16 = 2;
+// Entry list buffer (rows reserved at bottom for status indicator)
+pub const ENTRY_LIST_BOTTOM_BUFFER: u16 = 1;
 
 // Agenda widget
 pub const AGENDA_MIN_ENTRIES: usize = 7;

@@ -279,6 +279,7 @@ pub enum EditContext {
 pub enum ConfirmContext {
     CreateProjectJournal,
     DeleteTag(String),
+    DeleteTagFromCompleted(String),
 }
 
 /// State for the quick date picker overlay

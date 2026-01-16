@@ -16,12 +16,20 @@ fn is_valid_tag_boundary(journal: &str, end_pos: usize) -> bool {
     }
 }
 
-fn count_tag_occurrences(journal: &str, tag: &str) -> usize {
+fn count_tag_occurrences(journal: &str, tag: &str, line_filter: Option<fn(&str) -> bool>) -> usize {
     let tag_lower = tag.to_lowercase();
-    storage::TAG_REGEX
-        .captures_iter(journal)
+    let lines: Box<dyn Iterator<Item = &str>> = match line_filter {
+        Some(f) => Box::new(journal.lines().filter(move |line| f(line))),
+        None => Box::new(std::iter::once(journal)),
+    };
+    lines
+        .flat_map(|text| storage::TAG_REGEX.captures_iter(text))
         .filter(|cap| cap[1].to_lowercase() == tag_lower)
         .count()
+}
+
+fn is_completed_task(line: &str) -> bool {
+    line.trim_start().starts_with("- [x] ")
 }
 
 fn replace_tag_matches(journal: &str, regex: &Regex, replacement: Option<&str>) -> String {
@@ -59,7 +67,7 @@ impl App {
     pub(super) fn delete_all_tag_occurrences(&mut self, tag: &str) -> io::Result<usize> {
         let path = self.active_path().to_path_buf();
         let journal = storage::load_journal(&path)?;
-        let count = count_tag_occurrences(&journal, tag);
+        let count = count_tag_occurrences(&journal, tag, None);
 
         let tag_regex = storage::create_tag_delete_regex(tag).map_err(io::Error::other)?;
         let new_journal = replace_tag_matches(&journal, &tag_regex, None);
@@ -77,6 +85,37 @@ impl App {
         Ok(())
     }
 
+    pub(super) fn delete_tag_from_completed(&mut self, tag: &str) -> io::Result<usize> {
+        let path = self.active_path().to_path_buf();
+        let journal = storage::load_journal(&path)?;
+        let count = count_tag_occurrences(&journal, tag, Some(is_completed_task));
+
+        let tag_regex = storage::create_tag_delete_regex(tag).map_err(io::Error::other)?;
+        let new_journal = journal
+            .lines()
+            .map(|line| {
+                if is_completed_task(line) {
+                    replace_tag_matches(line, &tag_regex, None)
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let cleaned = Self::clean_empty_entries(&new_journal);
+
+        storage::save_journal(&path, &cleaned)?;
+        Ok(count)
+    }
+
+    pub fn confirm_delete_tag_from_completed(&mut self, tag: &str) -> io::Result<()> {
+        let count = self.delete_tag_from_completed(tag)?;
+        self.refresh_view_after_tag_change()?;
+        self.set_status(format!("Removed {count} tag occurrences from completed"));
+        self.open_palette(super::CommandPaletteMode::Tags);
+        Ok(())
+    }
+
     #[allow(dead_code)]
     pub(super) fn rename_tag_occurrences(
         &mut self,
@@ -85,7 +124,7 @@ impl App {
     ) -> io::Result<usize> {
         let path = self.active_path().to_path_buf();
         let journal = storage::load_journal(&path)?;
-        let count = count_tag_occurrences(&journal, old_tag);
+        let count = count_tag_occurrences(&journal, old_tag, None);
 
         let tag_regex = storage::create_tag_match_regex(old_tag).map_err(io::Error::other)?;
         let replacement = format!("#{new_tag}");

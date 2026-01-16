@@ -162,3 +162,49 @@ fn journal_switch_isolates_changes() {
 
     ctx.verify_invariants();
 }
+
+#[test]
+fn delete_tag_from_completed_preserves_incomplete_tasks() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+    let content =
+        "# 2026/01/15\n- [ ] incomplete #work\n- [x] completed #work\n- [x] also done #work\n";
+    let mut ctx = TestContext::with_journal_content(date, content);
+
+    // Open command palette and switch to tags tab
+    ctx.press(KeyCode::Char('q'));
+    ctx.press(KeyCode::Right); // Commands -> Projects
+    ctx.press(KeyCode::Right); // Projects -> Tags
+
+    // Press Shift+D to delete from completed (first tag is #work)
+    ctx.press_with_modifiers(KeyCode::Char('D'), KeyModifiers::SHIFT);
+
+    // Confirm deletion
+    ctx.press(KeyCode::Char('y'));
+
+    // Verify incomplete task still has tag, completed tasks don't
+    let journal = ctx.read_journal();
+    assert!(
+        journal.contains("- [ ] incomplete #work"),
+        "Incomplete task should keep tag"
+    );
+    // Completed tasks should have tag removed (no #work after their content)
+    assert!(
+        !journal.contains("- [x] completed #work"),
+        "Completed task should lose tag"
+    );
+    assert!(
+        !journal.contains("- [x] also done #work"),
+        "Second completed task should lose tag"
+    );
+    // Verify the lines exist without the tag
+    assert!(
+        journal.contains("- [x] completed"),
+        "Completed task entry should still exist"
+    );
+    assert!(
+        journal.contains("- [x] also done"),
+        "Second completed task entry should still exist"
+    );
+
+    ctx.verify_invariants();
+}

@@ -2,7 +2,7 @@ use ratatui::{
     Frame,
     layout::Rect,
     style::{Color, Style},
-    text::Line as RatatuiLine,
+    text::{Line as RatatuiLine, Span},
     widgets::{Block, BorderType, Borders, Paragraph},
 };
 
@@ -100,11 +100,40 @@ pub fn content_area_for(area: Rect, config: &ContainerConfig) -> Rect {
     }
 }
 
-pub fn render_list(f: &mut Frame<'_>, list: &ListModel, layout: &ContainerLayout) {
+pub fn render_list(
+    f: &mut Frame<'_>,
+    list: &ListModel,
+    layout: &ContainerLayout,
+    surface: &super::surface::Surface,
+) {
     let scroll_offset = list.scroll.offset;
     let lines = list.lines();
 
     #[allow(clippy::cast_possible_truncation)]
     let content = Paragraph::new(lines).scroll((scroll_offset as u16, 0));
     f.render_widget(content, layout.content_area);
+
+    let visible_height = layout.content_area.height as usize;
+    let total_lines = list.scroll.total;
+    let can_scroll_up = scroll_offset > 0;
+    let can_scroll_down = total_lines > scroll_offset + visible_height;
+
+    let indicator_style = Style::default().fg(super::theme::scroll_indicator(surface));
+    let indicator_x = layout.content_area.x.saturating_sub(2);
+
+    let render_indicator = |f: &mut Frame<'_>, glyph: &str, y: u16| {
+        let indicator = Paragraph::new(RatatuiLine::from(Span::styled(glyph, indicator_style)));
+        f.render_widget(indicator, Rect { x: indicator_x, y, width: 1, height: 1 });
+    };
+
+    if can_scroll_up {
+        render_indicator(f, super::theme::GLYPH_SCROLL_UP, layout.content_area.y);
+    }
+    if can_scroll_down {
+        render_indicator(
+            f,
+            super::theme::GLYPH_SCROLL_DOWN,
+            layout.content_area.y + layout.content_area.height.saturating_sub(1),
+        );
+    }
 }

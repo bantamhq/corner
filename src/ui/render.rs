@@ -66,7 +66,7 @@ pub fn render_app(f: &mut Frame<'_>, app: &mut App) {
             }
             match &panel.content {
                 PanelContent::EntryList(list) => {
-                    render_list(f, list, &container_layout);
+                    render_list(f, list, &container_layout, &app.surface);
                 }
                 PanelContent::Empty => {}
             }

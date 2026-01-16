@@ -208,10 +208,22 @@ impl App {
     }
 
     fn palette_delete_tag(&mut self, index: usize) {
+        self.confirm_tag_action(index, ConfirmContext::DeleteTag);
+    }
+
+    pub fn palette_delete_tag_from_completed(&mut self) {
+        if let InputMode::CommandPalette(state) = &self.input_mode
+            && state.mode == CommandPaletteMode::Tags
+        {
+            self.confirm_tag_action(state.selected, ConfirmContext::DeleteTagFromCompleted);
+        }
+    }
+
+    fn confirm_tag_action(&mut self, index: usize, context_fn: fn(String) -> ConfirmContext) {
         if let Some(tag) = self.cached_journal_tags.get(index) {
             let tag_name = tag.name.clone();
             self.close_command_palette();
-            self.input_mode = InputMode::Confirm(ConfirmContext::DeleteTag(tag_name));
+            self.input_mode = InputMode::Confirm(context_fn(tag_name));
         }
     }
 
