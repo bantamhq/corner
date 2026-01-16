@@ -1,5 +1,5 @@
 use crate::cursor::CursorBuffer;
-use crate::storage::{self, Entry, EntryType, Line, RawEntry, SourceType};
+use crate::storage::{self, Entry, EntryType, Line, RawEntry, SourceType, restore_done_meta};
 
 use super::actions::{CreateEntry, CreateTarget, EditEntry, EditTarget};
 use super::{App, EditContext, EntryLocation, InputMode, InsertPosition, ViewMode};
@@ -121,6 +121,8 @@ impl App {
             return;
         };
 
+        let new_content = restore_done_meta(&new_content, &original_content);
+
         if let Some(entry) = self.get_daily_entry_mut(entry_index) {
             entry.content = new_content.clone();
             self.save();
@@ -160,6 +162,8 @@ impl App {
         original_content: String,
     ) {
         let path = self.active_path().to_path_buf();
+
+        let new_content = restore_done_meta(&new_content, &original_content);
 
         if new_content.trim().is_empty() {
             let _ = storage::delete_entry(date, &path, line_index);

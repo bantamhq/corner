@@ -400,7 +400,6 @@ impl App {
         let lines = storage::load_day_lines(date, &path)?;
         let entry_indices = Self::compute_entry_indices(&lines);
         let projected_entries = storage::collect_projected_entries_for_date(date, &path)?;
-        let projected_entries = navigation::filter_done_today_recurring(projected_entries, &lines);
         let in_git_repo = storage::find_git_root().is_some();
         let cached_journal_tags = Vec::new();
         let hide_completed = config.hide_completed;

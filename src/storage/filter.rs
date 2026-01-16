@@ -71,6 +71,77 @@ pub static RECURRING_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         .unwrap()
 });
 
+/// Matches <!-- done: ... --> metadata comment at end of content
+static DONE_META_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\s*<!--\s*done:\s*([^>]*)\s*-->").unwrap());
+
+/// Extracts completion dates from entry content's <!-- done: ... --> comment.
+fn extract_done_dates(content: &str) -> Vec<NaiveDate> {
+    DONE_META_REGEX
+        .captures(content)
+        .and_then(|caps| caps.get(1))
+        .map(|m| {
+            m.as_str()
+                .split(',')
+                .filter_map(|s| NaiveDate::parse_from_str(s.trim(), "%Y-%m-%d").ok())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Checks if a specific date is marked as done in the entry content.
+#[must_use]
+pub fn is_done_on_date(content: &str, date: NaiveDate) -> bool {
+    extract_done_dates(content).contains(&date)
+}
+
+/// Formats content with done metadata comment. Returns base unchanged if dates is empty.
+fn format_done_meta(base: &str, dates: &[NaiveDate]) -> String {
+    if dates.is_empty() {
+        return base.to_string();
+    }
+    let dates_str = dates
+        .iter()
+        .map(|d| d.format("%Y-%m-%d").to_string())
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("{base} <!-- done: {dates_str} -->")
+}
+
+/// Adds a date to the done list in entry content. Returns the new content.
+#[must_use]
+pub fn add_done_date(content: &str, date: NaiveDate) -> String {
+    let mut dates = extract_done_dates(content);
+    if dates.contains(&date) {
+        return content.to_string();
+    }
+    dates.push(date);
+    dates.sort();
+    format_done_meta(&strip_done_meta(content), &dates)
+}
+
+/// Removes a date from the done list in entry content. Returns the new content.
+#[must_use]
+pub fn remove_done_date(content: &str, date: NaiveDate) -> String {
+    let mut dates = extract_done_dates(content);
+    dates.retain(|d| d != &date);
+    format_done_meta(&strip_done_meta(content), &dates)
+}
+
+/// Strips the <!-- done: ... --> metadata from content for display.
+#[must_use]
+pub fn strip_done_meta(content: &str) -> String {
+    DONE_META_REGEX.replace(content, "").trim().to_string()
+}
+
+/// Transfers done metadata from original content to new content.
+/// Used when editing entries to preserve completion tracking.
+#[must_use]
+pub fn restore_done_meta(new_content: &str, original: &str) -> String {
+    let done_dates = extract_done_dates(original);
+    format_done_meta(new_content, &done_dates)
+}
+
 /// Checks if a token looks like spread date syntax (not plain text search).
 /// Spread syntax includes: DATE, DATE.., ..DATE, DATE..DATE
 /// Where DATE can be: mm/dd, mm/dd/yy, mm/dd/yyyy, yyyy/mm/dd, d[1-999][+], weekday[+]
@@ -373,33 +444,36 @@ pub fn collect_projected_entries_for_date(
         }
 
         if let Some(source_date) = current_date {
-            // Skip entries from the target day itself (they're regular entries)
             if source_date == target_date {
                 line_index_in_day += 1;
                 continue;
             }
 
             let parsed = parse_lines(line);
-            if let Some(Line::Entry(raw_entry)) = parsed.first() {
-                // Check for @recurring pattern (repeating projection)
-                // Only project to dates on or after the source date
-                if let Some(pattern) = extract_recurring_pattern(&raw_entry.content)
-                    && target_date >= source_date
-                    && pattern.matches(target_date)
-                {
-                    entries.push(Entry::from_raw(
-                        raw_entry,
-                        source_date,
-                        line_index_in_day,
-                        SourceType::Recurring,
-                    ));
-                }
+            if let Some(Line::Entry(raw_entry)) = parsed.first()
+                && let Some(pattern) = extract_recurring_pattern(&raw_entry.content)
+                && target_date >= source_date
+                && pattern.matches(target_date)
+            {
+                let is_done = is_done_on_date(&raw_entry.content, target_date);
+                let entry_type = if is_done {
+                    EntryType::Task { completed: true }
+                } else {
+                    raw_entry.entry_type.clone()
+                };
+
+                entries.push(Entry {
+                    entry_type,
+                    content: strip_done_meta(&raw_entry.content),
+                    source_date,
+                    line_index: line_index_in_day,
+                    source_type: SourceType::Recurring,
+                });
             }
             line_index_in_day += 1;
         }
     }
 
-    // Sort by source_date
     entries.sort_by_key(|e| e.source_date);
     Ok(entries)
 }

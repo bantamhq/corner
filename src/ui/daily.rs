@@ -27,7 +27,12 @@ pub fn build_daily_list(app: &App, width: usize) -> ListModel {
             continue;
         }
         calendar_event_count += 1;
-        rows.push(rows::build_calendar_row(event, width, show_calendar_name, is_past));
+        rows.push(rows::build_calendar_row(
+            event,
+            width,
+            show_calendar_name,
+            is_past,
+        ));
     }
 
     let hidden_count = app.hidden_completed_count();

@@ -479,7 +479,7 @@ pub fn handle_confirm_key(app: &mut App, key: KeyCode) -> io::Result<()> {
             ConfirmContext::DeleteTag(_) => {
                 app.open_palette(CommandPaletteMode::Tags);
             }
-        }
+        },
         _ => {}
     }
 

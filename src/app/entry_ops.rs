@@ -4,7 +4,8 @@ use chrono::{Days, NaiveDate};
 
 use crate::cursor::CursorBuffer;
 use crate::storage::{
-    self, Entry, EntryType, RawEntry, SourceType, parse_to_raw_entry, strip_recurring_tags,
+    self, Entry, EntryType, RawEntry, SourceType, add_done_date, is_done_on_date,
+    parse_to_raw_entry, remove_done_date, strip_done_meta,
 };
 
 use super::{App, EditContext, InputMode, Line, SelectedItem, ViewMode};
@@ -139,20 +140,24 @@ impl App {
         let path = self.active_path().to_path_buf();
         match target {
             ToggleTarget::Projected(entry) => {
-                // Materialize: create completed copy on today instead of toggling source
-                // Add ↺ prefix for matching when hiding done-today recurring entries
-                let content =
+                let Some(content) =
                     storage::get_entry_content(entry.source_date, &path, entry.line_index)
-                        .map(|c| format!("↺ {}", strip_recurring_tags(&c)))
-                        .unwrap_or_default();
-
-                let raw_entry = RawEntry {
-                    entry_type: EntryType::Task { completed: true },
-                    content,
+                else {
+                    return Ok(());
                 };
-                self.lines.push(Line::Entry(raw_entry));
-                self.entry_indices = Self::compute_entry_indices(&self.lines);
-                self.save();
+
+                let new_content = if is_done_on_date(&content, self.current_date) {
+                    remove_done_date(&content, self.current_date)
+                } else {
+                    add_done_date(&content, self.current_date)
+                };
+
+                storage::update_entry_content(
+                    entry.source_date,
+                    &path,
+                    entry.line_index,
+                    new_content,
+                )?;
                 self.refresh_projected_entries();
             }
             ToggleTarget::Daily { line_idx } => {
@@ -207,8 +212,11 @@ impl App {
             SelectedItem::None => return,
         };
 
+        // Keep original with metadata for restoration on save
         self.original_edit_content = Some(content.clone());
-        self.edit_buffer = Some(CursorBuffer::new(content));
+        // Strip metadata for display in edit buffer
+        let display_content = strip_done_meta(&content);
+        self.edit_buffer = Some(CursorBuffer::new(display_content));
         self.input_mode = InputMode::Edit(ctx);
         self.update_hints();
     }

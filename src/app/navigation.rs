@@ -2,30 +2,9 @@ use std::io;
 
 use chrono::{Days, Local, Months, NaiveDate};
 
-use crate::storage::{self, Entry, EntryType, Line, RawEntry, strip_recurring_tags};
+use crate::storage::{self, Entry, EntryType, Line, RawEntry};
 
 use super::{App, DailyState, InputMode, SelectedItem, ViewMode};
-
-/// Filter out recurring entries that have been "done today" (have a matching ↺ entry).
-/// When a recurring entry is toggled complete, a materialized copy with ↺ prefix is created.
-/// This hides the projected recurring entry if such a copy exists.
-pub(super) fn filter_done_today_recurring(projected: Vec<Entry>, lines: &[Line]) -> Vec<Entry> {
-    let local_contents: Vec<&str> = lines
-        .iter()
-        .filter_map(|line| match line {
-            Line::Entry(raw) => Some(raw.content.as_str()),
-            _ => None,
-        })
-        .collect();
-
-    projected
-        .into_iter()
-        .filter(|entry| {
-            let expected_content = format!("↺ {}", strip_recurring_tags(&entry.content));
-            !local_contents.iter().any(|&c| c == expected_content)
-        })
-        .collect()
-}
 
 impl App {
     #[must_use]
@@ -165,7 +144,8 @@ impl App {
         // Check regular entries
         for &line_idx in &self.entry_indices {
             if let Line::Entry(raw_entry) = &self.lines[line_idx] {
-                let is_completed = matches!(raw_entry.entry_type, EntryType::Task { completed: true });
+                let is_completed =
+                    matches!(raw_entry.entry_type, EntryType::Task { completed: true });
                 if !is_completed {
                     if visible_idx == old_visible_idx {
                         return actual_idx;
@@ -408,7 +388,6 @@ impl App {
         let projected =
             storage::collect_projected_entries_for_date(self.current_date, self.active_path())
                 .unwrap_or_default();
-        let projected = filter_done_today_recurring(projected, &self.lines);
         if let ViewMode::Daily(state) = &mut self.view {
             state.projected_entries = projected;
         }
@@ -422,7 +401,6 @@ impl App {
 
     pub(super) fn reset_daily_view(&mut self, date: NaiveDate) -> io::Result<()> {
         let projected_entries = self.load_day(date)?;
-        let projected_entries = filter_done_today_recurring(projected_entries, &self.lines);
         self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), projected_entries));
         if self.hide_completed {
             self.clamp_selection_to_visible();
@@ -435,7 +413,6 @@ impl App {
         let projected_entries =
             storage::collect_projected_entries_for_date(self.current_date, self.active_path())
                 .unwrap_or_default();
-        let projected_entries = filter_done_today_recurring(projected_entries, &self.lines);
         self.view = ViewMode::Daily(DailyState::new(self.entry_indices.len(), projected_entries));
         if self.hide_completed {
             self.clamp_selection_to_visible();

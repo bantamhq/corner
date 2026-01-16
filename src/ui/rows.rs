@@ -7,7 +7,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, InputMode};
 use crate::calendar::CalendarEvent;
-use crate::storage::{Entry, EntryType, RawEntry, SourceType};
+use crate::storage::{Entry, EntryType, RawEntry, SourceType, strip_done_meta};
 
 use super::model::RowModel;
 use super::shared::{
@@ -24,7 +24,11 @@ pub fn build_calendar_row(
 ) -> RowModel {
     let prefix = "* ";
     let prefix_width = prefix.width();
-    let glyph = if is_past { theme::GLYPH_CALENDAR_PAST } else { theme::GLYPH_CALENDAR };
+    let glyph = if is_past {
+        theme::GLYPH_CALENDAR_PAST
+    } else {
+        theme::GLYPH_CALENDAR
+    };
     let indicator = glyph.to_string();
 
     let content = format_calendar_event(event, show_calendar_name);
@@ -42,7 +46,11 @@ pub fn build_calendar_row(
     let (_, rest_of_prefix) = split_prefix(prefix);
 
     let indicator_base = Style::default().fg(event.color);
-    let indicator_style = if is_past { indicator_base.dim() } else { indicator_base };
+    let indicator_style = if is_past {
+        indicator_base.dim()
+    } else {
+        indicator_base
+    };
 
     RowModel::new(
         Some(Span::styled(indicator, indicator_style)),
@@ -81,11 +89,12 @@ pub fn build_daily_entry_row(
     visible_idx: usize,
     width: usize,
 ) -> RowModel {
+    let content = strip_done_meta(&entry.content);
     build_entry_row(
         app,
         EntryRowSpec {
             entry_type: &entry.entry_type,
-            text: &entry.content,
+            text: &content,
             width,
             is_selected,
             visible_idx,
