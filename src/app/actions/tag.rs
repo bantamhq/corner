@@ -12,103 +12,132 @@ use super::types::{Action, ActionDescription, StatusVisibility};
 /// Target for tag operations (type alias for ContentTarget)
 pub type TagTarget = ContentTarget;
 
-/// Action to remove the last trailing tag from entries
-pub struct RemoveLastTag {
-    targets: Vec<TagTarget>,
+/// Which tag removal operation to perform
+#[derive(Clone, Copy)]
+enum RemovalKind {
+    Last,
+    All,
 }
+
+/// Action to remove tags from entries (consolidated from RemoveLastTag and RemoveAllTags)
+pub struct TagRemovalAction {
+    targets: Vec<TagTarget>,
+    kind: RemovalKind,
+}
+
+impl TagRemovalAction {
+    fn new(targets: Vec<TagTarget>, kind: RemovalKind) -> Self {
+        Self { targets, kind }
+    }
+
+    fn single(location: EntryLocation, original_content: String, kind: RemovalKind) -> Self {
+        Self::new(
+            vec![TagTarget {
+                location,
+                original_content,
+            }],
+            kind,
+        )
+    }
+}
+
+impl Action for TagRemovalAction {
+    fn execute(&mut self, app: &mut App) -> io::Result<Box<dyn Action>> {
+        let op_fn = match self.kind {
+            RemovalKind::Last => remove_last_trailing_tag,
+            RemovalKind::All => remove_all_trailing_tags,
+        };
+        for target in &self.targets {
+            execute_content_operation(app, &target.location, op_fn)?;
+        }
+
+        let operation = match self.kind {
+            RemovalKind::Last => TagOperation::RemoveLast,
+            RemovalKind::All => TagOperation::RemoveAll,
+        };
+        Ok(Box::new(RestoreContent::new(
+            self.targets.clone(),
+            operation,
+        )))
+    }
+
+    fn description(&self) -> ActionDescription {
+        let count = self.targets.len();
+        let (past, past_reversed) = match (self.kind, count == 1) {
+            (RemovalKind::Last, true) => ("Removed tag".to_string(), "Restored tag".to_string()),
+            (RemovalKind::Last, false) => (
+                format!("Removed tags from {} entries", count),
+                format!("Restored tags on {} entries", count),
+            ),
+            (RemovalKind::All, true) => {
+                ("Removed all tags".to_string(), "Restored tags".to_string())
+            }
+            (RemovalKind::All, false) => (
+                format!("Removed all tags from {} entries", count),
+                format!("Restored tags on {} entries", count),
+            ),
+        };
+        ActionDescription {
+            past,
+            past_reversed,
+            visibility: StatusVisibility::Always,
+        }
+    }
+}
+
+pub struct RemoveLastTag(TagRemovalAction);
 
 impl RemoveLastTag {
     #[must_use]
     pub fn new(targets: Vec<TagTarget>) -> Self {
-        Self { targets }
+        Self(TagRemovalAction::new(targets, RemovalKind::Last))
     }
 
     #[must_use]
     pub fn single(location: EntryLocation, original_content: String) -> Self {
-        Self::new(vec![TagTarget {
+        Self(TagRemovalAction::single(
             location,
             original_content,
-        }])
+            RemovalKind::Last,
+        ))
     }
 }
 
 impl Action for RemoveLastTag {
     fn execute(&mut self, app: &mut App) -> io::Result<Box<dyn Action>> {
-        for target in &self.targets {
-            execute_content_operation(app, &target.location, remove_last_trailing_tag)?;
-        }
-
-        Ok(Box::new(RestoreContent::new(
-            self.targets.clone(),
-            TagOperation::RemoveLast,
-        )))
+        self.0.execute(app)
     }
 
     fn description(&self) -> ActionDescription {
-        let count = self.targets.len();
-        if count == 1 {
-            ActionDescription {
-                past: "Removed tag".to_string(),
-                past_reversed: "Restored tag".to_string(),
-                visibility: StatusVisibility::Always,
-            }
-        } else {
-            ActionDescription {
-                past: format!("Removed tags from {} entries", count),
-                past_reversed: format!("Restored tags on {} entries", count),
-                visibility: StatusVisibility::Always,
-            }
-        }
+        self.0.description()
     }
 }
 
-/// Action to remove all trailing tags from entries
-pub struct RemoveAllTags {
-    targets: Vec<TagTarget>,
-}
+pub struct RemoveAllTags(TagRemovalAction);
 
 impl RemoveAllTags {
     #[must_use]
     pub fn new(targets: Vec<TagTarget>) -> Self {
-        Self { targets }
+        Self(TagRemovalAction::new(targets, RemovalKind::All))
     }
 
     #[must_use]
     pub fn single(location: EntryLocation, original_content: String) -> Self {
-        Self::new(vec![TagTarget {
+        Self(TagRemovalAction::single(
             location,
             original_content,
-        }])
+            RemovalKind::All,
+        ))
     }
 }
 
 impl Action for RemoveAllTags {
     fn execute(&mut self, app: &mut App) -> io::Result<Box<dyn Action>> {
-        for target in &self.targets {
-            execute_content_operation(app, &target.location, remove_all_trailing_tags)?;
-        }
-
-        Ok(Box::new(RestoreContent::new(
-            self.targets.clone(),
-            TagOperation::RemoveAll,
-        )))
+        self.0.execute(app)
     }
 
     fn description(&self) -> ActionDescription {
-        let count = self.targets.len();
-        if count == 1 {
-            ActionDescription {
-                past: "Removed all tags".to_string(),
-                past_reversed: "Restored tags".to_string(),
-                visibility: StatusVisibility::Always,
-            }
-        } else {
-            ActionDescription {
-                past: format!("Removed all tags from {} entries", count),
-                past_reversed: format!("Restored tags on {} entries", count),
-                visibility: StatusVisibility::Always,
-            }
-        }
+        self.0.description()
     }
 }
 
@@ -151,18 +180,21 @@ impl Action for AppendTag {
 
     fn description(&self) -> ActionDescription {
         let count = self.targets.len();
-        if count == 1 {
-            ActionDescription {
-                past: format!("Added #{}", self.tag),
-                past_reversed: format!("Removed #{}", self.tag),
-                visibility: StatusVisibility::Always,
-            }
+        let (past, past_reversed) = if count == 1 {
+            (
+                format!("Added #{}", self.tag),
+                format!("Removed #{}", self.tag),
+            )
         } else {
-            ActionDescription {
-                past: format!("Added #{} to {} entries", self.tag, count),
-                past_reversed: format!("Removed #{} from {} entries", self.tag, count),
-                visibility: StatusVisibility::Always,
-            }
+            (
+                format!("Added #{} to {} entries", self.tag, count),
+                format!("Removed #{} from {} entries", self.tag, count),
+            )
+        };
+        ActionDescription {
+            past,
+            past_reversed,
+            visibility: StatusVisibility::Always,
         }
     }
 }
@@ -207,52 +239,33 @@ impl Action for RestoreContent {
 
     fn description(&self) -> ActionDescription {
         let count = self.targets.len();
-        match &self.operation {
-            TagOperation::RemoveLast => {
-                if count == 1 {
-                    ActionDescription {
-                        past: "Restored tag".to_string(),
-                        past_reversed: "Removed tag".to_string(),
-                        visibility: StatusVisibility::Always,
-                    }
-                } else {
-                    ActionDescription {
-                        past: format!("Restored tags on {} entries", count),
-                        past_reversed: format!("Removed tags from {} entries", count),
-                        visibility: StatusVisibility::Always,
-                    }
-                }
+        let (past, past_reversed) = match (&self.operation, count == 1) {
+            (TagOperation::RemoveLast, true) => {
+                ("Restored tag".to_string(), "Removed tag".to_string())
             }
-            TagOperation::RemoveAll => {
-                if count == 1 {
-                    ActionDescription {
-                        past: "Restored tags".to_string(),
-                        past_reversed: "Removed all tags".to_string(),
-                        visibility: StatusVisibility::Always,
-                    }
-                } else {
-                    ActionDescription {
-                        past: format!("Restored tags on {} entries", count),
-                        past_reversed: format!("Removed all tags from {} entries", count),
-                        visibility: StatusVisibility::Always,
-                    }
-                }
+            (TagOperation::RemoveLast, false) => (
+                format!("Restored tags on {} entries", count),
+                format!("Removed tags from {} entries", count),
+            ),
+            (TagOperation::RemoveAll, true) => {
+                ("Restored tags".to_string(), "Removed all tags".to_string())
             }
-            TagOperation::Append(tag) => {
-                if count == 1 {
-                    ActionDescription {
-                        past: format!("Removed #{}", tag),
-                        past_reversed: format!("Added #{}", tag),
-                        visibility: StatusVisibility::Always,
-                    }
-                } else {
-                    ActionDescription {
-                        past: format!("Removed #{} from {} entries", tag, count),
-                        past_reversed: format!("Added #{} to {} entries", tag, count),
-                        visibility: StatusVisibility::Always,
-                    }
-                }
+            (TagOperation::RemoveAll, false) => (
+                format!("Restored tags on {} entries", count),
+                format!("Removed all tags from {} entries", count),
+            ),
+            (TagOperation::Append(tag), true) => {
+                (format!("Removed #{}", tag), format!("Added #{}", tag))
             }
+            (TagOperation::Append(tag), false) => (
+                format!("Removed #{} from {} entries", tag, count),
+                format!("Added #{} to {} entries", tag, count),
+            ),
+        };
+        ActionDescription {
+            past,
+            past_reversed,
+            visibility: StatusVisibility::Always,
         }
     }
 }

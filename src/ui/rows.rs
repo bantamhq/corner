@@ -88,22 +88,18 @@ pub fn build_daily_entry_row(
 }
 
 pub fn build_filter_selected_row(app: &App, entry: &Entry, index: usize, width: usize) -> RowModel {
-    let content_style = entry_style(&entry.entry_type);
-    let text = entry.content.clone();
-    let prefix = entry.entry_type.prefix();
-    let prefix_width = prefix.width();
-    let (date_suffix, date_suffix_width) = format_date_suffix(entry.source_date);
-
-    let (_, rest_of_prefix) = split_prefix(prefix);
-    let available = width.saturating_sub(prefix_width + date_suffix_width);
-    let display_text = truncate_with_tags(&text, available);
-
-    let resolver = IndicatorResolver::new(app);
-    RowModel::new(
-        Some(resolver.filter_cursor_indicator(index)),
-        Some(Span::styled(rest_of_prefix, content_style)),
-        style_content(&display_text, content_style),
-        Some(Span::styled(date_suffix, date_suffix_style(content_style))),
+    let (date_suffix, _) = format_date_suffix(entry.source_date);
+    build_entry_row(
+        app,
+        EntryRowSpec {
+            entry_type: &entry.entry_type,
+            text: &entry.content,
+            width,
+            is_selected: true,
+            visible_idx: index,
+            indicator: EntryIndicator::FilterSelected,
+            suffix: EntrySuffix::Date(date_suffix),
+        },
     )
 }
 
@@ -111,6 +107,7 @@ pub fn build_filter_selected_row(app: &App, entry: &Entry, index: usize, width: 
 enum EntryIndicator<'a> {
     Daily,
     Filter,
+    FilterSelected,
     Projected(&'a SourceType),
 }
 
@@ -158,6 +155,7 @@ fn build_entry_row(app: &App, spec: EntryRowSpec<'_>) -> RowModel {
         EntryIndicator::Filter => {
             resolver.filter_list_indicator(&first_char, spec.visible_idx, content_style)
         }
+        EntryIndicator::FilterSelected => resolver.filter_cursor_indicator(spec.visible_idx),
         EntryIndicator::Projected(source_type) => {
             resolver.projected_indicator(spec.is_selected, source_type, content_style)
         }

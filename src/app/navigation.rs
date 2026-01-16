@@ -101,40 +101,21 @@ impl App {
     }
 
     pub fn move_up(&mut self) {
-        let selected = self.view.selected_mut();
-        *selected = selected.saturating_sub(1);
+        self.view.move_up();
     }
 
     pub fn move_down(&mut self) {
         let total = self.visible_entry_count();
-        if let ViewMode::Daily(state) = &mut self.view
-            && total > 0
-            && state.selected < total - 1
-        {
-            state.selected += 1;
-        } else if let ViewMode::Filter(state) = &mut self.view
-            && !state.entries.is_empty()
-            && state.selected < state.entries.len() - 1
-        {
-            state.selected += 1;
-        }
+        self.view.move_down(total);
     }
 
     pub fn jump_to_first(&mut self) {
-        *self.view.selected_mut() = 0;
+        self.view.jump_to_first();
     }
 
     pub fn jump_to_last(&mut self) {
         let total = self.visible_entry_count();
-        if let ViewMode::Daily(state) = &mut self.view
-            && total > 0
-        {
-            state.selected = total - 1;
-        } else if let ViewMode::Filter(state) = &mut self.view
-            && !state.entries.is_empty()
-        {
-            state.selected = state.entries.len() - 1;
-        }
+        self.view.jump_to_last(total);
     }
 
     pub fn toggle_hide_completed(&mut self) {
@@ -299,7 +280,6 @@ impl App {
         visible_projected + visible_before
     }
 
-    /// Load a day's data into self, returning projected entries for view construction.
     pub(super) fn load_day(&mut self, date: NaiveDate) -> io::Result<Vec<Entry>> {
         self.current_date = date;
         let path = self.active_path().to_path_buf();
@@ -308,7 +288,6 @@ impl App {
         storage::collect_projected_entries_for_date(date, &path)
     }
 
-    /// Refresh projected entries in daily view, filtering out done-today recurring entries.
     pub fn refresh_projected_entries(&mut self) {
         let projected =
             storage::collect_projected_entries_for_date(self.current_date, self.active_path())
@@ -320,13 +299,11 @@ impl App {
         self.clamp_selection_to_visible();
     }
 
-    /// Shared cleanup for all view switches - resets input mode and clears undo/redo.
     pub(super) fn finalize_view_switch(&mut self) {
         self.input_mode = InputMode::Normal;
         self.executor.clear();
     }
 
-    /// Load a day and reset to daily view with proper selection clamping.
     pub(super) fn reset_daily_view(&mut self, date: NaiveDate) -> io::Result<()> {
         let projected_entries = self.load_day(date)?;
         let projected_entries = filter_done_today_recurring(projected_entries, &self.lines);
@@ -338,7 +315,6 @@ impl App {
         Ok(())
     }
 
-    /// Restore daily view without reloading from disk (for returning from filter).
     pub(super) fn restore_daily_view(&mut self) {
         let projected_entries =
             storage::collect_projected_entries_for_date(self.current_date, self.active_path())
@@ -366,18 +342,22 @@ impl App {
         Ok(())
     }
 
-    pub fn prev_day(&mut self) -> io::Result<()> {
-        if let Some(prev) = self.current_date.checked_sub_days(Days::new(1)) {
-            self.goto_day(prev)?;
+    fn navigate_by<F>(&mut self, calc: F) -> io::Result<()>
+    where
+        F: FnOnce(NaiveDate) -> Option<NaiveDate>,
+    {
+        if let Some(new_date) = calc(self.current_date) {
+            self.goto_day(new_date)?;
         }
         Ok(())
     }
 
+    pub fn prev_day(&mut self) -> io::Result<()> {
+        self.navigate_by(|d| d.checked_sub_days(Days::new(1)))
+    }
+
     pub fn next_day(&mut self) -> io::Result<()> {
-        if let Some(next) = self.current_date.checked_add_days(Days::new(1)) {
-            self.goto_day(next)?;
-        }
-        Ok(())
+        self.navigate_by(|d| d.checked_add_days(Days::new(1)))
     }
 
     pub fn goto_today(&mut self) -> io::Result<()> {
@@ -385,49 +365,39 @@ impl App {
     }
 
     pub fn prev_week(&mut self) -> io::Result<()> {
-        if let Some(prev) = self.current_date.checked_sub_days(Days::new(7)) {
-            self.goto_day(prev)?;
-        }
-        Ok(())
+        self.navigate_by(|d| d.checked_sub_days(Days::new(7)))
     }
 
     pub fn next_week(&mut self) -> io::Result<()> {
-        if let Some(next) = self.current_date.checked_add_days(Days::new(7)) {
-            self.goto_day(next)?;
-        }
-        Ok(())
+        self.navigate_by(|d| d.checked_add_days(Days::new(7)))
     }
 
     pub fn prev_month(&mut self) -> io::Result<()> {
-        if let Some(prev) = self.current_date.checked_sub_months(Months::new(1)) {
-            let target = super::calendar::clamp_day_to_month(self.current_date, prev);
-            self.goto_day(target)?;
-        }
-        Ok(())
+        self.navigate_by(|d| {
+            d.checked_sub_months(Months::new(1))
+                .map(|m| super::calendar::clamp_day_to_month(d, m))
+        })
     }
 
     pub fn next_month(&mut self) -> io::Result<()> {
-        if let Some(next) = self.current_date.checked_add_months(Months::new(1)) {
-            let target = super::calendar::clamp_day_to_month(self.current_date, next);
-            self.goto_day(target)?;
-        }
-        Ok(())
+        self.navigate_by(|d| {
+            d.checked_add_months(Months::new(1))
+                .map(|m| super::calendar::clamp_day_to_month(d, m))
+        })
     }
 
     pub fn prev_year(&mut self) -> io::Result<()> {
-        if let Some(prev) = self.current_date.checked_sub_months(Months::new(12)) {
-            let target = super::calendar::clamp_day_to_month(self.current_date, prev);
-            self.goto_day(target)?;
-        }
-        Ok(())
+        self.navigate_by(|d| {
+            d.checked_sub_months(Months::new(12))
+                .map(|m| super::calendar::clamp_day_to_month(d, m))
+        })
     }
 
     pub fn next_year(&mut self) -> io::Result<()> {
-        if let Some(next) = self.current_date.checked_add_months(Months::new(12)) {
-            let target = super::calendar::clamp_day_to_month(self.current_date, next);
-            self.goto_day(target)?;
-        }
-        Ok(())
+        self.navigate_by(|d| {
+            d.checked_add_months(Months::new(12))
+                .map(|m| super::calendar::clamp_day_to_month(d, m))
+        })
     }
 
     /// Navigate to the source date and select the entry at the given line index.

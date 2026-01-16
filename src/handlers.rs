@@ -25,7 +25,18 @@ fn shifted_char_to_digit(c: char) -> Option<char> {
     }
 }
 
-/// Handle Up/Down navigation in hint dropdown. Returns true if handled.
+fn dispatch_entry_op<S, C>(app: &mut App, for_selected: S, for_current: C) -> io::Result<()>
+where
+    S: FnOnce(&mut App) -> io::Result<()>,
+    C: FnOnce(&mut App) -> io::Result<()>,
+{
+    if matches!(app.input_mode, InputMode::Selection(_)) {
+        for_selected(app)
+    } else {
+        for_current(app)
+    }
+}
+
 fn handle_hint_navigation(app: &mut App, code: KeyCode) -> bool {
     if matches!(code, KeyCode::Up | KeyCode::Down) && app.hint_state.is_active() {
         if code == KeyCode::Down {
@@ -38,8 +49,128 @@ fn handle_hint_navigation(app: &mut App, code: KeyCode) -> bool {
     false
 }
 
+fn dispatch_date_navigation(app: &mut App, action: KeyActionId) -> io::Result<()> {
+    if !app.is_daily_view() {
+        return Ok(());
+    }
+    use KeyActionId::*;
+    match action {
+        MoveLeft => app.prev_day()?,
+        MoveRight => app.next_day()?,
+        PrevWeek => app.prev_week()?,
+        NextWeek => app.next_week()?,
+        PrevMonth => app.prev_month()?,
+        NextMonth => app.next_month()?,
+        PrevYear => app.prev_year()?,
+        NextYear => app.next_year()?,
+        GotoToday => app.goto_today()?,
+        DatePicker => app.open_date_picker(),
+        _ => {}
+    }
+    Ok(())
+}
+
+fn dispatch_entry_operation(app: &mut App, action: KeyActionId) -> io::Result<()> {
+    use KeyActionId::*;
+    match action {
+        ToggleComplete => {
+            dispatch_entry_op(app, App::toggle_selected, App::toggle_current_entry)?;
+        }
+        Delete => {
+            dispatch_entry_op(app, App::delete_selected, App::delete_current_entry)?;
+        }
+        MoveToToday => {
+            dispatch_entry_op(
+                app,
+                App::move_selected_to_today,
+                App::move_current_entry_to_today,
+            )?;
+        }
+        MoveToTomorrow => {
+            dispatch_entry_op(
+                app,
+                App::move_selected_to_tomorrow,
+                App::move_current_entry_to_tomorrow,
+            )?;
+        }
+        Yank => {
+            dispatch_entry_op(
+                app,
+                |a| {
+                    a.yank_selected();
+                    Ok(())
+                },
+                |a| {
+                    a.yank_current_entry();
+                    Ok(())
+                },
+            )?;
+        }
+        RemoveLastTag => {
+            dispatch_entry_op(
+                app,
+                App::remove_last_tag_from_selected,
+                App::remove_last_tag_from_current_entry,
+            )?;
+        }
+        RemoveAllTags => {
+            dispatch_entry_op(
+                app,
+                App::remove_all_tags_from_selected,
+                App::remove_all_tags_from_current_entry,
+            )?;
+        }
+        CycleEntryType => match &app.input_mode {
+            InputMode::Edit(_) => app.cycle_edit_entry_type(),
+            InputMode::Selection(_) => {
+                app.cycle_selected_entry_types()?;
+            }
+            _ => {
+                app.cycle_current_entry_type()?;
+            }
+        },
+        _ => {}
+    }
+    Ok(())
+}
+
 fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
     use KeyActionId::*;
+
+    // Date navigation (daily view only)
+    if matches!(
+        action,
+        MoveLeft
+            | MoveRight
+            | PrevWeek
+            | NextWeek
+            | PrevMonth
+            | NextMonth
+            | PrevYear
+            | NextYear
+            | GotoToday
+            | DatePicker
+    ) {
+        dispatch_date_navigation(app, action)?;
+        return Ok(true);
+    }
+
+    // Entry operations (selection-aware)
+    if matches!(
+        action,
+        ToggleComplete
+            | Delete
+            | MoveToToday
+            | MoveToTomorrow
+            | Yank
+            | RemoveLastTag
+            | RemoveAllTags
+            | CycleEntryType
+    ) {
+        dispatch_entry_operation(app, action)?;
+        return Ok(true);
+    }
+
     match action {
         Submit => match &app.input_mode {
             InputMode::Edit(_) => {
@@ -76,16 +207,6 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
             InputMode::Selection(_) => app.selection_move_up(),
             _ => app.move_up(),
         },
-        MoveLeft => {
-            if app.is_daily_view() {
-                app.prev_day()?;
-            }
-        }
-        MoveRight => {
-            if app.is_daily_view() {
-                app.next_day()?;
-            }
-        }
         JumpToFirst => match &app.input_mode {
             InputMode::Selection(_) => app.selection_jump_to_first(),
             _ => app.jump_to_first(),
@@ -94,41 +215,6 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
             InputMode::Selection(_) => app.selection_jump_to_last(),
             _ => app.jump_to_last(),
         },
-        PrevWeek => {
-            if app.is_daily_view() {
-                app.prev_week()?;
-            }
-        }
-        NextWeek => {
-            if app.is_daily_view() {
-                app.next_week()?;
-            }
-        }
-        PrevMonth => {
-            if app.is_daily_view() {
-                app.prev_month()?;
-            }
-        }
-        NextMonth => {
-            if app.is_daily_view() {
-                app.next_month()?;
-            }
-        }
-        PrevYear => {
-            if app.is_daily_view() {
-                app.prev_year()?;
-            }
-        }
-        NextYear => {
-            if app.is_daily_view() {
-                app.next_year()?;
-            }
-        }
-        GotoToday => {
-            if app.is_daily_view() {
-                app.goto_today()?;
-            }
-        }
         NewEntryBelow => {
             if let SelectedItem::Projected { entry, .. } = app.get_selected_item() {
                 app.go_to_source(entry.source_date, entry.line_index)?;
@@ -138,71 +224,9 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
         }
         NewEntryAbove => app.new_task(InsertPosition::Above),
         Edit => app.edit_current_entry(),
-        ToggleComplete => {
-            if matches!(app.input_mode, InputMode::Selection(_)) {
-                app.toggle_selected()?;
-            } else {
-                app.toggle_current_entry()?;
-            }
-        }
-        Delete => {
-            if matches!(app.input_mode, InputMode::Selection(_)) {
-                app.delete_selected()?;
-            } else {
-                app.delete_current_entry()?;
-            }
-        }
-        MoveToToday => {
-            if matches!(app.input_mode, InputMode::Selection(_)) {
-                app.move_selected_to_today()?;
-            } else {
-                app.move_current_entry_to_today()?;
-            }
-        }
-        MoveToTomorrow => {
-            if matches!(app.input_mode, InputMode::Selection(_)) {
-                app.move_selected_to_tomorrow()?;
-            } else {
-                app.move_current_entry_to_tomorrow()?;
-            }
-        }
-        Yank => {
-            if matches!(app.input_mode, InputMode::Selection(_)) {
-                app.yank_selected();
-            } else {
-                app.yank_current_entry();
-            }
-        }
-        Paste => {
-            app.paste_from_clipboard()?;
-        }
+        Paste => app.paste_from_clipboard()?,
         Undo => app.undo(),
-        Redo => {
-            app.redo()?;
-        }
-        RemoveLastTag => {
-            if matches!(app.input_mode, InputMode::Selection(_)) {
-                app.remove_last_tag_from_selected()?;
-            } else {
-                app.remove_last_tag_from_current_entry()?;
-            }
-        }
-        RemoveAllTags => {
-            if matches!(app.input_mode, InputMode::Selection(_)) {
-                app.remove_all_tags_from_selected()?;
-            } else {
-                app.remove_all_tags_from_current_entry()?;
-            }
-        }
-        CycleEntryType => match &app.input_mode {
-            InputMode::Edit(_) => app.cycle_edit_entry_type(),
-            InputMode::Selection(_) => {
-                app.cycle_selected_entry_types()?;
-            }
-            _ => {
-                app.cycle_current_entry_type()?;
-            }
-        },
+        Redo => app.redo()?,
         Selection => {
             if matches!(app.input_mode, InputMode::Selection(_)) {
                 app.selection_toggle_current();
@@ -211,25 +235,13 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
             }
         }
         SelectionExtendRange => app.selection_extend_to_cursor(),
-        ToggleFilterView => {
-            app.cycle_view()?;
-        }
-        ToggleJournal => {
-            app.toggle_journal()?;
-        }
-        CommandPalette => {
-            app.toggle_command_palette();
-        }
-        ToggleCalendarSidebar => {
-            app.toggle_calendar_sidebar();
-        }
-        ToggleAgenda => {
-            app.toggle_agenda();
-        }
+        ToggleFilterView => app.cycle_view()?,
+        ToggleJournal => app.toggle_journal()?,
+        CommandPalette => app.toggle_command_palette(),
+        ToggleCalendarSidebar => app.toggle_calendar_sidebar(),
+        ToggleAgenda => app.toggle_agenda(),
         FilterQuickAdd => app.filter_quick_add(),
-        Refresh => {
-            app.refresh_filter()?;
-        }
+        Refresh => app.refresh_filter()?,
         SaveAndNew => {
             app.accept_hint();
             app.clear_hints();
@@ -245,18 +257,11 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
             }
             app.update_hints();
         }
-        Quit => {
-            app.should_quit = true;
-        }
-        FilterPrompt => {
-            app.enter_filter_prompt()?;
-        }
-        DatePicker => {
-            if app.is_daily_view() {
-                app.open_date_picker();
-            }
-        }
+        Quit => app.should_quit = true,
+        FilterPrompt => app.enter_filter_prompt()?,
         NoOp => {}
+        // Already handled above
+        _ => {}
     }
     Ok(true)
 }

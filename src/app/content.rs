@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::storage::{self, expand_favorite_tags, normalize_entry_structure, Line};
+use crate::storage::{self, Line, expand_favorite_tags, normalize_entry_structure};
 
 use super::{App, EntryLocation, ViewMode};
 

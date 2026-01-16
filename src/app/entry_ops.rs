@@ -53,6 +53,32 @@ impl App {
         }
     }
 
+    pub(super) fn add_entries_to_date(
+        &mut self,
+        entries: Vec<RawEntry>,
+        target_date: NaiveDate,
+    ) -> io::Result<()> {
+        let path = self.active_path().to_path_buf();
+        let mut target_lines = storage::load_day_lines(target_date, &path)?;
+        for entry in entries {
+            target_lines.push(Line::Entry(entry));
+        }
+        storage::save_day_lines(target_date, &path, &target_lines)?;
+        self.refresh_affected_views(target_date)
+    }
+
+    fn extract_location_from_current(&self) -> Option<EntryLocation> {
+        match self.get_selected_item() {
+            SelectedItem::Projected { entry, .. } => Some(EntryLocation::Projected(entry.clone())),
+            SelectedItem::Daily { line_idx, .. } => Some(EntryLocation::Daily { line_idx }),
+            SelectedItem::Filter { index, entry } => Some(EntryLocation::Filter {
+                index,
+                entry: entry.clone(),
+            }),
+            SelectedItem::None => None,
+        }
+    }
+
     /// Extract delete target from current selection
     pub fn extract_delete_target_from_current(&self) -> Option<DeleteTarget> {
         match self.get_selected_item() {
@@ -73,8 +99,6 @@ impl App {
         }
     }
 
-    /// Delete the currently selected entry (view-aware, yanks to clipboard first)
-    /// Projected entries (recurring) are read-only - must go to source.
     pub fn delete_current_entry(&mut self) -> io::Result<()> {
         if let SelectedItem::Projected { .. } = self.get_selected_item() {
             self.set_status("Press o to go to source");
@@ -93,40 +117,24 @@ impl App {
         self.execute_action(Box::new(action))
     }
 
-    /// Extract toggle target from current selection (only for tasks)
-    pub fn extract_toggle_target_from_current(&self) -> Option<ToggleTarget> {
-        match self.get_selected_item() {
-            SelectedItem::Projected { entry, .. } => {
-                if matches!(entry.entry_type, EntryType::Task { .. }) {
-                    Some(ToggleTarget::Projected(entry.clone()))
-                } else {
-                    None
-                }
-            }
-            SelectedItem::Daily {
-                line_idx, entry, ..
-            } => {
-                if matches!(entry.entry_type, EntryType::Task { .. }) {
-                    Some(ToggleTarget::Daily { line_idx })
-                } else {
-                    None
-                }
-            }
-            SelectedItem::Filter { index, entry } => {
-                if matches!(entry.entry_type, EntryType::Task { .. }) {
-                    Some(ToggleTarget::Filter {
-                        index,
-                        entry: entry.clone(),
-                    })
-                } else {
-                    None
-                }
-            }
+    fn current_is_task(&self) -> bool {
+        let entry_type = match self.get_selected_item() {
+            SelectedItem::Projected { entry, .. } => Some(&entry.entry_type),
+            SelectedItem::Daily { entry, .. } => Some(&entry.entry_type),
+            SelectedItem::Filter { entry, .. } => Some(&entry.entry_type),
             SelectedItem::None => None,
+        };
+        entry_type.is_some_and(|t| matches!(t, EntryType::Task { .. }))
+    }
+
+    pub fn extract_toggle_target_from_current(&self) -> Option<ToggleTarget> {
+        if self.current_is_task() {
+            self.extract_location_from_current()
+        } else {
+            None
         }
     }
 
-    /// Execute toggle on a target
     pub fn execute_toggle(&mut self, target: ToggleTarget) -> io::Result<()> {
         let path = self.active_path().to_path_buf();
         match target {
@@ -171,7 +179,6 @@ impl App {
         Ok(())
     }
 
-    /// Toggle task completion (view-aware)
     pub fn toggle_current_entry(&mut self) -> io::Result<()> {
         let Some(target) = self.extract_toggle_target_from_current() else {
             return Ok(());
@@ -179,8 +186,6 @@ impl App {
         self.execute_toggle(target)
     }
 
-    /// Start editing the current entry (view-aware)
-    /// Projected entries (recurring) are read-only - must go to source.
     pub fn edit_current_entry(&mut self) {
         let (ctx, content) = match self.get_selected_item() {
             SelectedItem::Projected { .. } => {
@@ -208,7 +213,6 @@ impl App {
         self.update_hints();
     }
 
-    /// Extract yank target from current selection (includes prefix for round-trip paste)
     pub fn extract_yank_target_from_current(&self) -> Option<YankTarget> {
         let content = match self.get_selected_item() {
             SelectedItem::Projected { entry, .. } => {
@@ -225,12 +229,10 @@ impl App {
         Some(YankTarget { content })
     }
 
-    /// Get content from a yank target
     pub fn yank_target_content(target: &YankTarget) -> &str {
         &target.content
     }
 
-    /// Execute yank - copy content to clipboard
     pub fn execute_yank(&mut self, contents: &[&str]) {
         if contents.is_empty() {
             return;
@@ -256,71 +258,31 @@ impl App {
         self.execute_yank(&[content]);
     }
 
-    /// Extract tag removal target from current selection
-    pub fn extract_tag_removal_target_from_current(&self) -> Option<TagRemovalTarget> {
-        match self.get_selected_item() {
-            SelectedItem::Projected { entry, .. } => {
-                Some(TagRemovalTarget::Projected(entry.clone()))
-            }
-            SelectedItem::Daily { line_idx, .. } => Some(TagRemovalTarget::Daily { line_idx }),
-            SelectedItem::Filter { index, entry } => Some(TagRemovalTarget::Filter {
-                index,
-                entry: entry.clone(),
-            }),
-            SelectedItem::None => None,
-        }
-    }
-
-    /// Extract cycle target (location + entry type) from current selection
     pub fn extract_cycle_target_from_current(&self) -> Option<super::actions::CycleTarget> {
-        match self.get_selected_item() {
-            SelectedItem::Projected { entry, .. } => Some(super::actions::CycleTarget {
-                location: EntryLocation::Projected(entry.clone()),
-                original_type: entry.entry_type.clone(),
-            }),
-            SelectedItem::Daily {
-                line_idx, entry, ..
-            } => Some(super::actions::CycleTarget {
-                location: EntryLocation::Daily { line_idx },
-                original_type: entry.entry_type.clone(),
-            }),
-            SelectedItem::Filter { index, entry } => Some(super::actions::CycleTarget {
-                location: EntryLocation::Filter {
-                    index,
-                    entry: entry.clone(),
-                },
-                original_type: entry.entry_type.clone(),
-            }),
-            SelectedItem::None => None,
-        }
+        let location = self.extract_location_from_current()?;
+        let original_type = match self.get_selected_item() {
+            SelectedItem::Projected { entry, .. } => entry.entry_type.clone(),
+            SelectedItem::Daily { entry, .. } => entry.entry_type.clone(),
+            SelectedItem::Filter { entry, .. } => entry.entry_type.clone(),
+            SelectedItem::None => return None,
+        };
+        Some(super::actions::CycleTarget {
+            location,
+            original_type,
+        })
     }
 
-    /// Extract content target (location + content) from current selection.
-    /// Used for tag operations, date operations, and other content transformations.
     pub fn extract_content_target_from_current(&self) -> Option<super::actions::ContentTarget> {
-        match self.get_selected_item() {
-            SelectedItem::Projected { entry, .. } => Some(super::actions::ContentTarget::new(
-                EntryLocation::Projected(entry.clone()),
-                entry.content.clone(),
-            )),
-            SelectedItem::Daily {
-                line_idx, entry, ..
-            } => Some(super::actions::ContentTarget::new(
-                EntryLocation::Daily { line_idx },
-                entry.content.clone(),
-            )),
-            SelectedItem::Filter { index, entry } => Some(super::actions::ContentTarget::new(
-                EntryLocation::Filter {
-                    index,
-                    entry: entry.clone(),
-                },
-                entry.content.clone(),
-            )),
-            SelectedItem::None => None,
-        }
+        let location = self.extract_location_from_current()?;
+        let content = match self.get_selected_item() {
+            SelectedItem::Projected { entry, .. } => entry.content.clone(),
+            SelectedItem::Daily { entry, .. } => entry.content.clone(),
+            SelectedItem::Filter { entry, .. } => entry.content.clone(),
+            SelectedItem::None => return None,
+        };
+        Some(super::actions::ContentTarget::new(location, content))
     }
 
-    /// Remove the last trailing tag from the selected entry
     pub fn remove_last_tag_from_current_entry(&mut self) -> io::Result<()> {
         let Some(target) = self.extract_content_target_from_current() else {
             return Ok(());
@@ -330,7 +292,6 @@ impl App {
         self.execute_action(Box::new(action))
     }
 
-    /// Remove all trailing tags from the selected entry
     pub fn remove_all_tags_from_current_entry(&mut self) -> io::Result<()> {
         let Some(target) = self.extract_content_target_from_current() else {
             return Ok(());
@@ -340,7 +301,6 @@ impl App {
         self.execute_action(Box::new(action))
     }
 
-    /// Append a favorite tag to the current entry
     pub fn append_tag_to_current_entry(&mut self, tag: &str) -> io::Result<()> {
         let Some(target) = self.extract_content_target_from_current() else {
             return Ok(());
@@ -353,7 +313,6 @@ impl App {
         self.execute_action(Box::new(action))
     }
 
-    /// Cycle entry type on the current entry
     pub fn cycle_current_entry_type(&mut self) -> io::Result<()> {
         let Some(target) = self.extract_cycle_target_from_current() else {
             return Ok(());
@@ -385,7 +344,6 @@ impl App {
         clipboard.get_text()
     }
 
-    /// Paste clipboard content as entries below current selection
     pub fn paste_from_clipboard(&mut self) -> io::Result<()> {
         let text = match Self::read_from_clipboard() {
             Ok(t) => t,
@@ -397,7 +355,6 @@ impl App {
         self.paste_entries_from_text(&text)
     }
 
-    /// Paste text as entries below current selection (used by bracketed paste)
     pub fn paste_entries_from_text(&mut self, text: &str) -> io::Result<()> {
         let mut raw_entries = Self::parse_paste_raw(text);
         if raw_entries.is_empty() {
@@ -440,13 +397,7 @@ impl App {
             .collect();
 
         storage::save_day_lines(date, &path, &lines)?;
-
-        if date == self.current_date {
-            self.reload_current_day()?;
-        }
-        if let ViewMode::Filter(_) = &self.view {
-            let _ = self.refresh_filter();
-        }
+        self.refresh_affected_views(date)?;
 
         let target = super::actions::PasteTarget {
             date,
@@ -474,21 +425,21 @@ impl App {
         self.clamp_daily_selection();
     }
 
-    /// Move the current entry to a different date
     fn move_current_entry_to_date(&mut self, target_date: NaiveDate) -> io::Result<()> {
-        // Projected entries cannot be moved - must go to source
         if let SelectedItem::Projected { .. } = self.get_selected_item() {
             self.set_status("Press o to go to source");
             return Ok(());
         }
 
-        // Get entry info before deleting
         let (source_date, raw_entry) = match self.get_selected_item() {
             SelectedItem::Daily { entry, .. } => (self.current_date, entry.clone()),
             SelectedItem::Filter { entry, .. } => {
-                let content =
-                    storage::get_entry_content(entry.source_date, self.active_path(), entry.line_index)
-                        .unwrap_or_default();
+                let content = storage::get_entry_content(
+                    entry.source_date,
+                    self.active_path(),
+                    entry.line_index,
+                )
+                .unwrap_or_default();
                 (
                     entry.source_date,
                     RawEntry {
@@ -500,45 +451,27 @@ impl App {
             SelectedItem::Projected { .. } | SelectedItem::None => return Ok(()),
         };
 
-        // Don't move if already on target date
         if source_date == target_date {
             self.set_status("Entry already on target date");
             return Ok(());
         }
 
-        let path = self.active_path().to_path_buf();
-
-        // Delete from source
         let Some(delete_target) = self.extract_delete_target_from_current() else {
             return Ok(());
         };
         let delete_action = super::actions::DeleteEntries::single(delete_target);
         self.execute_action(Box::new(delete_action))?;
 
-        // Add to target date
-        let mut target_lines = storage::load_day_lines(target_date, &path)?;
-        target_lines.push(Line::Entry(raw_entry));
-        storage::save_day_lines(target_date, &path, &target_lines)?;
-
-        // Refresh views
-        if target_date == self.current_date {
-            self.reload_current_day()?;
-        }
-        if let ViewMode::Filter(_) = &self.view {
-            let _ = self.refresh_filter();
-        }
-
+        self.add_entries_to_date(vec![raw_entry], target_date)?;
         self.set_status(format!("Moved to {}", target_date.format("%m/%d")));
         Ok(())
     }
 
-    /// Move the current entry to today
     pub fn move_current_entry_to_today(&mut self) -> io::Result<()> {
         let today = chrono::Local::now().date_naive();
         self.move_current_entry_to_date(today)
     }
 
-    /// Move the current entry to tomorrow
     pub fn move_current_entry_to_tomorrow(&mut self) -> io::Result<()> {
         let tomorrow = chrono::Local::now()
             .date_naive()

@@ -225,6 +225,35 @@ impl ViewMode {
             ViewMode::Filter(state) => state.scroll_offset,
         }
     }
+
+    /// Move selection up by one (with bounds check)
+    pub fn move_up(&mut self) {
+        let selected = self.selected_mut();
+        *selected = selected.saturating_sub(1);
+    }
+
+    /// Move selection down by one (with bounds check)
+    pub fn move_down(&mut self, max: usize) {
+        if max == 0 {
+            return;
+        }
+        let selected = self.selected_mut();
+        if *selected < max - 1 {
+            *selected += 1;
+        }
+    }
+
+    /// Jump to first item
+    pub fn jump_to_first(&mut self) {
+        *self.selected_mut() = 0;
+    }
+
+    /// Jump to last item
+    pub fn jump_to_last(&mut self, max: usize) {
+        if max > 0 {
+            *self.selected_mut() = max - 1;
+        }
+    }
 }
 
 /// Context for what is being edited
@@ -699,7 +728,16 @@ impl App {
         Ok(())
     }
 
-    /// Update hints based on current input buffer and mode.
+    pub fn refresh_affected_views(&mut self, affected_date: NaiveDate) -> io::Result<()> {
+        if affected_date == self.current_date {
+            self.reload_current_day()?;
+        }
+        if matches!(self.view, ViewMode::Filter(_)) {
+            let _ = self.refresh_filter();
+        }
+        Ok(())
+    }
+
     pub fn update_hints(&mut self) {
         let (input, mode, saved_filters) = match &self.input_mode {
             InputMode::Edit(_) => {
@@ -741,7 +779,6 @@ impl App {
         self.hint_state = hint.with_previous_selection(&self.hint_state);
     }
 
-    /// Clear any active hints.
     pub fn clear_hints(&mut self) {
         self.hint_state = HintContext::Inactive;
     }

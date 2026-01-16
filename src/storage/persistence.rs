@@ -5,7 +5,6 @@ use std::path::Path;
 
 use chrono::NaiveDate;
 
-
 /// Information about a day's content for calendar display.
 #[derive(Debug, Clone, Default)]
 pub struct DayInfo {

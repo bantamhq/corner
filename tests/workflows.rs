@@ -112,7 +112,6 @@ fn reorder_entries_persists_correctly() {
     ctx.verify_invariants();
 }
 
-
 #[test]
 fn day_navigation_preserves_entries() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();

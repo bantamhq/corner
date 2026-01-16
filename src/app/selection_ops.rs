@@ -219,28 +219,25 @@ impl App {
         })
     }
 
-    /// Collect toggle targets for all selected entries (tasks only)
     fn collect_toggle_targets_from_selected(&self) -> Vec<ToggleTarget> {
         self.collect_targets_from_selected(|entry| {
-            fn is_task(entry_type: &EntryType) -> bool {
-                matches!(entry_type, EntryType::Task { .. })
-            }
-
-            match entry {
-                SelectedEntry::Projected(projected) if is_task(&projected.entry_type) => {
-                    Some(ToggleTarget::Projected(projected.clone()))
+            let (entry_type, target) = match entry {
+                SelectedEntry::Projected(projected) => (
+                    &projected.entry_type,
+                    ToggleTarget::Projected(projected.clone()),
+                ),
+                SelectedEntry::Daily { line_idx, entry } => {
+                    (&entry.entry_type, ToggleTarget::Daily { line_idx })
                 }
-                SelectedEntry::Daily { line_idx, entry } if is_task(&entry.entry_type) => {
-                    Some(ToggleTarget::Daily { line_idx })
-                }
-                SelectedEntry::Filter { index, entry } if is_task(&entry.entry_type) => {
-                    Some(ToggleTarget::Filter {
+                SelectedEntry::Filter { index, entry } => (
+                    &entry.entry_type,
+                    ToggleTarget::Filter {
                         index,
                         entry: entry.clone(),
-                    })
-                }
-                _ => None,
-            }
+                    },
+                ),
+            };
+            matches!(entry_type, EntryType::Task { .. }).then_some(target)
         })
     }
 
@@ -464,21 +461,7 @@ impl App {
         }
 
         // Add to target date
-        let path = self.active_path().to_path_buf();
-        let mut target_lines = storage::load_day_lines(target_date, &path)?;
-        for entry in raw_entries {
-            target_lines.push(Line::Entry(entry));
-        }
-        storage::save_day_lines(target_date, &path, &target_lines)?;
-
-        // Refresh views
-        if target_date == self.current_date {
-            self.reload_current_day()?;
-        }
-        if let ViewMode::Filter(_) = &self.view {
-            let _ = self.refresh_filter();
-        }
-
+        self.add_entries_to_date(raw_entries, target_date)?;
         self.cancel_selection_mode();
         self.set_status(format!(
             "Moved {} entries to {}",

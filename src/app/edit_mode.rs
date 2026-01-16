@@ -186,10 +186,7 @@ impl App {
             let _ = self.execute_action(Box::new(action));
         }
 
-        if date == self.current_date {
-            let _ = self.reload_current_day();
-        }
-        let _ = self.refresh_filter();
+        let _ = self.refresh_affected_views(date);
     }
 
     fn save_filter_quick_add_with_action(
@@ -227,12 +224,8 @@ impl App {
             let action = CreateEntry::new(target);
             let _ = self.execute_action(Box::new(action));
 
-            if date == self.current_date {
-                let _ = self.reload_current_day();
-            }
+            let _ = self.refresh_affected_views(date);
         }
-
-        let _ = self.refresh_filter();
         if let ViewMode::Filter(state) = &mut self.view {
             state.selected = state.entries.len().saturating_sub(1);
         }
