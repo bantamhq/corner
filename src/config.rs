@@ -531,7 +531,9 @@ fn apply_overlay(
         Some(o) => (o.merge_over(base).into_config(), None),
         None => (
             base.into_config(),
-            err.map(|e| format!("{overlay_name} config is malformed. Using base config. Error: {e}")),
+            err.map(|e| {
+                format!("{overlay_name} config is malformed. Using base config. Error: {e}")
+            }),
         ),
     }
 }

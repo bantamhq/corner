@@ -148,9 +148,15 @@ pub fn render_confirm_modal(f: &mut Frame<'_>, area: Rect, model: ConfirmModel) 
     }
     lines.push(RatatuiLine::raw(""));
     lines.push(RatatuiLine::from(vec![
-        Span::styled(theme::LABEL_CONFIRM_YES, Style::default().fg(theme::CONFIRM_YES)),
+        Span::styled(
+            theme::LABEL_CONFIRM_YES,
+            Style::default().fg(theme::CONFIRM_YES),
+        ),
         Span::raw(theme::LABEL_YES),
-        Span::styled(theme::LABEL_CONFIRM_NO, Style::default().fg(theme::CONFIRM_NO)),
+        Span::styled(
+            theme::LABEL_CONFIRM_NO,
+            Style::default().fg(theme::CONFIRM_NO),
+        ),
         Span::raw(theme::LABEL_NO),
     ]));
     let content = ratatui::text::Text::from(lines);

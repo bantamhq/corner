@@ -123,7 +123,15 @@ pub fn render_list(
 
     let render_indicator = |f: &mut Frame<'_>, glyph: &str, y: u16| {
         let indicator = Paragraph::new(RatatuiLine::from(Span::styled(glyph, indicator_style)));
-        f.render_widget(indicator, Rect { x: indicator_x, y, width: 1, height: 1 });
+        f.render_widget(
+            indicator,
+            Rect {
+                x: indicator_x,
+                y,
+                width: 1,
+                height: 1,
+            },
+        );
     };
 
     if can_scroll_up {

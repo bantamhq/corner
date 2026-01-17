@@ -44,14 +44,14 @@ Launch Caliber in a git repository and it will auto-init a project journal (conf
 | Key | Action |
 |-----|--------|
 | `Enter` | Add a new entry |
-| `j` / `k` or `↓` / `↑` | Move up and down |
-| `h` / `l` or `[` / `]` | Previous / next day |
+| `↓` / `↑` or `j` / `k` | Move up and down |
+| `←` / `→` or `h` / `l` | Previous / next day |
 | `Shift+Tab` | Cycle type: task → note → event |
 | `/` | Open filter |
 | `` ` `` | Toggle between project and hub journal |
-| `?` | Help |
-| `.` | Project interface |
-| `,` | Tag interface |
+| `q` | Command palette |
+| `.` | Calendar sidebar |
+| `,` | Agenda panel |
 
 **Entry types:**
 
@@ -68,29 +68,30 @@ That's enough to get started. The sections below go deeper.
 
 ![daily view demo](docs/examples/entry-ops.gif)
 
-Your home base. Each day is a page in your journal. Navigate between days with `h` / `l` or `[` / `]`, or jump to any date with `\` to open the date interface.
+Your home base. Each day is a page in your journal. Navigate between days with `h` / `l` or arrow keys, or jump to any date with `\` to open the date picker.
 
 Entries from other days that target today appear at the top — one-time `@date` entries and recurring `@every-*` entries surface when the day comes.
 
 | Key | Action |
 |-----|--------|
-| `h` / `l` or `[` / `]` | Previous / next day |
+| `←` / `→` or `h` / `l` | Previous / next day |
+| `[` / `]` | Previous / next month |
 | `t` | Jump to today |
-| `\` | Open date interface |
+| `\` | Open date picker |
 | `Enter` | New entry at end |
 | `o` / `O` | New entry below / above cursor |
 | `i` | Edit selected entry |
 | `d` | Delete entry |
-| `c` | Toggle task completion |
+| `Space` | Toggle task completion |
 | `z` | Hide / show completed tasks |
-| `T` | Tidy entries by type |
+| `s` | Tidy entries by type |
+| `T` | Move entry to today |
 
-### Date Interface
+### Date Picker
 
 ![date interface demo](docs/examples/datepicker.gif)
 
-Press `\` to open a calendar for quick navigation. Days with entries are highlighted. Navigate with `h/j/k/l` or arrow keys, switch months with `[` and `]`, and press `Enter` to jump to the selected date.
-You can also type a date directly in the date interface and press `Enter` to jump. Use `{` and `}` to navigate years.
+Press `\` to open a calendar for quick navigation. Days with entries are highlighted. Navigate with arrow keys or `h/j/k/l`, switch months with `[` and `]`, and press `Enter` to jump to the selected date. Use `{` and `}` to navigate years.
 
 ## Filtering
 
@@ -105,29 +106,29 @@ Press `/` to search across your entire journal. Filter by entry type, tags, date
 | `!tasks` | All incomplete tasks |
 | `#work` | Entries tagged #work |
 | `!tasks #work` | Incomplete tasks tagged #work |
-| `@after:yesterday @before:tomorrow` | Entries from today |
+| `1/15..1/20` | Entries between Jan 15 and Jan 20 |
 | `@recurring` | All recurring entries |
 | `meeting #standup` | Entries containing "meeting" with #standup tag |
-| `not:#work` | Entries without #work tag |
+| `-#work` | Entries without #work tag |
 
 Edit, toggle, or delete entries directly from filter results. Press `Enter` to quick-add a new entry to today without leaving the filter view.
 
-### Date Filters
+### Date Ranges
 
-Dates in filters default to past (most useful for searching history):
+Use spread syntax for date ranges:
 
-- `today`, `tomorrow`, `yesterday`
-- `mon`, `fri` (last Monday, last Friday)
-- `d7` (7 days ago), `d7+` (7 days from now)
-- Standard formats: `1/15`, `1/15/26`, `2026/01/15`
+- `1/15` — Exact date
+- `1/15..` — From date to today
+- `..1/15` — All past through date
+- `1/15..1/20` — Between two dates
+
+Dates default to past (most useful for searching history). Use relative dates like `today`, `yesterday`, `mon`, `d7` (7 days ago), or `d7+` (7 days from now).
 
 ### Combining Filters
 
 - Filters combine with AND: `!tasks #work meeting` finds incomplete tasks tagged #work containing "meeting"
 - Entry type filters combine with OR: `!tasks !notes` shows both tasks and notes
-- Negative filters combine with OR: `not:#work not:#personal` excludes entries with either tag
-- One `@before:` and one `@after:` allowed per query
-- `@on:` cannot be combined with `@before:` or `@after:`
+- Negative filters exclude: `-#work -#personal` excludes entries with either tag
 
 ## Task Management
 
@@ -142,7 +143,7 @@ Press `v` to enter selection mode for batch operations. Select multiple entries,
 | `v` | Toggle selection on current entry |
 | `V` | Select range from last selection to cursor |
 | `d` | Delete all selected |
-| `c` | Toggle completion on all selected |
+| `Space` | Toggle completion on all selected |
 | `y` | Yank (copy) all selected |
 | `Esc` | Exit selection mode |
 
@@ -177,38 +178,80 @@ Recurring entries appear on all matching days. When you complete one, a copy is 
 
 To edit or delete a recurring entry, press `o` to jump to its source.
 
+### Moving & Deferring
+
+Move entries between days to reschedule:
+
+| Key | Action |
+|-----|--------|
+| `T` | Move entry to today |
+| `>` | Defer entry to tomorrow |
+
+Defer is useful for tasks you didn't get to today. If `defer_skip_weekends = true` in your config, deferring on Friday or Saturday moves the entry to Monday instead.
+
 ### Undo / Redo
 
 Most actions can be undone with `u` and redone with `U`. Undo history clears when you navigate to a different day, filter, or journal.
 
 ## Project Registry
 
-Caliber maintains a project registry at `~/.config/caliber/projects.toml` used by the project interface.
-You can hide a project from the interface via `hide_from_registry = true` in the project config.
+Caliber maintains a project registry at `~/.config/caliber/projects.toml` used by the command palette.
+You can hide a project from the palette via `hide_from_registry = true` in the project config.
 
-## Tag Interface
+## Command Palette
 
-Press `,` to open a tag list with counts. Select a tag to filter, `d` to delete, or `r` to rename it across the journal.
+Press `q` to open the command palette. It provides access to commands, projects, and tags in a single searchable interface. The palette is self-documented — each item shows its description inline.
 
-## Project Interface
+## Sidebars
 
-Press `.` to open the project list. Select to switch journals, `d` to remove from registry, or `H` to hide.
+Caliber has two optional sidebars that can be toggled on and off:
 
-## Commands
+- **Calendar sidebar** (`.`) — Shows a monthly calendar with days that have entries highlighted. Useful for navigating to specific dates.
+- **Agenda panel** (`,`) — Shows upcoming events from connected calendars (see Calendar Integration below).
 
-Enter `:` to run a command:
+Configure which sidebar opens on launch with `sidebar_default` in your config:
 
-- `:date` — open date interface
-- `:project` — open project interface
-- `:tag` / `:tags` — open tag interface
-- `:scratchpad` — open scratchpad in your editor
-- `:quit` — save and exit
+```toml
+# Options: "none", "agenda", "calendar" (default)
+sidebar_default = "calendar"
+```
 
-## Configuration
+## Calendar Integration
 
-Base config lives at `~/.config/caliber/config.toml`. Hub config can be overlaid via `~/.config/caliber/hub_config.toml`.
-Project config lives at `.caliber/config.toml`.
-Key remapping uses `[keys]` per context/action; defining any key for an action disables its defaults.
+Caliber can display events from external ICS calendar feeds in the agenda panel. Events appear alongside your journal entries, giving you a unified view of your day.
+
+### Setup
+
+Add calendar sources to your base `config.toml` (not project configs, for security):
+
+```toml
+[calendars.work]
+url = "https://calendar.example.com/work.ics"
+enabled = true
+color = "blue"  # Optional: red, green, yellow, blue, magenta, cyan, etc.
+
+[calendars.personal]
+url = "https://calendar.example.com/personal.ics"
+enabled = true
+```
+
+### Visibility Options
+
+```toml
+[calendar_visibility]
+# "all" shows all calendars by default, "none" hides them
+default_mode = "all"
+# Show cancelled events (with strikethrough)
+display_cancelled = false
+# Show declined events (with strikethrough)
+display_declined = false
+```
+
+### Usage
+
+- Press `,` to toggle the agenda panel showing today's events
+- Events are read-only — they sync from your calendar feeds
+- Colors help distinguish between different calendars
 
 ## Favorite Tags
 
@@ -243,52 +286,52 @@ Define reusable filter queries in your config, then use `$name` to expand them.
 t = "!tasks"
 n = "!notes"
 next = "!tasks #next"
-stale = "!tasks @before:d7"
+stale = "!tasks ..d7"  # Tasks from 7+ days ago
 ```
 
 Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!tasks #work`.
 
 ## Keyboard Reference
 
+### Navigation
+
+<!-- GENERATED:NAVIGATION -->
+
+### Entry Operations
+
+<!-- GENERATED:ENTRIES -->
+
+### Clipboard & Undo
+
+<!-- GENERATED:CLIPBOARD -->
+
+### Tags
+
+<!-- GENERATED:TAGS -->
+
+### Views & Panels
+
+<!-- GENERATED:VIEWS -->
+
 ### Daily Mode
 
-<!-- GENERATED:DAILY_KEYS -->
+<!-- GENERATED:DAILY -->
 
 ### Filter Mode
 
-<!-- GENERATED:FILTER_KEYS -->
+<!-- GENERATED:FILTER -->
 
 ### Edit Mode
 
-<!-- GENERATED:EDIT_KEYS -->
-
-### Reorder Mode
-
-Press `r` to manually arrange entries within a day.
-
-<!-- GENERATED:REORDER_KEYS -->
+<!-- GENERATED:EDIT -->
 
 ### Selection Mode
 
-Press `v` for batch operations on multiple entries.
+<!-- GENERATED:SELECTION -->
 
-<!-- GENERATED:SELECTION_KEYS -->
+### General
 
-### Date Interface
-
-Press `\` to open the calendar interface.
-
-<!-- GENERATED:DATE_KEYS -->
-
-### Project Interface
-
-Press `+` to open the project switcher.
-
-<!-- GENERATED:PROJECT_KEYS -->
-
-### Commands
-
-<!-- GENERATED:COMMANDS -->
+<!-- GENERATED:GENERAL -->
 
 ### Filter Syntax
 
@@ -332,15 +375,27 @@ scratchpad_file = "~/notes/scratchpad.md"
 # Start with completed tasks hidden (default: false)
 hide_completed = false
 
-# Custom sort order for 's' command
+# Custom tidy order for 's' command (default shown)
 # Options: completed, uncompleted, notes, events
-sort_order = ["uncompleted", "notes", "events", "completed"]
+tidy_order = ["completed", "events", "notes", "uncompleted"]
 
-# Date format in header (default: "%m/%d/%y")
-header_date_format = "%m/%d/%y"
+# Date format in header (default: "%A, %b %-d" e.g. "Monday, Jan 5")
+header_date_format = "%A, %b %-d"
 
 # Default filter when pressing '/' (default: "!tasks")
 default_filter = "!tasks"
+
+# Auto-create project journal when opening Caliber in a git repo (default: true)
+auto_init_project = true
+
+# Skip weekends when deferring with '>' (defer Friday → Monday) (default: false)
+defer_skip_weekends = false
+
+# Hide footer key hints (default: false)
+hide_footer_help = false
+
+# Default sidebar on launch: "none", "agenda", or "calendar" (default: "calendar")
+sidebar_default = "calendar"
 
 # Favorite tags - press 1-9 to filter, Shift+1-9 to append, #1-9 to expand
 [favorite_tags]
@@ -359,7 +414,32 @@ e = "!events"
 
 Project config at `.caliber/config.toml` overlays the base config — project values override matching keys, while unset options inherit from your base `config.toml`. Similarly, `hub_config.toml` can override settings specifically for your hub journal.
 
+Project-specific options:
+
+```toml
+# Custom journal path for this project (default: .caliber/journal.md)
+journal_file = ".caliber/journal.md"
+
+# Hide this project from the command palette
+hide_from_registry = false
+```
+
 When you launch Caliber in a git repository, it will offer to create a project journal for you. If you declined or want to create one outside a git repo, run `caliber init project`.
+
+### Key Remapping
+
+Remap keys per context using `[keys.<context>]`:
+
+```toml
+[keys.daily_normal]
+move_down = "n"
+move_up = "e"
+
+[keys.edit]
+submit = "C-s"
+```
+
+Defining any key for an action disables its defaults. Valid contexts: `daily_normal`, `filter_normal`, `edit`, `reorder`, `selection`, `command_palette`.
 
 ## License
 

@@ -68,6 +68,46 @@ struct DateValueDef {
     completion_hint: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct HelpFile {
+    help: Vec<HelpDef>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum StringOrVec {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+impl StringOrVec {
+    fn to_vec(&self) -> Vec<String> {
+        match self {
+            Self::Single(s) => vec![s.clone()],
+            Self::Multiple(v) => v.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct HelpDef {
+    actions: StringOrVec,
+    description: String,
+    category: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct HelpEntriesFile {
+    help_entry: Vec<HelpEntryDef>,
+}
+
+#[derive(Debug, Deserialize)]
+struct HelpEntryDef {
+    section: String,
+    key: String,
+    description: String,
+}
+
 const VALID_CONTEXTS: &[&str] = &[
     "shared_normal",
     "daily_normal",
@@ -90,6 +130,125 @@ fn to_pascal_case(s: &str) -> String {
             }
         })
         .collect()
+}
+
+/// Format a key spec for README display (e.g., "down" -> "↓", "ret" -> "Enter")
+fn format_key_for_readme(key: &str) -> String {
+    // Handle modifier prefixes
+    let mut modifiers = Vec::new();
+    let mut remaining = key;
+
+    loop {
+        if let Some(rest) = remaining.strip_prefix("C-") {
+            modifiers.push("Ctrl");
+            remaining = rest;
+        } else if let Some(rest) = remaining.strip_prefix("A-") {
+            modifiers.push("Alt");
+            remaining = rest;
+        } else if let Some(rest) = remaining.strip_prefix("S-") {
+            modifiers.push("Shift");
+            remaining = rest;
+        } else {
+            break;
+        }
+    }
+
+    // Map the base key (preserve original case for single chars)
+    let base = match remaining.to_lowercase().as_str() {
+        "ret" | "enter" => "Enter".to_string(),
+        "esc" | "escape" => "Esc".to_string(),
+        "tab" => "Tab".to_string(),
+        "backtab" | "btab" => "Shift+Tab".to_string(),
+        "backspace" | "bs" => "Backspace".to_string(),
+        "del" | "delete" => "Delete".to_string(),
+        "up" => "↑".to_string(),
+        "down" => "↓".to_string(),
+        "left" => "←".to_string(),
+        "right" => "→".to_string(),
+        "home" => "Home".to_string(),
+        "end" => "End".to_string(),
+        "pageup" => "PgUp".to_string(),
+        "pagedown" => "PgDn".to_string(),
+        "space" => "Space".to_string(),
+        _ => {
+            // For single characters and other keys, preserve original case
+            if modifiers.is_empty() {
+                format!("`{remaining}`")
+            } else {
+                return format!("{}+`{}`", modifiers.join("+"), remaining);
+            }
+        }
+    };
+
+    if modifiers.is_empty() {
+        base
+    } else {
+        format!("{}+{}", modifiers.join("+"), base)
+    }
+}
+
+/// Format keys for multiple related actions (e.g., move_up + move_down)
+/// For paired actions, formats as "key1 / key2" showing one key per action
+fn format_action_keys_for_readme(action_ids: &[String], actions: &[ActionDef]) -> String {
+    if action_ids.len() == 1 {
+        // Single action: show all its keys
+        if let Some(action) = actions.iter().find(|a| a.key_action_id == action_ids[0]) {
+            return format_keys_grouped(&action.default_keys);
+        }
+        return String::new();
+    }
+
+    // Multiple actions (paired like move_up/move_down): show first key of each action
+    let mut primary_keys: Vec<String> = Vec::new();
+    for action_id in action_ids {
+        if let Some(action) = actions.iter().find(|a| a.key_action_id == *action_id)
+            && let Some(first_key) = action.default_keys.first()
+        {
+            primary_keys.push(format_key_for_readme(first_key));
+        }
+    }
+
+    // Group arrows together, letters together
+    let arrows: Vec<_> = primary_keys
+        .iter()
+        .filter(|k| k.contains('↑') || k.contains('↓') || k.contains('←') || k.contains('→'))
+        .cloned()
+        .collect();
+    let others: Vec<_> = primary_keys
+        .iter()
+        .filter(|k| !k.contains('↑') && !k.contains('↓') && !k.contains('←') && !k.contains('→'))
+        .cloned()
+        .collect();
+
+    match (arrows.is_empty(), others.is_empty()) {
+        (true, true) => String::new(),
+        (true, false) => others.join(" / "),
+        (false, true) => arrows.join("/"),
+        (false, false) => format!("{} / {}", arrows.join("/"), others.join("/")),
+    }
+}
+
+/// Format a list of keys, grouping arrows and letters
+fn format_keys_grouped(keys: &[String]) -> String {
+    let formatted: Vec<String> = keys.iter().map(|k| format_key_for_readme(k)).collect();
+
+    let arrows: Vec<_> = formatted
+        .iter()
+        .filter(|k| k.contains('↑') || k.contains('↓') || k.contains('←') || k.contains('→'))
+        .cloned()
+        .collect();
+    let others: Vec<_> = formatted
+        .iter()
+        .filter(|k| !k.contains('↑') && !k.contains('↓') && !k.contains('←') && !k.contains('→'))
+        .cloned()
+        .collect();
+
+    match (arrows.is_empty(), others.is_empty()) {
+        (true, true) => String::new(),
+        (true, false) => others.join(" / "),
+        (false, true) => arrows.join("/"),
+        (false, false) => format!("{} / {}", arrows.join("/"), others.join("/")),
+    }
 }
 
 fn expand_contexts(contexts: &[String]) -> Vec<String> {
@@ -523,43 +682,37 @@ fn generate_date_values_code(date_values: &[DateValueDef]) -> String {
     code
 }
 
-fn generate_commands_table(commands: &[CommandDef]) -> String {
+/// Generate a markdown table for a help category
+fn generate_help_table(helps: &[HelpDef], actions: &[ActionDef], category: &str) -> String {
     let mut table = String::from("| Key | Action |\n|-----|--------|\n");
 
-    for cmd in commands {
-        table.push_str(&format!(
-            "| `:{} {}` | {} |\n",
-            cmd.name,
-            cmd.args.as_deref().unwrap_or(""),
-            cmd.help
-        ));
+    for help in helps.iter().filter(|h| h.category == category) {
+        let action_ids = help.actions.to_vec();
+        let keys = format_action_keys_for_readme(&action_ids, actions);
+        if !keys.is_empty() {
+            table.push_str(&format!("| {} | {} |\n", keys, help.description));
+        }
     }
 
     table
 }
 
-fn generate_filter_syntax_table(filters: &[FilterDef]) -> String {
+/// Generate a markdown table for help_entries (documentation-only)
+fn generate_help_entries_table(entries: &[HelpEntryDef], section: &str) -> String {
     let mut table = String::from("| Pattern | Matches |\n|---------|---------|");
 
-    for filter in filters {
-        if filter.category == "text_search" {
-            continue;
-        }
-
-        let display = filter.display.as_deref().unwrap_or(&filter.syntax);
-        table.push_str(&format!("\n| `{}` | {} |", display, filter.help));
+    for entry in entries.iter().filter(|e| e.section == section) {
+        table.push_str(&format!("\n| {} | {} |", entry.key, entry.description));
     }
-
-    table.push_str("\n| `word` | Entries containing text |");
 
     table
 }
 
 fn generate_readme(
     manifest_dir: &Path,
-    _actions: &[ActionDef],
-    commands: &[CommandDef],
-    filters: &[FilterDef],
+    actions: &[ActionDef],
+    helps: &[HelpDef],
+    help_entries: &[HelpEntryDef],
 ) {
     let template_path = manifest_dir.join("docs/templates/README.template.md");
     let readme_path = manifest_dir.join("README.md");
@@ -572,26 +725,33 @@ fn generate_readme(
 
     let template = fs::read_to_string(&template_path).expect("Failed to read README.template.md");
 
-    let daily_table = String::new();
-    let reorder_table = String::new();
-    let edit_table = String::new();
-    let date_table = String::new();
-    let project_table = String::new();
-    let selection_table = String::new();
-    let filter_table = String::new();
-    let commands_table = generate_commands_table(commands);
-    let filter_syntax_table = generate_filter_syntax_table(filters);
-    let date_syntax_table = String::new();
+    // Generate tables from help.toml categories
+    let navigation_table = generate_help_table(helps, actions, "navigation");
+    let entries_table = generate_help_table(helps, actions, "entries");
+    let clipboard_table = generate_help_table(helps, actions, "clipboard");
+    let tags_table = generate_help_table(helps, actions, "tags");
+    let views_table = generate_help_table(helps, actions, "views");
+    let daily_table = generate_help_table(helps, actions, "daily");
+    let filter_table = generate_help_table(helps, actions, "filter");
+    let edit_table = generate_help_table(helps, actions, "edit");
+    let selection_table = generate_help_table(helps, actions, "selection");
+    let general_table = generate_help_table(helps, actions, "general");
+
+    // Generate tables from help_entries.toml sections
+    let filter_syntax_table = generate_help_entries_table(help_entries, "filter_syntax");
+    let date_syntax_table = generate_help_entries_table(help_entries, "date_syntax");
 
     let readme = template
-        .replace("<!-- GENERATED:DAILY_KEYS -->", &daily_table)
-        .replace("<!-- GENERATED:REORDER_KEYS -->", &reorder_table)
-        .replace("<!-- GENERATED:EDIT_KEYS -->", &edit_table)
-        .replace("<!-- GENERATED:DATE_KEYS -->", &date_table)
-        .replace("<!-- GENERATED:PROJECT_KEYS -->", &project_table)
-        .replace("<!-- GENERATED:SELECTION_KEYS -->", &selection_table)
-        .replace("<!-- GENERATED:FILTER_KEYS -->", &filter_table)
-        .replace("<!-- GENERATED:COMMANDS -->", &commands_table)
+        .replace("<!-- GENERATED:NAVIGATION -->", &navigation_table)
+        .replace("<!-- GENERATED:ENTRIES -->", &entries_table)
+        .replace("<!-- GENERATED:CLIPBOARD -->", &clipboard_table)
+        .replace("<!-- GENERATED:TAGS -->", &tags_table)
+        .replace("<!-- GENERATED:VIEWS -->", &views_table)
+        .replace("<!-- GENERATED:DAILY -->", &daily_table)
+        .replace("<!-- GENERATED:FILTER -->", &filter_table)
+        .replace("<!-- GENERATED:EDIT -->", &edit_table)
+        .replace("<!-- GENERATED:SELECTION -->", &selection_table)
+        .replace("<!-- GENERATED:GENERAL -->", &general_table)
         .replace("<!-- GENERATED:FILTER_SYNTAX -->", &filter_syntax_table)
         .replace("<!-- GENERATED:DATE_SYNTAX -->", &date_syntax_table);
 
@@ -614,6 +774,8 @@ fn main() {
     println!("cargo:rerun-if-changed=src/registry/commands.toml");
     println!("cargo:rerun-if-changed=src/registry/filters.toml");
     println!("cargo:rerun-if-changed=src/registry/date_values.toml");
+    println!("cargo:rerun-if-changed=src/registry/help.toml");
+    println!("cargo:rerun-if-changed=src/registry/help_entries.toml");
 
     let actions_toml =
         fs::read_to_string(registry_dir.join("actions.toml")).expect("Failed to read actions.toml");
@@ -623,6 +785,10 @@ fn main() {
         fs::read_to_string(registry_dir.join("filters.toml")).expect("Failed to read filters.toml");
     let date_values_toml = fs::read_to_string(registry_dir.join("date_values.toml"))
         .expect("Failed to read date_values.toml");
+    let help_toml =
+        fs::read_to_string(registry_dir.join("help.toml")).expect("Failed to read help.toml");
+    let help_entries_toml = fs::read_to_string(registry_dir.join("help_entries.toml"))
+        .expect("Failed to read help_entries.toml");
 
     let actions: ActionsFile = toml::from_str(&actions_toml).expect("Failed to parse actions.toml");
     let commands: CommandsFile =
@@ -630,6 +796,9 @@ fn main() {
     let filters: FiltersFile = toml::from_str(&filters_toml).expect("Failed to parse filters.toml");
     let date_values: DateValuesFile =
         toml::from_str(&date_values_toml).expect("Failed to parse date_values.toml");
+    let helps: HelpFile = toml::from_str(&help_toml).expect("Failed to parse help.toml");
+    let help_entries: HelpEntriesFile =
+        toml::from_str(&help_entries_toml).expect("Failed to parse help_entries.toml");
 
     validate_actions(&actions.action);
     validate_date_values(&date_values.date_value);
@@ -649,7 +818,7 @@ fn main() {
     generate_readme(
         manifest_dir,
         &actions.action,
-        &commands.command,
-        &filters.filter,
+        &helps.help,
+        &help_entries.help_entry,
     );
 }

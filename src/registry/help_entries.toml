@@ -1,17 +1,100 @@
 # Documentation-only entries for help overlay and README
 # These are not filters or keybindings, just reference information
 
+# =============================================================================
+# Filter Syntax
+# =============================================================================
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`!tasks`"
+description = "Incomplete tasks"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`!completed`"
+description = "Completed tasks"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`!notes`"
+description = "Notes only"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`!events`"
+description = "Events only"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`#tag`"
+description = "Entries with tag"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`$name`"
+description = "Saved filter"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`word`"
+description = "Entries containing text"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`mm/dd`"
+description = "Entries on exact date"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`mm/dd..`"
+description = "From date to today"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`..mm/dd`"
+description = "All past through date"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`mm/dd..mm/dd`"
+description = "Between two dates"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`@recurring`"
+description = "Show recurring entries (hidden by default)"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`-#tag`"
+description = "Entries without tag"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`-!type`"
+description = "Exclude entry type"
+
+[[help_entry]]
+section = "filter_syntax"
+key = "`-word`"
+description = "Entries not containing text"
+
+# =============================================================================
+# Date Syntax
+# =============================================================================
+
 [[help_entry]]
 section = "date_syntax"
 key = "Dates"
-description = "MM/DD, MM/DD/YY, MM/DD/YYYY, YYYY/MM/DD"
+description = "`MM/DD`, `MM/DD/YY`, `MM/DD/YYYY`, `YYYY/MM/DD`"
 
 [[help_entry]]
 section = "date_syntax"
 key = "Relative"
-description = "today, tomorrow, yesterday, [mon-sun], d[1-999] (+/- for direction)"
+description = "`today`, `tomorrow`, `yesterday`, `[mon-sun]`, `d[1-999]` (+/- for direction)"
 
 [[help_entry]]
 section = "date_syntax"
 key = "Recurring (entries)"
-description = "every-[mon-sun], every-[1-31], every-day, every-weekday"
+description = "`@every-[mon-sun]`, `@every-[1-31]`, `@every-day`, `@every-weekday`"
