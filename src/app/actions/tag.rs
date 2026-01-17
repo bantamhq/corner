@@ -3,24 +3,20 @@ use std::io;
 use crate::app::{App, EntryLocation};
 use crate::ui::{remove_all_trailing_tags, remove_last_trailing_tag};
 
-use super::content_ops::{
-    ContentTarget, execute_content_append, execute_content_operation, get_entry_content,
-    set_entry_content,
+use super::types::{
+    Action, ActionDescription, ContentTarget, StatusVisibility, execute_content_append,
+    execute_content_operation, get_entry_content, set_entry_content,
 };
-use super::types::{Action, ActionDescription, StatusVisibility};
 
-/// Target for tag operations (type alias for ContentTarget)
 pub type TagTarget = ContentTarget;
 
-/// Which tag removal operation to perform
 #[derive(Clone, Copy)]
 enum RemovalKind {
     Last,
     All,
 }
 
-/// Action to remove tags from entries (consolidated from RemoveLastTag and RemoveAllTags)
-pub struct TagRemovalAction {
+struct TagRemovalAction {
     targets: Vec<TagTarget>,
     kind: RemovalKind,
 }
@@ -141,7 +137,6 @@ impl Action for RemoveAllTags {
     }
 }
 
-/// Action to append a tag to entries
 pub struct AppendTag {
     targets: Vec<TagTarget>,
     tag: String,
@@ -199,7 +194,6 @@ impl Action for AppendTag {
     }
 }
 
-/// Which operation was performed (for redo)
 #[derive(Clone)]
 enum TagOperation {
     RemoveLast,
@@ -207,8 +201,7 @@ enum TagOperation {
     Append(String),
 }
 
-/// Action to restore original content (reverse of tag operations)
-pub struct RestoreContent {
+struct RestoreContent {
     targets: Vec<TagTarget>,
     operation: TagOperation,
 }
