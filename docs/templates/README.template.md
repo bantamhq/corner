@@ -25,11 +25,24 @@ Your journal is a plain markdown file. Commit it to your repo, read it on your p
 
 ## Installation
 
+**Homebrew (macOS/Linux)**
+```bash
+brew install bantamhq/tap/caliber
+```
+
+**Shell (macOS/Linux)**
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://github.com/bantamhq/caliber/releases/latest/download/caliber-installer.sh | sh
+```
+
+**Cargo**
 ```bash
 cargo install caliber
 ```
 
-Requires Rust 1.85+ (edition 2024).
+**Manual**
+
+Download the latest binary for your platform from [Releases](https://github.com/bantamhq/caliber/releases).
 
 ## Quick Start
 
