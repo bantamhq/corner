@@ -1,6 +1,6 @@
 [package]
 name = "caliber"
-version = "0.4.1"
+version = "1.0.0"
 edition = "2024"
 description = "A terminal-based task journal for developers. Capture ideas without leaving your workflow, find them when you need them."
 license = "MIT"
@@ -36,3 +36,8 @@ serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
 tempfile = "3"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
