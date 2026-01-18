@@ -65,15 +65,26 @@ impl CommandPaletteState {
     }
 }
 
-fn visible_projects() -> Vec<ProjectInfo> {
-    ProjectRegistry::load()
-        .projects
-        .into_iter()
-        .filter(|p| !p.hide_from_registry)
-        .collect()
-}
-
 impl App {
+    /// Returns visible projects sorted with current project first (matching palette display order)
+    fn visible_projects_sorted(&self) -> Vec<ProjectInfo> {
+        let current_path = self.journal_context.project_path();
+        let mut projects: Vec<_> = ProjectRegistry::load()
+            .projects
+            .into_iter()
+            .filter(|p| !p.hide_from_registry)
+            .collect();
+
+        projects.sort_by_key(|p| {
+            let is_current = current_path
+                .map(|cp| cp.starts_with(&p.root) || p.root.starts_with(cp.parent().unwrap_or(cp)))
+                .unwrap_or(false);
+            !is_current
+        });
+
+        projects
+    }
+
     pub fn open_command_palette(&mut self) {
         self.open_palette(super::CommandPaletteMode::Commands);
     }
@@ -121,7 +132,7 @@ impl App {
     fn palette_item_count(&self, mode: CommandPaletteMode) -> usize {
         match mode {
             CommandPaletteMode::Commands => COMMANDS.len(),
-            CommandPaletteMode::Projects => visible_projects().len(),
+            CommandPaletteMode::Projects => self.visible_projects_sorted().len(),
             CommandPaletteMode::Tags => self.cached_journal_tags.len(),
         }
     }
@@ -155,7 +166,7 @@ impl App {
     }
 
     fn execute_selected_project(&mut self, index: usize) -> io::Result<()> {
-        let projects = visible_projects();
+        let projects = self.visible_projects_sorted();
         if let Some(project) = projects.get(index) {
             let journal_path = project.journal_path();
             self.open_journal(&journal_path.to_string_lossy())?;
@@ -192,7 +203,7 @@ impl App {
     }
 
     fn palette_delete_project(&mut self, index: usize) -> io::Result<()> {
-        let projects = visible_projects();
+        let projects = self.visible_projects_sorted();
         let Some(project) = projects.get(index) else {
             return Ok(());
         };
@@ -201,8 +212,9 @@ impl App {
         registry.remove(&project.id);
         registry.save()?;
         self.set_status(format!("Removed '{}' from registry", project.name));
+        let new_count = self.visible_projects_sorted().len();
         if let InputMode::CommandPalette(state) = &mut self.input_mode {
-            state.clamp_selection(visible_projects().len());
+            state.clamp_selection(new_count);
         }
         Ok(())
     }
@@ -237,7 +249,7 @@ impl App {
             return Ok(());
         }
 
-        let projects = visible_projects();
+        let projects = self.visible_projects_sorted();
         let Some(project) = projects.get(selected) else {
             return Ok(());
         };
@@ -249,8 +261,9 @@ impl App {
 
         set_hide_from_registry(&project.path, true)?;
         self.set_status(format!("Hidden '{}' from palette", project.name));
+        let new_count = self.visible_projects_sorted().len();
         if let InputMode::CommandPalette(state) = &mut self.input_mode {
-            state.clamp_selection(visible_projects().len());
+            state.clamp_selection(new_count);
         }
         Ok(())
     }

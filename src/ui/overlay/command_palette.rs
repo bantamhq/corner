@@ -43,7 +43,7 @@ impl CommandPaletteModel {
         current_project_path: Option<&std::path::Path>,
     ) -> Self {
         let registry = ProjectRegistry::load();
-        let projects = registry
+        let mut projects: Vec<_> = registry
             .projects
             .iter()
             .filter(|p| !p.hide_from_registry)
@@ -61,6 +61,9 @@ impl CommandPaletteModel {
                 }
             })
             .collect();
+
+        // Sort so current project is first (index 0), matching visual display order
+        projects.sort_by_key(|p| !p.is_current);
 
         let tags = tags
             .iter()
