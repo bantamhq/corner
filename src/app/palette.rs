@@ -75,12 +75,7 @@ impl App {
             .filter(|p| !p.hide_from_registry)
             .collect();
 
-        projects.sort_by_key(|p| {
-            let is_current = current_path
-                .map(|cp| cp.starts_with(&p.root) || p.root.starts_with(cp.parent().unwrap_or(cp)))
-                .unwrap_or(false);
-            !is_current
-        });
+        projects.sort_by_key(|p| !p.matches_path(current_path));
 
         projects
     }

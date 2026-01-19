@@ -1,6 +1,6 @@
 [package]
 name = "caliber"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 description = "A terminal-based task journal for developers. Capture ideas without leaving your workflow, find them when you need them."
 license = "MIT"

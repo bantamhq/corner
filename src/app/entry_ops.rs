@@ -500,26 +500,42 @@ impl App {
     }
 
     pub fn defer_current_entry(&mut self) -> io::Result<()> {
-        let target = self.next_defer_date();
+        // Get the entry's source date (not today)
+        let source_date = match self.get_selected_item() {
+            SelectedItem::Daily { .. } | SelectedItem::Projected { .. } => self.current_date,
+            SelectedItem::Filter { entry, .. } => entry.source_date,
+            SelectedItem::None => return Ok(()),
+        };
+
+        let target = self.defer_date_from(source_date);
         self.move_current_entry_to_date(target)
     }
 
-    /// Calculate the next defer date based on config.
-    /// If `defer_skip_weekends` is enabled, skips to Monday when deferring on Friday/Saturday.
+    /// Calculate the defer date from a given source date.
+    /// If `defer_skip_weekends` is enabled, ensures the target date is not a weekend.
     #[must_use]
-    pub fn next_defer_date(&self) -> NaiveDate {
-        let today = chrono::Local::now().date_naive();
-        let days_to_add = if self.config.defer_skip_weekends {
-            match today.weekday() {
-                Weekday::Fri => 3, // Friday -> Monday
-                Weekday::Sat => 2, // Saturday -> Monday
-                _ => 1,
+    pub fn defer_date_from(&self, from_date: NaiveDate) -> NaiveDate {
+        let mut target = from_date
+            .checked_add_days(Days::new(1))
+            .expect("defer date should be valid");
+
+        if self.config.defer_skip_weekends {
+            // Skip to Monday if target falls on a weekend
+            match target.weekday() {
+                Weekday::Sat => {
+                    target = target
+                        .checked_add_days(Days::new(2))
+                        .expect("defer date should be valid");
+                }
+                Weekday::Sun => {
+                    target = target
+                        .checked_add_days(Days::new(1))
+                        .expect("defer date should be valid");
+                }
+                _ => {}
             }
-        } else {
-            1
-        };
-        today
-            .checked_add_days(Days::new(days_to_add))
-            .expect("defer date should be valid")
+        }
+
+        target
     }
 }

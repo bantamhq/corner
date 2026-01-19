@@ -177,6 +177,9 @@ fn run_app<B: ratatui::backend::Backend>(
         }
     }
 
+    // Check for external file changes approximately every second (60 * 16ms)
+    let mut tick_counter = 0u32;
+
     loop {
         if app.needs_redraw {
             terminal.clear()?;
@@ -186,6 +189,12 @@ fn run_app<B: ratatui::backend::Backend>(
         terminal.draw(|f| ui::render_app(f, &mut app))?;
 
         app.poll_calendar_results();
+
+        // Periodically check for external file changes (~1 second intervals)
+        tick_counter = tick_counter.wrapping_add(1);
+        if tick_counter.is_multiple_of(60) {
+            app.check_external_changes();
+        }
 
         if event::poll(std::time::Duration::from_millis(16))? {
             match event::read()? {

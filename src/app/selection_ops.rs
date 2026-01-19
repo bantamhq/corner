@@ -478,7 +478,8 @@ impl App {
     }
 
     pub fn defer_selected(&mut self) -> io::Result<()> {
-        let target = self.next_defer_date();
+        // Defer from the current viewed date (selection is always in daily view)
+        let target = self.defer_date_from(self.current_date);
         self.move_selected_to_date(target)
     }
 }

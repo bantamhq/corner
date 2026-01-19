@@ -46,6 +46,14 @@ impl ProjectInfo {
             self.path.join("journal.md")
         }
     }
+
+    /// Check if this project matches the given journal path.
+    #[must_use]
+    pub fn matches_path(&self, journal_path: Option<&Path>) -> bool {
+        journal_path.is_some_and(|jp| {
+            jp.starts_with(&self.root) || self.root.starts_with(jp.parent().unwrap_or(jp))
+        })
+    }
 }
 
 /// Project registry with resolved project info

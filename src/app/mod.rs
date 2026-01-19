@@ -369,6 +369,8 @@ pub struct App {
     pub calendar_rx: Option<mpsc::Receiver<crate::calendar::CalendarFetchResult>>,
     pub calendar_tx: Option<mpsc::Sender<crate::calendar::CalendarFetchResult>>,
     pub(crate) surface: crate::ui::surface::Surface,
+    /// Last known modification time of the journal file (for external change detection)
+    last_file_mtime: Option<std::time::SystemTime>,
 }
 
 impl App {
@@ -417,6 +419,8 @@ impl App {
             (None, None)
         };
 
+        let last_file_mtime = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+
         let mut app = Self {
             current_date: date,
             last_daily_date: date,
@@ -450,6 +454,7 @@ impl App {
             calendar_rx,
             calendar_tx,
             surface,
+            last_file_mtime,
         };
 
         if hide_completed {
@@ -654,6 +659,68 @@ impl App {
         if let Err(e) = storage::save_day_lines(self.current_date, self.active_path(), &self.lines)
         {
             self.set_status(format!("Failed to save: {e}"));
+        }
+        self.update_file_mtime();
+        self.invalidate_agenda_cache();
+        self.refresh_calendar_cache();
+    }
+
+    /// Updates the tracked file modification time to the current value.
+    fn update_file_mtime(&mut self) {
+        self.last_file_mtime = std::fs::metadata(self.active_path())
+            .and_then(|m| m.modified())
+            .ok();
+    }
+
+    /// Checks if the journal file was modified externally and reloads if so.
+    /// Returns true if a reload occurred.
+    pub fn check_external_changes(&mut self) -> bool {
+        // Don't reload while editing - user might lose work
+        if matches!(self.input_mode, InputMode::Edit(_)) {
+            return false;
+        }
+
+        let current_mtime = std::fs::metadata(self.active_path())
+            .and_then(|m| m.modified())
+            .ok();
+
+        // Check if file was modified externally
+        let was_modified = match (self.last_file_mtime, current_mtime) {
+            (Some(old), Some(new)) => new > old,
+            (None, Some(_)) => true, // File appeared
+            _ => false,
+        };
+
+        if was_modified {
+            self.reload_current_view();
+            self.last_file_mtime = current_mtime;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Reloads the current view from disk.
+    fn reload_current_view(&mut self) {
+        match &self.view {
+            ViewMode::Daily(_) => {
+                if let Ok(lines) = storage::load_day_lines(self.current_date, self.active_path()) {
+                    self.lines = lines;
+                    self.entry_indices = Self::compute_entry_indices(&self.lines);
+                    if let Ok(projected) = storage::collect_projected_entries_for_date(
+                        self.current_date,
+                        self.active_path(),
+                    ) && let ViewMode::Daily(state) = &mut self.view
+                    {
+                        state.projected_entries = projected;
+                    }
+                    self.clamp_selection_to_visible();
+                }
+            }
+            ViewMode::Filter(_) => {
+                // Refresh filter results
+                let _ = self.refresh_filter();
+            }
         }
         self.invalidate_agenda_cache();
         self.refresh_calendar_cache();

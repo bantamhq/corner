@@ -47,22 +47,14 @@ impl CommandPaletteModel {
             .projects
             .iter()
             .filter(|p| !p.hide_from_registry)
-            .map(|p| {
-                let is_current = current_project_path
-                    .map(|cp| {
-                        cp.starts_with(&p.root) || p.root.starts_with(cp.parent().unwrap_or(cp))
-                    })
-                    .unwrap_or(false);
-                PaletteProject {
-                    name: p.name.clone(),
-                    path: p.root.display().to_string(),
-                    available: p.available,
-                    is_current,
-                }
+            .map(|p| PaletteProject {
+                name: p.name.clone(),
+                path: p.root.display().to_string(),
+                available: p.available,
+                is_current: p.matches_path(current_project_path),
             })
             .collect();
 
-        // Sort so current project is first (index 0), matching visual display order
         projects.sort_by_key(|p| !p.is_current);
 
         let tags = tags
