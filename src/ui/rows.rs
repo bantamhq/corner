@@ -67,7 +67,13 @@ pub fn build_projected_row(
     visible_idx: usize,
     width: usize,
 ) -> RowModel {
-    let (source_suffix, _) = format_date_suffix(projected_entry.source_date);
+    // Don't show source date for recurring entries - the creation date isn't meaningful
+    let suffix = if matches!(projected_entry.source_type, SourceType::Recurring) {
+        EntrySuffix::None
+    } else {
+        let (source_suffix, _) = format_date_suffix(projected_entry.source_date);
+        EntrySuffix::Date(source_suffix)
+    };
     build_entry_row(
         app,
         EntryRowSpec {
@@ -77,7 +83,7 @@ pub fn build_projected_row(
             is_selected,
             visible_idx,
             indicator: EntryIndicator::Projected(&projected_entry.source_type),
-            suffix: EntrySuffix::Date(source_suffix),
+            suffix,
         },
     )
 }

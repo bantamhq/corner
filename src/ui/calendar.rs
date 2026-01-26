@@ -9,7 +9,7 @@ use ratatui::{
 };
 use time::{Date, Month};
 
-use crate::storage::{DayInfo, JournalSlot};
+use crate::storage::DayInfo;
 
 use super::theme;
 
@@ -22,7 +22,6 @@ pub struct CalendarModel<'a> {
     pub selected: NaiveDate,
     pub display_month: NaiveDate,
     pub day_cache: &'a HashMap<NaiveDate, DayInfo>,
-    pub journal_slot: JournalSlot,
 }
 
 impl CalendarModel<'_> {
@@ -44,7 +43,6 @@ fn to_time_date(date: NaiveDate) -> Date {
 
 pub fn render_calendar(f: &mut Frame<'_>, model: &CalendarModel<'_>, area: Rect) {
     let today = Local::now().date_naive();
-    let context_primary = theme::context_primary(model.journal_slot);
     let mut events = CalendarEventStore::default();
 
     // Style non-selected, non-today days based on content
@@ -58,39 +56,50 @@ pub fn render_calendar(f: &mut Frame<'_>, model: &CalendarModel<'_>, area: Rect)
                 to_time_date(*date),
                 Style::default().fg(theme::CALENDAR_INCOMPLETE).not_dim(),
             );
-        } else if info.has_entries || info.has_calendar_events {
-            // Has content but no incomplete tasks: white, not dimmed
+        } else if info.has_entries {
+            // Manual entries: white
             events.add(
                 to_time_date(*date),
                 Style::default().fg(theme::CALENDAR_TEXT).not_dim(),
+            );
+        } else if info.has_calendar_events || info.has_recurring {
+            // Only automated entries (calendar/recurring): blue
+            events.add(
+                to_time_date(*date),
+                Style::default().fg(theme::CALENDAR_AUTOMATED).not_dim(),
             );
         }
         // Empty days use default style (white dimmed)
     }
 
-    // Today - uses context primary color
+    // Today - always cyan regardless of journal context
     if today.month() == model.display_month.month()
         && today.year() == model.display_month.year()
         && today != model.selected
     {
         events.add(
             to_time_date(today),
-            Style::default().fg(context_primary).not_dim(),
+            Style::default().fg(theme::CALENDAR_TODAY).not_dim(),
         );
     }
 
     // Selected day styling
     let selected_info = model.day_cache.get(&model.selected);
     let selected_style = if model.selected == today {
-        Style::default().fg(context_primary).reversed().not_dim()
+        Style::default().fg(theme::CALENDAR_TODAY).reversed().not_dim()
     } else if selected_info.is_some_and(|i| i.has_incomplete_tasks) {
         Style::default()
             .fg(theme::CALENDAR_INCOMPLETE)
             .reversed()
             .not_dim()
-    } else if selected_info.is_some_and(|i| i.has_entries || i.has_calendar_events) {
+    } else if selected_info.is_some_and(|i| i.has_entries) {
         Style::default()
             .fg(theme::CALENDAR_TEXT)
+            .reversed()
+            .not_dim()
+    } else if selected_info.is_some_and(|i| i.has_calendar_events || i.has_recurring) {
+        Style::default()
+            .fg(theme::CALENDAR_AUTOMATED)
             .reversed()
             .not_dim()
     } else {

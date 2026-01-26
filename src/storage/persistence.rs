@@ -12,6 +12,7 @@ pub struct DayInfo {
     pub has_incomplete_tasks: bool,
     pub has_events: bool,
     pub has_calendar_events: bool,
+    pub has_recurring: bool,
 }
 
 use super::entries::{EntryType, Line, RawEntry, parse_lines, serialize_lines};

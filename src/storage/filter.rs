@@ -496,6 +496,41 @@ pub fn collect_projected_entries_for_date(
     Ok(entries)
 }
 
+/// Scans the journal for recurring entries and returns which dates in the range have them.
+/// More efficient than calling collect_projected_entries_for_date for each date.
+pub fn scan_recurring_in_range(
+    start: NaiveDate,
+    end: NaiveDate,
+    path: &Path,
+) -> io::Result<HashSet<NaiveDate>> {
+    let journal = load_journal(path)?;
+    let mut result = HashSet::new();
+    let mut current_date: Option<NaiveDate> = None;
+
+    for line in journal.lines() {
+        if let Some(date) = parse_day_header(line) {
+            current_date = Some(date);
+            continue;
+        }
+
+        if let Some(source_date) = current_date {
+            let parsed = parse_lines(line);
+            if let Some(Line::Entry(raw_entry)) = parsed.first()
+                && let Some(pattern) = extract_recurring_pattern(&raw_entry.content)
+            {
+                // Check each date in range to see if this pattern matches
+                for date in start.iter_days().take_while(|d| *d <= end) {
+                    if date >= source_date && date != source_date && pattern.matches(date) {
+                        result.insert(date);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(result)
+}
+
 fn parse_type_keyword(s: &str) -> Option<FilterType> {
     match s {
         "tasks" | "task" | "t" => Some(FilterType::Task),

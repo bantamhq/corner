@@ -354,7 +354,6 @@ fn render_calendar_sidebar(f: &mut Frame<'_>, app: &App, sidebar_area: Rect) {
         selected: calendar_state.selected,
         display_month: calendar_state.display_month,
         day_cache: &calendar_state.day_cache,
-        journal_slot: app.active_journal(),
     };
     render_calendar(f, &calendar_model, calendar_layout.content_area);
 

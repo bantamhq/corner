@@ -33,7 +33,8 @@ pub use filter::{
     create_tag_delete_regex, create_tag_match_regex, expand_favorite_tags, expand_saved_filters,
     extract_recurring_pattern, extract_tags, is_done_on_date, normalize_entry_structure,
     parse_filter_date, parse_filter_query, parse_natural_date, parse_recurring_pattern,
-    remove_done_date, restore_done_meta, strip_done_meta, strip_recurring_tags,
+    remove_done_date, restore_done_meta, scan_recurring_in_range, strip_done_meta,
+    strip_recurring_tags,
 };
 
 // Re-export project registry types
