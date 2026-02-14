@@ -32,6 +32,10 @@ impl App {
             scroll_offset: 0,
         });
         self.finalize_view_switch();
+
+        if self.combined_view {
+            self.load_combined_filter()?;
+        }
         Ok(())
     }
 
@@ -55,6 +59,9 @@ impl App {
             self.last_filter_query = Some(state.query.clone());
         }
         self.restore_daily_view();
+        if self.combined_view {
+            let _ = self.load_combined_daily();
+        }
     }
 
     pub fn return_to_filter(&mut self) -> io::Result<()> {
@@ -66,6 +73,11 @@ impl App {
     }
 
     pub fn refresh_filter(&mut self) -> io::Result<()> {
+        if self.combined_view {
+            self.load_combined_filter()?;
+            return Ok(());
+        }
+
         let path = self.active_path().to_path_buf();
         let ViewMode::Filter(state) = &mut self.view else {
             return Ok(());
@@ -92,6 +104,10 @@ impl App {
     }
 
     pub fn filter_quick_add(&mut self) {
+        if self.combined_view {
+            self.set_error("Switch to a journal to add entries");
+            return;
+        }
         let today = Local::now().date_naive();
         self.original_edit_content = Some(String::new());
         self.edit_buffer = Some(CursorBuffer::empty());

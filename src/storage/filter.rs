@@ -486,6 +486,7 @@ pub fn collect_projected_entries_for_date(
                     source_date,
                     line_index: line_index_in_day,
                     source_type: SourceType::Recurring,
+                    source_journal: path.to_path_buf(),
                 });
             }
             line_index_in_day += 1;
@@ -674,6 +675,7 @@ pub fn collect_filtered_entries(filter: &Filter, path: &Path) -> io::Result<Vec<
                         source_date,
                         line_index_in_day,
                         SourceType::Local,
+                        path.to_path_buf(),
                     ));
                 }
             }

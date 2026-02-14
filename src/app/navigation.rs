@@ -236,6 +236,10 @@ impl App {
 
     #[must_use]
     pub fn get_selected_item(&self) -> SelectedItem<'_> {
+        if self.combined_view && matches!(self.view, ViewMode::Daily(_)) {
+            return self.get_combined_selected_item();
+        }
+
         match &self.view {
             ViewMode::Daily(state) => {
                 let mut visible_idx = 0;
@@ -285,6 +289,7 @@ impl App {
     pub fn visible_entry_count(&self) -> usize {
         match &self.view {
             ViewMode::Filter(state) => state.entries.len(),
+            ViewMode::Daily(_) if self.combined_view => self.combined_visible_count(),
             ViewMode::Daily(state) => {
                 if !self.hide_completed {
                     return state.projected_entries.len() + self.entry_indices.len();
@@ -313,6 +318,10 @@ impl App {
 
     #[must_use]
     pub fn hidden_completed_count(&self) -> usize {
+        if self.combined_view && matches!(self.view, ViewMode::Daily(_)) {
+            return self.combined_hidden_completed_count();
+        }
+
         let ViewMode::Daily(state) = &self.view else {
             return 0;
         };
@@ -428,6 +437,11 @@ impl App {
 
         self.save();
         self.reset_daily_view(date)?;
+
+        if self.combined_view {
+            self.load_combined_daily()?;
+        }
+
         self.edit_buffer = None;
         self.last_daily_date = date;
         self.sync_calendar_state(date);

@@ -229,6 +229,11 @@ default_keys = ["\\"]
 contexts = ["daily_normal"]
 
 [[action]]
+key_action_id = "toggle_combined_view"
+default_keys = ["c"]
+contexts = ["shared_normal"]
+
+[[action]]
 key_action_id = "quit"
 default_keys = ["C-q"]
 contexts = ["shared_normal"]

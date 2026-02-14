@@ -106,7 +106,23 @@ impl Action for RestoreEntries {
         // Sort by line index ascending for correct insertion order
         self.entries.sort_by_key(|(_, line_idx, _)| *line_idx);
 
-        match &app.view {
+        if app.combined_view {
+            for (_date, _line_idx, entry) in &self.entries {
+                let path = &entry.source_journal;
+                if let Ok(mut lines) = storage::load_day_lines(entry.source_date, path) {
+                    let insert_idx = entry.line_index.min(lines.len());
+                    lines.insert(insert_idx, Line::Entry(entry.to_raw()));
+                    let _ = storage::save_day_lines(entry.source_date, path, &lines);
+                    delete_targets.push(DeleteTarget::Daily {
+                        line_idx: insert_idx,
+                        entry: entry.clone(),
+                    });
+                }
+            }
+            let _ = app.load_combined_data();
+            clamp_daily_selection(app);
+        } else {
+            match &app.view {
             ViewMode::Daily(_) => {
                 let (current_day_entries, other_day_entries): (Vec<_>, Vec<_>) = self
                     .entries
@@ -203,6 +219,7 @@ impl Action for RestoreEntries {
                                 source_date: date,
                                 line_index: insert_idx,
                                 source_type: entry.source_type.clone(),
+                                source_journal: entry.source_journal.clone(),
                             };
                             lines.insert(insert_idx, Line::Entry(entry.to_raw()));
 
@@ -226,6 +243,7 @@ impl Action for RestoreEntries {
                 }
             }
         }
+        }
 
         Ok(Box::new(DeleteEntries {
             targets: delete_targets,
@@ -246,18 +264,29 @@ fn execute_delete_raw(
     app: &mut App,
     target: &DeleteTarget,
 ) -> io::Result<(NaiveDate, usize, Entry)> {
-    let path = app.active_path().to_path_buf();
+    let path = resolve_delete_path(app, target);
 
     match target {
         DeleteTarget::Projected(entry) => {
             storage::delete_entry(entry.source_date, &path, entry.line_index)?;
 
-            app.refresh_projected_entries();
+            if app.combined_view {
+                let _ = app.load_combined_data();
+            } else {
+                app.refresh_projected_entries();
+            }
             clamp_daily_selection(app);
 
             Ok((entry.source_date, entry.line_index, entry.clone()))
         }
         DeleteTarget::Daily { line_idx, entry } => {
+            if app.combined_view {
+                storage::delete_entry(app.current_date, &path, *line_idx)?;
+                let _ = app.load_combined_data();
+                clamp_daily_selection(app);
+                return Ok((app.current_date, *line_idx, entry.clone()));
+            }
+
             let result = (app.current_date, *line_idx, entry.clone());
             app.lines.remove(*line_idx);
             app.entry_indices = App::compute_entry_indices(&app.lines);
@@ -289,6 +318,17 @@ fn execute_delete_raw(
 
             Ok((entry.source_date, entry.line_index, entry.clone()))
         }
+    }
+}
+
+fn resolve_delete_path(app: &App, target: &DeleteTarget) -> std::path::PathBuf {
+    if !app.combined_view {
+        return app.active_path().to_path_buf();
+    }
+    match target {
+        DeleteTarget::Projected(entry)
+        | DeleteTarget::Filter { entry, .. }
+        | DeleteTarget::Daily { entry, .. } => entry.source_journal.clone(),
     }
 }
 
@@ -535,31 +575,37 @@ impl Action for RedoEdit {
 }
 
 fn set_entry_content_raw(app: &mut App, target: &EditTarget) -> io::Result<()> {
-    let path = app.active_path().to_path_buf();
+    let path = app.resolve_entry_path(&target.location);
+    let content = &target.original_content;
 
     match &target.location {
         EntryLocation::Projected(entry) => {
             storage::mutate_entry(entry.source_date, &path, entry.line_index, |raw_entry| {
-                raw_entry.content = target.original_content.clone();
+                raw_entry.content = content.clone();
             })?;
-
             app.refresh_projected_entries();
         }
-        EntryLocation::Daily { line_idx } => {
-            if let Line::Entry(raw_entry) = &mut app.lines[*line_idx] {
-                raw_entry.content = target.original_content.clone();
+        EntryLocation::Daily {
+            line_idx,
+            source_path,
+        } => {
+            if source_path.is_some() || app.combined_view {
+                storage::update_entry_content(app.current_date, &path, *line_idx, content.clone())?;
+                let _ = app.load_combined_data();
+            } else if let Line::Entry(raw_entry) = &mut app.lines[*line_idx] {
+                raw_entry.content = content.clone();
                 app.save();
             }
         }
         EntryLocation::Filter { index, entry } => {
             storage::mutate_entry(entry.source_date, &path, entry.line_index, |raw_entry| {
-                raw_entry.content = target.original_content.clone();
+                raw_entry.content = content.clone();
             })?;
 
             if let ViewMode::Filter(state) = &mut app.view
                 && let Some(filter_entry) = state.entries.get_mut(*index)
             {
-                filter_entry.content = target.original_content.clone();
+                filter_entry.content = content.clone();
             }
 
             if entry.source_date == app.current_date {
@@ -662,7 +708,7 @@ impl Action for RestoreEntryType {
 }
 
 fn execute_cycle_raw(app: &mut App, location: &EntryLocation) -> io::Result<Option<EntryType>> {
-    let path = app.active_path().to_path_buf();
+    let path = app.resolve_entry_path(location);
 
     match location {
         EntryLocation::Projected(entry) => {
@@ -677,8 +723,17 @@ fn execute_cycle_raw(app: &mut App, location: &EntryLocation) -> io::Result<Opti
             }
             Ok(new_type)
         }
-        EntryLocation::Daily { line_idx } => {
-            if let Line::Entry(raw_entry) = &mut app.lines[*line_idx] {
+        EntryLocation::Daily {
+            line_idx,
+            source_path,
+        } => {
+            if source_path.is_some() || app.combined_view {
+                // Combined mode: persist via storage, then reload
+                let new_type =
+                    storage::cycle_entry_type(app.current_date, &path, *line_idx)?;
+                let _ = app.load_combined_data();
+                Ok(new_type)
+            } else if let Line::Entry(raw_entry) = &mut app.lines[*line_idx] {
                 let new_type = raw_entry.entry_type.cycle();
                 raw_entry.entry_type = new_type.clone();
                 app.save();
@@ -710,7 +765,7 @@ fn set_entry_type_raw(
     location: &EntryLocation,
     entry_type: &EntryType,
 ) -> io::Result<()> {
-    let path = app.active_path().to_path_buf();
+    let path = app.resolve_entry_path(location);
 
     match location {
         EntryLocation::Projected(entry) => {
@@ -725,8 +780,17 @@ fn set_entry_type_raw(
                 projected_entry.entry_type = entry_type.clone();
             }
         }
-        EntryLocation::Daily { line_idx } => {
-            if let Line::Entry(raw_entry) = &mut app.lines[*line_idx] {
+        EntryLocation::Daily {
+            line_idx,
+            source_path,
+        } => {
+            if source_path.is_some() || app.combined_view {
+                let et = entry_type.clone();
+                storage::mutate_entry(app.current_date, &path, *line_idx, move |raw_entry| {
+                    raw_entry.entry_type = et;
+                })?;
+                let _ = app.load_combined_data();
+            } else if let Line::Entry(raw_entry) = &mut app.lines[*line_idx] {
                 raw_entry.entry_type = entry_type.clone();
                 app.save();
             }

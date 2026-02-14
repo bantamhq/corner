@@ -25,6 +25,7 @@ impl App {
 
     pub fn open_journal(&mut self, path: &str) -> io::Result<()> {
         self.save();
+        self.deactivate_combined();
 
         let path = resolve_path(path);
         self.journal_context.set_project_path(path.clone());
@@ -39,6 +40,7 @@ impl App {
             return Ok(());
         }
         self.save();
+        self.deactivate_combined();
         self.journal_context.set_active_slot(slot);
 
         let config_load = match slot {
@@ -85,6 +87,8 @@ impl App {
     }
 
     pub fn switch_to_registered_project(&mut self, id: &str) -> io::Result<()> {
+        self.deactivate_combined();
+
         let registry = ProjectRegistry::load();
         let project = registry.find_by_id(id).ok_or_else(|| {
             io::Error::new(

@@ -12,6 +12,7 @@ hints = [
     { actions = ["delete"], text = "Delete" },
     { actions = ["selection"], text = "Select" },
     { actions = ["undo", "redo"], text = "Undo/Redo" },
+    { actions = ["toggle_combined_view"], text = "Combined" },
     { actions = ["command_palette"], text = "Menu" },
 ]
 

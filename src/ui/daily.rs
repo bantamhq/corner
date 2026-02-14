@@ -1,8 +1,9 @@
-use ratatui::style::{Style, Stylize};
+use ratatui::style::{Modifier, Style, Stylize};
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, EditContext, InputMode, ViewMode};
 use crate::storage::{EntryType, Line};
+use crate::ui::model::RowModel;
 
 use super::helpers::edit_text;
 use super::model::ListModel;
@@ -12,6 +13,10 @@ use super::shared::entry_style;
 use super::theme;
 
 pub fn build_daily_list(app: &App, width: usize) -> ListModel {
+    if app.combined_view {
+        return build_combined_daily_list(app, width);
+    }
+
     let ViewMode::Daily(state) = &app.view else {
         return ListModel::from_rows(None, Vec::new(), app.scroll_offset());
     };
@@ -118,6 +123,71 @@ pub fn build_daily_list(app: &App, width: usize) -> ListModel {
     {
         rows.push(rows::build_message_row(
             "(No entries - press Enter to add)",
+            Style::default().dim(),
+        ));
+    }
+
+    ListModel::from_rows(None, rows, app.scroll_offset())
+}
+
+fn build_combined_daily_list(app: &App, width: usize) -> ListModel {
+    let ViewMode::Daily(state) = &app.view else {
+        return ListModel::from_rows(None, Vec::new(), app.scroll_offset());
+    };
+
+    let mut rows = Vec::new();
+    let mut flat_visible_idx: usize = 0;
+
+    let hidden_count = app.combined_hidden_completed_count();
+    if app.hide_completed && hidden_count > 0 {
+        let message = theme::hidden_entries_label(hidden_count);
+        rows.push(rows::build_message_row(&message, Style::default().dim()));
+    }
+
+    for group in &app.combined_groups {
+        let header_style = Style::default()
+            .fg(theme::PALETTE_ACCENT)
+            .add_modifier(Modifier::BOLD);
+        rows.push(RowModel::from_spans(vec![
+            ratatui::text::Span::styled(format!("── {} ──", group.project_name), header_style),
+        ]));
+
+        for projected_entry in &group.projected_entries {
+            if app.hide_completed && !app.should_show_entry(projected_entry) {
+                continue;
+            }
+            let is_selected = flat_visible_idx == state.selected;
+            rows.push(rows::build_projected_row(
+                app,
+                projected_entry,
+                is_selected,
+                flat_visible_idx,
+                width,
+            ));
+            flat_visible_idx += 1;
+        }
+
+        for &line_idx in &group.entry_indices {
+            if let Line::Entry(entry) = &group.lines[line_idx] {
+                if app.hide_completed && !app.should_show_raw_entry(entry) {
+                    continue;
+                }
+                let is_selected = flat_visible_idx == state.selected;
+                rows.push(rows::build_daily_entry_row(
+                    app,
+                    entry,
+                    is_selected,
+                    flat_visible_idx,
+                    width,
+                ));
+                flat_visible_idx += 1;
+            }
+        }
+    }
+
+    if flat_visible_idx == 0 && hidden_count == 0 {
+        rows.push(rows::build_message_row(
+            "(No entries across journals)",
             Style::default().dim(),
         ));
     }

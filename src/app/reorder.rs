@@ -4,6 +4,11 @@ use super::{App, InputMode, SelectedItem, ViewMode};
 
 impl App {
     pub fn enter_reorder_mode(&mut self) {
+        if self.combined_view {
+            self.set_error("Reorder is not available in combined view");
+            return;
+        }
+
         if matches!(self.get_selected_item(), SelectedItem::Projected { .. }) {
             self.set_error("Cannot reorder projected entries");
             return;

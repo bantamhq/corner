@@ -1,5 +1,6 @@
 pub mod actions;
 mod calendar;
+mod combined;
 mod command;
 mod content;
 mod date_picker;
@@ -19,7 +20,7 @@ pub use hints::{HintContext, HintItem, HintMode};
 
 use std::collections::{BTreeSet, HashMap};
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use chrono::{Local, NaiveDate};
 
@@ -315,6 +316,23 @@ pub enum SidebarType {
     Agenda,
 }
 
+/// A group of entries from a single journal, used in combined view.
+#[derive(Clone)]
+pub struct CombinedGroup {
+    pub project_name: String,
+    pub journal_path: PathBuf,
+    pub lines: Vec<Line>,
+    pub entry_indices: Vec<usize>,
+    pub projected_entries: Vec<Entry>,
+}
+
+/// Position within the combined view's flat selection model.
+pub struct CombinedPosition {
+    pub group_index: usize,
+    pub is_projected: bool,
+    pub entry_index: usize,
+}
+
 /// Status message with error flag for styling
 #[derive(Clone)]
 pub struct StatusMessage {
@@ -361,6 +379,8 @@ pub struct App {
     pub executor: actions::ActionExecutor,
     pub keymap: Keymap,
     pub original_edit_content: Option<String>,
+    /// In combined mode: (journal_path, line_idx) for the Daily entry being edited
+    pub(super) combined_edit_source: Option<(PathBuf, usize)>,
     pub calendar_store: CalendarStore,
     pub calendar_state: CalendarState,
     pub active_sidebar: Option<SidebarType>,
@@ -371,6 +391,10 @@ pub struct App {
     pub(crate) surface: crate::ui::surface::Surface,
     /// Last known modification time of the journal file (for external change detection)
     last_file_mtime: Option<std::time::SystemTime>,
+    /// Whether the combined view (all journals) is active
+    pub combined_view: bool,
+    /// Groups of entries from each journal, populated when combined_view is true
+    pub combined_groups: Vec<CombinedGroup>,
 }
 
 impl App {
@@ -442,6 +466,7 @@ impl App {
             executor: actions::ActionExecutor::new(),
             keymap,
             original_edit_content: None,
+            combined_edit_source: None,
             calendar_store: CalendarStore::new(),
             calendar_state: CalendarState::new(date),
             active_sidebar: match sidebar_default {
@@ -455,6 +480,8 @@ impl App {
             calendar_tx,
             surface,
             last_file_mtime,
+            combined_view: false,
+            combined_groups: Vec::new(),
         };
 
         if hide_completed {
@@ -575,12 +602,17 @@ impl App {
     /// Get the display name for the current journal
     #[must_use]
     pub fn journal_display_name(&self) -> String {
-        match self.active_journal() {
+        let name = match self.active_journal() {
             JournalSlot::Hub => "HUB".to_string(),
             JournalSlot::Project => self
                 .get_current_project_info()
                 .map(|p| p.name)
                 .unwrap_or_else(|| "Project".to_string()),
+        };
+        if self.combined_view {
+            format!("{name} (Combined)")
+        } else {
+            name
         }
     }
 
@@ -702,6 +734,13 @@ impl App {
 
     /// Reloads the current view from disk.
     fn reload_current_view(&mut self) {
+        if self.combined_view {
+            let _ = self.load_combined_data();
+            self.invalidate_agenda_cache();
+            self.refresh_calendar_cache();
+            return;
+        }
+
         match &self.view {
             ViewMode::Daily(_) => {
                 if let Ok(lines) = storage::load_day_lines(self.current_date, self.active_path()) {
@@ -758,6 +797,11 @@ impl App {
     }
 
     pub fn tidy_entries(&mut self) {
+        if self.combined_view {
+            self.set_error("Tidy is not available in combined view");
+            return;
+        }
+
         let entry_positions: Vec<usize> = self
             .lines
             .iter()

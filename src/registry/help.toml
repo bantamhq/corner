@@ -148,6 +148,11 @@ description = "Toggle between hub and project journal"
 category = "views"
 
 [[help]]
+actions = "toggle_combined_view"
+description = "Toggle combined view (all journals)"
+category = "views"
+
+[[help]]
 actions = "toggle_calendar_sidebar"
 description = "Toggle calendar sidebar"
 category = "views"

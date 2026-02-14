@@ -40,7 +40,7 @@ impl App {
         let path = self.active_path().to_path_buf();
 
         match location {
-            EntryLocation::Daily { line_idx } => {
+            EntryLocation::Daily { line_idx, .. } => {
                 if let Line::Entry(raw_entry) = &mut self.lines[*line_idx] {
                     raw_entry.content = content.to_string();
                     self.save();
@@ -73,7 +73,7 @@ impl App {
 
     pub fn get_entry_content(&self, location: &EntryLocation) -> io::Result<String> {
         match location {
-            EntryLocation::Daily { line_idx } => {
+            EntryLocation::Daily { line_idx, .. } => {
                 if let Line::Entry(raw_entry) = &self.lines[*line_idx] {
                     Ok(raw_entry.content.clone())
                 } else {

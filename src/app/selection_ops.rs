@@ -200,6 +200,7 @@ impl App {
 
     fn collect_delete_targets_from_selected(&self) -> Vec<DeleteTarget> {
         let current_date = self.current_date;
+        let active_path = self.active_path().to_path_buf();
         self.collect_targets_from_selected(|entry| match entry {
             SelectedEntry::Projected(projected) => {
                 if matches!(projected.source_type, SourceType::Recurring) {
@@ -210,7 +211,13 @@ impl App {
             }
             SelectedEntry::Daily { line_idx, entry } => Some(DeleteTarget::Daily {
                 line_idx,
-                entry: Entry::from_raw(entry, current_date, line_idx, SourceType::Local),
+                entry: Entry::from_raw(
+                    entry,
+                    current_date,
+                    line_idx,
+                    SourceType::Local,
+                    active_path.clone(),
+                ),
             }),
             SelectedEntry::Filter { index, entry } => Some(DeleteTarget::Filter {
                 index,
@@ -226,9 +233,13 @@ impl App {
                     &projected.entry_type,
                     ToggleTarget::Projected(projected.clone()),
                 ),
-                SelectedEntry::Daily { line_idx, entry } => {
-                    (&entry.entry_type, ToggleTarget::Daily { line_idx })
-                }
+                SelectedEntry::Daily { line_idx, entry } => (
+                    &entry.entry_type,
+                    ToggleTarget::Daily {
+                        line_idx,
+                        source_path: None,
+                    },
+                ),
                 SelectedEntry::Filter { index, entry } => (
                     &entry.entry_type,
                     ToggleTarget::Filter {
@@ -267,7 +278,7 @@ impl App {
                 original_type: projected.entry_type.clone(),
             }),
             SelectedEntry::Daily { line_idx, entry } => Some(super::actions::CycleTarget {
-                location: TagRemovalTarget::Daily { line_idx },
+                location: TagRemovalTarget::Daily { line_idx, source_path: None },
                 original_type: entry.entry_type.clone(),
             }),
             SelectedEntry::Filter { index, entry } => Some(super::actions::CycleTarget {
@@ -289,7 +300,7 @@ impl App {
                 projected.content.clone(),
             )),
             SelectedEntry::Daily { line_idx, entry } => Some(super::actions::ContentTarget::new(
-                TagRemovalTarget::Daily { line_idx },
+                TagRemovalTarget::Daily { line_idx, source_path: None },
                 entry.content.clone(),
             )),
             SelectedEntry::Filter { index, entry } => Some(super::actions::ContentTarget::new(

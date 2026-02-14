@@ -252,6 +252,7 @@ fn dispatch_action(app: &mut App, action: KeyActionId) -> io::Result<bool> {
             }
         }
         TidyEntries => app.tidy_entries(),
+        ToggleCombinedView => app.toggle_combined_view()?,
         Hide => app.toggle_hide_completed(),
         Autocomplete => {
             app.accept_hint();

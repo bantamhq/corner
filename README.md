@@ -357,6 +357,7 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 | Tab | Toggle between daily and filter view |
 | `/` | Open filter prompt |
 | ``` | Toggle between hub and project journal |
+| `c` | Toggle combined view (all journals) |
 | `.` | Toggle calendar sidebar |
 | `,` | Toggle agenda panel |
 

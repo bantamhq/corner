@@ -8,6 +8,11 @@ impl App {
     pub fn cycle_edit_entry_type(&mut self) {
         match &mut self.input_mode {
             InputMode::Edit(EditContext::Daily { entry_index }) => {
+                if let Some((ref path, line_idx)) = self.combined_edit_source {
+                    let _ = storage::cycle_entry_type(self.current_date, path, line_idx);
+                    return;
+                }
+
                 let line_idx = match self.entry_indices.get(*entry_index) {
                     Some(&idx) => idx,
                     None => return,
@@ -102,6 +107,11 @@ impl App {
         original_content: String,
         is_new_entry: bool,
     ) {
+        if let Some((path, line_idx)) = self.combined_edit_source.take() {
+            self.save_combined_edit(path, line_idx, new_content, original_content);
+            return;
+        }
+
         let line_idx = match self.entry_indices.get(entry_index) {
             Some(&idx) => idx,
             None => return,
@@ -130,8 +140,13 @@ impl App {
 
         if is_new_entry {
             if let Line::Entry(raw_entry) = &self.lines[line_idx] {
-                let entry =
-                    Entry::from_raw(raw_entry, self.current_date, line_idx, SourceType::Local);
+                let entry = Entry::from_raw(
+                    raw_entry,
+                    self.current_date,
+                    line_idx,
+                    SourceType::Local,
+                    self.active_path().to_path_buf(),
+                );
                 let target = CreateTarget {
                     date: self.current_date,
                     line_index: line_idx,
@@ -143,7 +158,10 @@ impl App {
             }
         } else if original_content != new_content {
             let target = EditTarget {
-                location: EntryLocation::Daily { line_idx },
+                location: EntryLocation::Daily {
+                    line_idx,
+                    source_path: None,
+                },
                 original_content,
                 new_content,
                 entry_type,
@@ -176,6 +194,7 @@ impl App {
                 source_date: date,
                 line_index,
                 source_type: SourceType::Local,
+                source_journal: path.clone(),
             };
             let target = EditTarget {
                 location: EntryLocation::Filter {
@@ -218,6 +237,7 @@ impl App {
                 source_date: date,
                 line_index,
                 source_type: SourceType::Local,
+                source_journal: path.clone(),
             };
             let target = CreateTarget {
                 date,
@@ -264,6 +284,7 @@ impl App {
     pub fn cancel_edit_mode(&mut self) {
         self.edit_buffer = None;
         self.original_edit_content = None;
+        self.combined_edit_source = None;
 
         if let InputMode::Edit(EditContext::Daily { entry_index }) =
             std::mem::replace(&mut self.input_mode, InputMode::Normal)
@@ -350,6 +371,47 @@ impl App {
     }
 
     pub fn new_task(&mut self, position: InsertPosition) {
+        if self.combined_view {
+            self.set_error("Switch to a journal to add entries");
+            return;
+        }
         self.add_entry_internal(RawEntry::new_task(""), position);
+    }
+
+    fn save_combined_edit(
+        &mut self,
+        path: std::path::PathBuf,
+        line_idx: usize,
+        new_content: String,
+        original_content: String,
+    ) {
+        let new_content = restore_done_meta(&new_content, &original_content);
+
+        if new_content.trim().is_empty() {
+            let _ = storage::delete_entry(self.current_date, &path, line_idx);
+        } else {
+            let entry_type = storage::get_entry_type(self.current_date, &path, line_idx);
+            let _ = storage::update_entry_content(
+                self.current_date,
+                &path,
+                line_idx,
+                new_content.clone(),
+            );
+
+            if original_content != new_content {
+                let target = EditTarget {
+                    location: EntryLocation::Daily {
+                        line_idx,
+                        source_path: Some(path),
+                    },
+                    original_content,
+                    new_content,
+                    entry_type,
+                };
+                let action = EditEntry::new(target);
+                let _ = self.execute_action(Box::new(action));
+            }
+        }
+        let _ = self.load_combined_data();
     }
 }

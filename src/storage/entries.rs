@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use chrono::{Datelike, NaiveDate, Weekday};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -79,6 +81,7 @@ pub struct Entry {
     pub source_date: NaiveDate,
     pub line_index: usize,
     pub source_type: SourceType,
+    pub source_journal: PathBuf,
 }
 
 impl Entry {
@@ -89,6 +92,7 @@ impl Entry {
         source_date: NaiveDate,
         line_index: usize,
         source_type: SourceType,
+        source_journal: PathBuf,
     ) -> Self {
         Self {
             entry_type: raw.entry_type.clone(),
@@ -96,17 +100,24 @@ impl Entry {
             source_date,
             line_index,
             source_type,
+            source_journal,
         }
     }
 
     #[must_use]
-    pub fn new_task(content: &str, source_date: NaiveDate, line_index: usize) -> Self {
+    pub fn new_task(
+        content: &str,
+        source_date: NaiveDate,
+        line_index: usize,
+        source_journal: PathBuf,
+    ) -> Self {
         Self {
             entry_type: EntryType::Task { completed: false },
             content: content.to_string(),
             source_date,
             line_index,
             source_type: SourceType::Local,
+            source_journal,
         }
     }
 

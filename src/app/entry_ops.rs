@@ -1,4 +1,5 @@
 use std::io;
+use std::path::PathBuf;
 
 use chrono::{Datelike, Days, NaiveDate, Weekday};
 
@@ -26,8 +27,12 @@ pub enum DeleteTarget {
 pub enum EntryLocation {
     /// Projected entry (Recurring) - Entry has source_date, line_index, source_type
     Projected(Entry),
-    /// Local entry in daily view - line_idx is index in self.lines
-    Daily { line_idx: usize },
+    /// Local entry in daily view - line_idx is index in self.lines.
+    /// source_path is Some in combined mode to route writes to the correct journal.
+    Daily {
+        line_idx: usize,
+        source_path: Option<PathBuf>,
+    },
     /// Entry in filter view - index is position in filter results
     Filter { index: usize, entry: Entry },
 }
@@ -71,7 +76,17 @@ impl App {
     fn extract_location_from_current(&self) -> Option<EntryLocation> {
         match self.get_selected_item() {
             SelectedItem::Projected { entry, .. } => Some(EntryLocation::Projected(entry.clone())),
-            SelectedItem::Daily { line_idx, .. } => Some(EntryLocation::Daily { line_idx }),
+            SelectedItem::Daily { line_idx, .. } => {
+                let source_path = if self.combined_view {
+                    self.resolve_combined_journal_path(self.view.selected())
+                } else {
+                    None
+                };
+                Some(EntryLocation::Daily {
+                    line_idx,
+                    source_path,
+                })
+            }
             SelectedItem::Filter { index, entry } => Some(EntryLocation::Filter {
                 index,
                 entry: entry.clone(),
@@ -80,7 +95,6 @@ impl App {
         }
     }
 
-    /// Extract delete target from current selection
     pub fn extract_delete_target_from_current(&self) -> Option<DeleteTarget> {
         match self.get_selected_item() {
             SelectedItem::Projected { entry, .. } => Some(DeleteTarget::Projected(entry.clone())),
@@ -88,10 +102,21 @@ impl App {
                 line_idx,
                 entry: raw_entry,
                 ..
-            } => Some(DeleteTarget::Daily {
-                line_idx,
-                entry: Entry::from_raw(raw_entry, self.current_date, line_idx, SourceType::Local),
-            }),
+            } => {
+                let source_journal = self
+                    .resolve_combined_journal_path(self.view.selected())
+                    .unwrap_or_else(|| self.active_path().to_path_buf());
+                Some(DeleteTarget::Daily {
+                    line_idx,
+                    entry: Entry::from_raw(
+                        raw_entry,
+                        self.current_date,
+                        line_idx,
+                        SourceType::Local,
+                        source_journal,
+                    ),
+                })
+            }
             SelectedItem::Filter { index, entry } => Some(DeleteTarget::Filter {
                 index,
                 entry: entry.clone(),
@@ -137,52 +162,76 @@ impl App {
     }
 
     pub fn execute_toggle(&mut self, target: ToggleTarget) -> io::Result<()> {
-        let path = self.active_path().to_path_buf();
         match target {
-            ToggleTarget::Projected(entry) => {
-                let Some(content) =
-                    storage::get_entry_content(entry.source_date, &path, entry.line_index)
-                else {
-                    return Ok(());
-                };
-
-                let new_content = if is_done_on_date(&content, self.current_date) {
-                    remove_done_date(&content, self.current_date)
-                } else {
-                    add_done_date(&content, self.current_date)
-                };
-
-                storage::update_entry_content(
-                    entry.source_date,
-                    &path,
-                    entry.line_index,
-                    new_content,
-                )?;
-                self.refresh_projected_entries();
+            ToggleTarget::Projected(ref entry) => {
+                self.toggle_projected_entry(entry)?;
             }
-            ToggleTarget::Daily { line_idx } => {
-                if let Line::Entry(raw_entry) = &mut self.lines[line_idx] {
-                    raw_entry.toggle_complete();
-                    self.save();
-                    if self.hide_completed {
-                        self.clamp_selection_to_visible();
-                    }
-                }
+            ToggleTarget::Daily {
+                line_idx,
+                ref source_path,
+            } => {
+                self.toggle_daily_entry(line_idx, source_path.as_ref())?;
             }
-            ToggleTarget::Filter { index, entry } => {
-                storage::toggle_entry_complete(entry.source_date, &path, entry.line_index)?;
-
-                if let ViewMode::Filter(state) = &mut self.view {
-                    let filter_entry = &mut state.entries[index];
-                    if let EntryType::Task { completed } = &mut filter_entry.entry_type {
-                        *completed = !*completed;
-                    }
-                }
-
-                if entry.source_date == self.current_date {
-                    self.reload_current_day()?;
-                }
+            ToggleTarget::Filter { index, ref entry } => {
+                self.toggle_filter_entry(index, entry)?;
             }
+        }
+        Ok(())
+    }
+
+    fn toggle_projected_entry(&mut self, entry: &Entry) -> io::Result<()> {
+        let path = self.resolve_entry_path(&EntryLocation::Projected(entry.clone()));
+        let Some(content) = storage::get_entry_content(entry.source_date, &path, entry.line_index)
+        else {
+            return Ok(());
+        };
+
+        let new_content = if is_done_on_date(&content, self.current_date) {
+            remove_done_date(&content, self.current_date)
+        } else {
+            add_done_date(&content, self.current_date)
+        };
+
+        storage::update_entry_content(entry.source_date, &path, entry.line_index, new_content)?;
+
+        if self.combined_view {
+            let _ = self.load_combined_data();
+        } else {
+            self.refresh_projected_entries();
+        }
+        Ok(())
+    }
+
+    fn toggle_daily_entry(&mut self, line_idx: usize, source_path: Option<&PathBuf>) -> io::Result<()> {
+        if let Some(path) = source_path {
+            storage::toggle_entry_complete(self.current_date, path, line_idx)?;
+            let _ = self.load_combined_data();
+        } else if let Line::Entry(raw_entry) = &mut self.lines[line_idx] {
+            raw_entry.toggle_complete();
+            self.save();
+        }
+        if self.hide_completed {
+            self.clamp_selection_to_visible();
+        }
+        Ok(())
+    }
+
+    fn toggle_filter_entry(&mut self, index: usize, entry: &Entry) -> io::Result<()> {
+        let path = self.resolve_entry_path(&EntryLocation::Filter {
+            index,
+            entry: entry.clone(),
+        });
+        storage::toggle_entry_complete(entry.source_date, &path, entry.line_index)?;
+
+        if let ViewMode::Filter(state) = &mut self.view
+            && let Some(filter_entry) = state.entries.get_mut(index)
+            && let EntryType::Task { completed } = &mut filter_entry.entry_type
+        {
+            *completed = !*completed;
+        }
+
+        if entry.source_date == self.current_date {
+            self.reload_current_day()?;
         }
         Ok(())
     }
@@ -195,25 +244,45 @@ impl App {
     }
 
     pub fn edit_current_entry(&mut self) {
-        let (ctx, content) = match self.get_selected_item() {
+        // Extract edit info from selection (before any mutable borrows)
+        let edit_info = match self.get_selected_item() {
             SelectedItem::Projected { .. } => {
                 self.set_status("Press o to go to source");
                 return;
             }
-            SelectedItem::Daily { index, entry, .. } => (
+            SelectedItem::Daily {
+                index,
+                line_idx,
+                entry,
+            } => Some((
                 EditContext::Daily { entry_index: index },
                 entry.content.clone(),
-            ),
-            SelectedItem::Filter { index, entry } => (
+                Some(line_idx),
+            )),
+            SelectedItem::Filter { index, entry } => Some((
                 EditContext::FilterEdit {
                     date: entry.source_date,
                     line_index: entry.line_index,
                     filter_index: index,
                 },
                 entry.content.clone(),
-            ),
-            SelectedItem::None => return,
+                None,
+            )),
+            SelectedItem::None => None,
         };
+
+        let Some((ctx, content, daily_line_idx)) = edit_info else {
+            return;
+        };
+
+        if let Some(line_idx) = daily_line_idx
+            && self.combined_view
+        {
+            let source_path = self
+                .resolve_combined_journal_path(self.view.selected())
+                .unwrap_or_else(|| self.active_path().to_path_buf());
+            self.combined_edit_source = Some((source_path, line_idx));
+        }
 
         // Keep original with metadata for restoration on save
         self.original_edit_content = Some(content.clone());
@@ -356,6 +425,10 @@ impl App {
     }
 
     pub fn paste_from_clipboard(&mut self) -> io::Result<()> {
+        if self.combined_view {
+            self.set_error("Switch to a journal to paste entries");
+            return Ok(());
+        }
         let text = match Self::read_from_clipboard() {
             Ok(t) => t,
             Err(e) => {
@@ -403,7 +476,7 @@ impl App {
             .map(|(i, raw)| {
                 let line_idx = insert_pos + i;
                 lines.insert(line_idx, Line::Entry(raw.clone()));
-                Entry::from_raw(raw, date, line_idx, SourceType::Local)
+                Entry::from_raw(raw, date, line_idx, SourceType::Local, path.clone())
             })
             .collect();
 
@@ -453,6 +526,10 @@ impl App {
     }
 
     fn move_current_entry_to_date(&mut self, target_date: NaiveDate) -> io::Result<()> {
+        if self.combined_view {
+            self.set_error("Move is not available in combined view");
+            return Ok(());
+        }
         if let SelectedItem::Projected { .. } = self.get_selected_item() {
             self.set_status("Press o to go to source");
             return Ok(());
