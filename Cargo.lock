@@ -101,29 +101,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b35204fbdc0b3f4446b89fc1ac2cf84a8a68971995d0bf2e925ec7cd960f9cb3"
 
 [[package]]
-name = "caliber"
-version = "1.0.2"
-dependencies = [
- "arboard",
- "chrono",
- "chrono-tz 0.10.4",
- "crossterm",
- "dirs",
- "ical",
- "libc",
- "ratatui",
- "regex",
- "reqwest",
- "rrule",
- "serde",
- "tempfile",
- "time",
- "tokio",
- "toml",
- "unicode-width 0.2.0",
-]
-
-[[package]]
 name = "cassowary"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -234,6 +211,29 @@ name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
+
+[[package]]
+name = "corner"
+version = "0.1.0"
+dependencies = [
+ "arboard",
+ "chrono",
+ "chrono-tz 0.10.4",
+ "crossterm",
+ "dirs",
+ "ical",
+ "libc",
+ "ratatui",
+ "regex",
+ "reqwest",
+ "rrule",
+ "serde",
+ "tempfile",
+ "time",
+ "tokio",
+ "toml",
+ "unicode-width 0.2.0",
+]
 
 [[package]]
 name = "crc32fast"

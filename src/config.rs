@@ -41,7 +41,7 @@ impl ProfileContext {
         ProfileContext {
             config_dir: profile_path,
             project_root: project_root
-                .join(".caliber")
+                .join(".corner")
                 .exists()
                 .then_some(project_root),
         }
@@ -89,12 +89,12 @@ pub fn get_profile_project_root() -> Option<&'static Path> {
 /// Get the default config directory (without profile override).
 fn default_config_dir() -> PathBuf {
     if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
-        PathBuf::from(xdg).join("caliber")
+        PathBuf::from(xdg).join("corner")
     } else {
         dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join(".config")
-            .join("caliber")
+            .join("corner")
     }
 }
 
@@ -483,7 +483,7 @@ impl Config {
     /// Load project config from a specific project root path
     pub fn load_merged_from(project_root: &Path) -> io::Result<ConfigLoad> {
         let (base, base_warning) = load_base_config();
-        let project_path = project_root.join(".caliber").join("config.toml");
+        let project_path = project_root.join(".corner").join("config.toml");
         let (config, overlay_warning) = apply_overlay(base, &project_path, "Project");
         Ok(ConfigLoad {
             config,
@@ -521,13 +521,13 @@ impl Config {
         }
     }
 
-    /// Get project journal path, defaulting to .caliber/journal.md if not configured.
+    /// Get project journal path, defaulting to .corner/journal.md if not configured.
     #[must_use]
     pub fn get_project_journal_path(&self, project_root: &Path) -> PathBuf {
         if let Some(ref file) = self.journal_file {
             expand_tilde(file)
         } else {
-            project_root.join(".caliber").join("journal.md")
+            project_root.join(".corner").join("journal.md")
         }
     }
 }
@@ -621,14 +621,14 @@ fn apply_overlay(
 
 fn get_project_config_path() -> Option<PathBuf> {
     if let Some(root) = find_git_root() {
-        let path = root.join(".caliber").join("config.toml");
+        let path = root.join(".corner").join("config.toml");
         if path.exists() {
             return Some(path);
         }
     }
 
     let cwd = std::env::current_dir().ok()?;
-    let path = cwd.join(".caliber").join("config.toml");
+    let path = cwd.join(".corner").join("config.toml");
     if path.exists() {
         return Some(path);
     }

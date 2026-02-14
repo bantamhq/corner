@@ -9,11 +9,11 @@ use crossterm::{
 };
 use ratatui::{Terminal, backend::CrosstermBackend};
 
-use caliber::app::{App, InputMode};
-use caliber::config::{self, Config, get_profile_project_root, has_custom_profile, init_profile};
-use caliber::storage::{JournalContext, JournalSlot};
-use caliber::ui::surface::Surface;
-use caliber::{handlers, storage, testrun, ui};
+use corner::app::{App, InputMode};
+use corner::config::{self, Config, get_profile_project_root, has_custom_profile, init_profile};
+use corner::storage::{JournalContext, JournalSlot};
+use corner::ui::surface::Surface;
+use corner::{handlers, storage, testrun, ui};
 
 fn main() -> Result<(), io::Error> {
     let args: Vec<String> = std::env::args().collect();
@@ -21,7 +21,7 @@ fn main() -> Result<(), io::Error> {
     let (recorder_name, remaining_args) = parse_record_arg(&remaining_args);
     let recorder = recorder_name.map(|name| {
         let name = name.strip_suffix(".tape").unwrap_or(&name).to_string();
-        caliber::recorder::Recorder::new(name)
+        corner::recorder::Recorder::new(name)
     });
 
     let temp_dir = testrun_path
@@ -122,7 +122,7 @@ fn run_app<B: ratatui::backend::Backend>(
     journal_context: JournalContext,
     surface: Surface,
     config_warning: Option<String>,
-    mut recorder: Option<caliber::recorder::Recorder>,
+    mut recorder: Option<corner::recorder::Recorder>,
 ) -> io::Result<()> {
     let date = chrono::Local::now().date_naive();
 
@@ -144,18 +144,18 @@ fn run_app<B: ratatui::backend::Backend>(
         && app.in_git_repo
         && let Some(git_root) = storage::find_git_root()
     {
-        let caliber_dir = git_root.join(".caliber");
+        let corner_dir = git_root.join(".corner");
 
-        if caliber_dir.exists() {
+        if corner_dir.exists() {
             let mut registry = storage::ProjectRegistry::load();
-            if registry.find_by_path(&caliber_dir).is_none() {
-                let _ = registry.register(caliber_dir.clone());
+            if registry.find_by_path(&corner_dir).is_none() {
+                let _ = registry.register(corner_dir.clone());
                 let _ = registry.save();
             }
         }
 
         if app.journal_context.project_path().is_none() && app.config.auto_init_project {
-            fs::create_dir_all(&caliber_dir)?;
+            fs::create_dir_all(&corner_dir)?;
 
             let journal_path = app.config.get_project_journal_path(&git_root);
             if !journal_path.exists() {
@@ -166,8 +166,8 @@ fn run_app<B: ratatui::backend::Backend>(
             }
 
             let mut registry = storage::ProjectRegistry::load();
-            if registry.find_by_path(&caliber_dir).is_none() {
-                let _ = registry.register(caliber_dir.clone());
+            if registry.find_by_path(&corner_dir).is_none() {
+                let _ = registry.register(corner_dir.clone());
                 let _ = registry.save();
             }
 

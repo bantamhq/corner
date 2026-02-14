@@ -19,7 +19,7 @@ pub fn parse_arg(args: &[String]) -> (Option<PathBuf>, Vec<String>) {
 }
 
 pub fn create_temp_profile(source: &Path) -> io::Result<PathBuf> {
-    let temp_dir = std::env::temp_dir().join(format!("caliber-testrun-{}", std::process::id()));
+    let temp_dir = std::env::temp_dir().join(format!("corner-testrun-{}", std::process::id()));
     fs::create_dir_all(&temp_dir)?;
 
     for file in [
@@ -34,7 +34,7 @@ pub fn create_temp_profile(source: &Path) -> io::Result<PathBuf> {
         }
     }
 
-    for subdir in ["calendars", "project/.caliber"] {
+    for subdir in ["calendars", "project/.corner"] {
         let src_dir = source.join(subdir);
         if src_dir.exists() {
             let dst_dir = temp_dir.join(subdir);

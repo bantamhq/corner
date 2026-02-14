@@ -61,7 +61,7 @@ impl App {
                 self.open_in_editor(&path)?;
             }
             "add-gitignore" => {
-                self.add_caliber_to_gitignore();
+                self.add_corner_to_gitignore();
             }
             _ => {}
         }
@@ -103,20 +103,20 @@ impl App {
         Ok(())
     }
 
-    fn add_caliber_to_gitignore(&mut self) {
+    fn add_corner_to_gitignore(&mut self) {
         let Some(git_root) = find_git_root() else {
             self.set_error("Not in a git repository");
             return;
         };
 
         let gitignore_path = git_root.join(".gitignore");
-        let entry = ".caliber";
+        let entry = ".corner";
 
         if gitignore_path.exists()
             && let Ok(content) = fs::read_to_string(&gitignore_path)
             && content.lines().any(|line| line.trim() == entry)
         {
-            self.set_status(".caliber already in .gitignore");
+            self.set_status(".corner already in .gitignore");
             return;
         }
 
@@ -148,6 +148,6 @@ impl App {
             return;
         }
 
-        self.set_status("Added .caliber to .gitignore");
+        self.set_status("Added .corner to .gitignore");
     }
 }

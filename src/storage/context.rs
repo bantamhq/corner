@@ -79,9 +79,9 @@ pub fn find_git_root() -> Option<PathBuf> {
 #[must_use]
 pub fn detect_project_journal() -> Option<PathBuf> {
     let root = find_git_root().or_else(|| std::env::current_dir().ok())?;
-    let caliber_dir = root.join(".caliber");
+    let corner_dir = root.join(".corner");
 
-    if !caliber_dir.exists() {
+    if !corner_dir.exists() {
         return None;
     }
 

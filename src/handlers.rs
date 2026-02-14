@@ -430,8 +430,8 @@ pub fn handle_confirm_key(app: &mut App, key: KeyCode) -> io::Result<()> {
                     std::env::current_dir()?
                 };
 
-                let caliber_dir = root.join(".caliber");
-                if let Err(e) = std::fs::create_dir_all(&caliber_dir) {
+                let corner_dir = root.join(".corner");
+                if let Err(e) = std::fs::create_dir_all(&corner_dir) {
                     app.set_error(format!("Failed to create project: {e}"));
                     app.input_mode = InputMode::Normal;
                     return Ok(());
@@ -457,10 +457,10 @@ pub fn handle_confirm_key(app: &mut App, key: KeyCode) -> io::Result<()> {
                     }
                 }
 
-                if std::env::var("CALIBER_SKIP_REGISTRY").is_err() {
+                if std::env::var("CORNER_SKIP_REGISTRY").is_err() {
                     let mut registry = storage::ProjectRegistry::load();
-                    if registry.find_by_path(&caliber_dir).is_none() {
-                        let _ = registry.register(caliber_dir);
+                    if registry.find_by_path(&corner_dir).is_none() {
+                        let _ = registry.register(corner_dir);
                         let _ = registry.save();
                     }
                 }

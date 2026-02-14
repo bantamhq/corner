@@ -4,7 +4,7 @@ use chrono::NaiveDate;
 use crossterm::event::{KeyCode, KeyModifiers};
 use helpers::TestContext;
 
-use caliber::app::InputMode;
+use corner::app::InputMode;
 
 #[test]
 fn selection_valid_after_delete_operations() {

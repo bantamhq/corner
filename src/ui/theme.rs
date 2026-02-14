@@ -178,7 +178,7 @@ pub const TITLE_REMOVE_FROM_COMPLETED: &str = " Remove from Completed ";
 
 // UI Labels - Confirm dialog messages
 pub const MSG_NO_PROJECT_JOURNAL: &str = "No project journal found.";
-pub const MSG_CREATE_PROJECT_JOURNAL: &str = "Create .caliber/journal.md?";
+pub const MSG_CREATE_PROJECT_JOURNAL: &str = "Create .corner/journal.md?";
 
 // UI Labels - Daily view
 #[must_use]

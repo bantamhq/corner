@@ -403,8 +403,8 @@ impl App {
 
     fn is_test_environment() -> bool {
         // cfg(test) only works for unit tests in this crate.
-        // For integration tests, we check CALIBER_SKIP_CLIPBOARD which TestContext sets.
-        cfg!(test) || std::env::var("CALIBER_SKIP_CLIPBOARD").is_ok()
+        // For integration tests, we check CORNER_SKIP_CLIPBOARD which TestContext sets.
+        cfg!(test) || std::env::var("CORNER_SKIP_CLIPBOARD").is_ok()
     }
 
     pub(super) fn copy_to_clipboard(text: &str) -> Result<(), arboard::Error> {

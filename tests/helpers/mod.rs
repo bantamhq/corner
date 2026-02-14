@@ -6,12 +6,12 @@ use chrono::NaiveDate;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tempfile::TempDir;
 
-use caliber::app::{App, InputMode, ViewMode};
-use caliber::config::Config;
-use caliber::handlers;
-use caliber::storage::{JournalContext, JournalSlot};
-use caliber::ui;
-use caliber::ui::surface::Surface;
+use corner::app::{App, InputMode, ViewMode};
+use corner::config::Config;
+use corner::handlers;
+use corner::storage::{JournalContext, JournalSlot};
+use corner::ui;
+use corner::ui::surface::Surface;
 
 pub struct TestContext {
     pub app: App,
@@ -22,8 +22,8 @@ impl TestContext {
     pub fn new() -> Self {
         // SAFETY: Tests run single-threaded per test file, env var is set before any other work
         unsafe {
-            std::env::set_var("CALIBER_SKIP_CLIPBOARD", "1");
-            std::env::set_var("CALIBER_SKIP_REGISTRY", "1");
+            std::env::set_var("CORNER_SKIP_CLIPBOARD", "1");
+            std::env::set_var("CORNER_SKIP_REGISTRY", "1");
         }
         Self::with_date(NaiveDate::from_ymd_opt(2026, 1, 15).unwrap())
     }
@@ -31,8 +31,8 @@ impl TestContext {
     pub fn with_date(date: NaiveDate) -> Self {
         // SAFETY: Tests run single-threaded per test file, env var is set before any other work
         unsafe {
-            std::env::set_var("CALIBER_SKIP_CLIPBOARD", "1");
-            std::env::set_var("CALIBER_SKIP_REGISTRY", "1");
+            std::env::set_var("CORNER_SKIP_CLIPBOARD", "1");
+            std::env::set_var("CORNER_SKIP_REGISTRY", "1");
         }
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let journal_path = temp_dir.path().join("test_journal.md");
@@ -54,8 +54,8 @@ impl TestContext {
     pub fn with_config_and_content(date: NaiveDate, content: &str, config: Config) -> Self {
         // SAFETY: Tests run single-threaded per test file, env var is set before any other work
         unsafe {
-            std::env::set_var("CALIBER_SKIP_CLIPBOARD", "1");
-            std::env::set_var("CALIBER_SKIP_REGISTRY", "1");
+            std::env::set_var("CORNER_SKIP_CLIPBOARD", "1");
+            std::env::set_var("CORNER_SKIP_REGISTRY", "1");
         }
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let journal_path = temp_dir.path().join("test_journal.md");

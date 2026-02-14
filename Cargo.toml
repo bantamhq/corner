@@ -1,10 +1,10 @@
 [package]
-name = "caliber"
-version = "1.0.2"
+name = "corner"
+version = "0.1.0"
 edition = "2024"
 description = "A terminal-based task journal for developers. Capture ideas without leaving your workflow, find them when you need them."
 license = "MIT"
-repository = "https://github.com/bantamhq/caliber"
+repository = "https://github.com/bantamhq/corner"
 readme = "README.md"
 keywords = ["tui", "terminal", "bullet-journal", "todo", "productivity"]
 categories = ["command-line-utilities"]

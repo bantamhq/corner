@@ -1,8 +1,8 @@
-# Caliber
+# Corner
 
 A terminal-based task journal for developers. Capture ideas without leaving your workflow, find them when you need them.
 
-![caliber demo](docs/examples/hero.gif)
+![corner demo](docs/examples/hero.gif)
 
 - **Keyboard-driven** — Vim-style navigation that feels natural in the terminal
 - **Zero-friction capture** — Press enter and start typing, organize later or don't
@@ -11,9 +11,9 @@ A terminal-based task journal for developers. Capture ideas without leaving your
 - **Filter everything** — Search your entire history by tags, dates, or text
 - **Plain markdown** — Commit it, edit it anywhere, let AI agents read it for context
 
-## Why Caliber?
+## Why Corner?
 
-If you live in the terminal, context-switching to a GUI app just to jot down a task breaks your flow. Caliber lives where you work.
+If you live in the terminal, context-switching to a GUI app just to jot down a task breaks your flow. Corner lives where you work.
 
 Tab over, press enter, start typing. That's it. No forms, no fields, no friction.
 
@@ -27,30 +27,30 @@ Your journal is a plain markdown file. Commit it to your repo, read it on your p
 
 **Homebrew (macOS/Linux)**
 ```bash
-brew install bantamhq/tap/caliber
+brew install bantamhq/tap/corner
 ```
 
 **Shell (macOS/Linux)**
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://github.com/bantamhq/caliber/releases/latest/download/caliber-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -sSf https://github.com/bantamhq/corner/releases/latest/download/corner-installer.sh | sh
 ```
 
 **Cargo**
 ```bash
-cargo install caliber
+cargo install corner
 ```
 
 **Manual**
 
-Download the latest binary for your platform from [Releases](https://github.com/bantamhq/caliber/releases).
+Download the latest binary for your platform from [Releases](https://github.com/bantamhq/corner/releases).
 
 ## Quick Start
 
 ```bash
-caliber                  # Open your journal
+corner                   # Open your journal
 ```
 
-Launch Caliber in a git repository and it will auto-init a project journal (configurable). Otherwise, you'll start in your hub journal.
+Launch Corner in a git repository and it will auto-init a project journal (configurable). Otherwise, you'll start in your hub journal.
 
 **The basics:**
 
@@ -208,7 +208,7 @@ Most actions can be undone with `u` and redone with `U`. Undo history clears whe
 
 ## Project Registry
 
-Caliber maintains a project registry at `~/.config/caliber/projects.toml` used by the command palette.
+Corner maintains a project registry at `~/.config/corner/projects.toml` used by the command palette.
 You can hide a project from the palette via `hide_from_registry = true` in the project config.
 
 ## Command Palette
@@ -217,7 +217,7 @@ Press `q` to open the command palette. It provides access to commands, projects,
 
 ## Sidebars
 
-Caliber has two optional sidebars that can be toggled on and off:
+Corner has two optional sidebars that can be toggled on and off:
 
 - **Calendar sidebar** (`.`) — Shows a monthly calendar with days that have entries highlighted. Useful for navigating to specific dates.
 - **Agenda panel** (`,`) — Shows upcoming events from connected calendars (see Calendar Integration below).
@@ -231,7 +231,7 @@ sidebar_default = "calendar"
 
 ## Calendar Integration
 
-Caliber can display events from external ICS calendar feeds in the agenda panel. Events appear alongside your journal entries, giving you a unified view of your day.
+Corner can display events from external ICS calendar feeds in the agenda panel. Events appear alongside your journal entries, giving you a unified view of your day.
 
 ### Setup
 
@@ -356,7 +356,7 @@ Now `/$next` expands to `!tasks #next`. Combine them: `$t #work` expands to `!ta
 
 ## Journal Format
 
-Caliber uses a markdown-compatible format:
+Corner uses a markdown-compatible format:
 
 ```markdown
 # 2025/01/15
@@ -374,15 +374,15 @@ Empty days are automatically removed. Non-entry lines (headers, blank lines, raw
 
 ## Configuration
 
-Config file: `~/.config/caliber/config.toml`
+Config file: `~/.config/corner/config.toml`
 
-Run `caliber init` to create an empty config file. Configuration is optional — Caliber works out of the box with sensible defaults.
+Run `corner init` to create an empty config file. Configuration is optional — Corner works out of the box with sensible defaults.
 
 ```toml
-# Custom hub journal path (default: ~/.config/caliber/hub_journal.md)
+# Custom hub journal path (default: ~/.config/corner/hub_journal.md)
 hub_file = "/path/to/journal.md"
 
-# Custom scratchpad path (default: ~/.config/caliber/scratchpad.md)
+# Custom scratchpad path (default: ~/.config/corner/scratchpad.md)
 scratchpad_file = "~/notes/scratchpad.md"
 
 # Start with completed tasks hidden (default: false)
@@ -398,7 +398,7 @@ header_date_format = "%A, %b %-d"
 # Default filter when pressing '/' (default: "!tasks")
 default_filter = "!tasks"
 
-# Auto-create project journal when opening Caliber in a git repo (default: true)
+# Auto-create project journal when opening Corner in a git repo (default: true)
 auto_init_project = true
 
 # Skip weekends when deferring with '>' (defer Friday → Monday) (default: false)
@@ -425,19 +425,19 @@ e = "!events"
 
 ### Project Configuration
 
-Project config at `.caliber/config.toml` overlays the base config — project values override matching keys, while unset options inherit from your base `config.toml`. Similarly, `hub_config.toml` can override settings specifically for your hub journal.
+Project config at `.corner/config.toml` overlays the base config — project values override matching keys, while unset options inherit from your base `config.toml`. Similarly, `hub_config.toml` can override settings specifically for your hub journal.
 
 Project-specific options:
 
 ```toml
-# Custom journal path for this project (default: .caliber/journal.md)
-journal_file = ".caliber/journal.md"
+# Custom journal path for this project (default: .corner/journal.md)
+journal_file = ".corner/journal.md"
 
 # Hide this project from the command palette
 hide_from_registry = false
 ```
 
-When you launch Caliber in a git repository, it will offer to create a project journal for you. If you declined or want to create one outside a git repo, run `caliber init project`.
+When you launch Corner in a git repository, it will offer to create a project journal for you. If you declined or want to create one outside a git repo, run `corner init project`.
 
 ### Key Remapping
 

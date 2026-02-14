@@ -71,8 +71,8 @@ impl ProjectRegistry {
         let mut seen_ids = Vec::new();
 
         for reg in file.project {
-            let caliber_path = normalize_to_caliber_dir(&reg.path);
-            if let Some(mut info) = resolve_project_info(&caliber_path, reg.calendars) {
+            let corner_path = normalize_to_corner_dir(&reg.path);
+            if let Some(mut info) = resolve_project_info(&corner_path, reg.calendars) {
                 let base_id = info.id.clone();
                 let mut final_id = base_id.clone();
                 let mut counter = 2;
@@ -116,19 +116,19 @@ impl ProjectRegistry {
     }
 
     pub fn register(&mut self, path: PathBuf) -> io::Result<ProjectInfo> {
-        let caliber_path = normalize_to_caliber_dir(&path);
+        let corner_path = normalize_to_corner_dir(&path);
 
-        if self.find_by_path(&caliber_path).is_some() {
+        if self.find_by_path(&corner_path).is_some() {
             return Err(io::Error::new(
                 io::ErrorKind::AlreadyExists,
                 "Project already registered",
             ));
         }
 
-        let Some(mut info) = resolve_project_info(&caliber_path, None) else {
+        let Some(mut info) = resolve_project_info(&corner_path, None) else {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
-                "Invalid project path - must be a .caliber/ directory",
+                "Invalid project path - must be a .corner/ directory",
             ));
         };
 
@@ -151,11 +151,11 @@ impl ProjectRegistry {
         self.projects.iter().find(|p| p.id.eq_ignore_ascii_case(id))
     }
 
-    /// Find project by path (accepts either .caliber/ or .caliber/journal.md)
+    /// Find project by path (accepts either .corner/ or .corner/journal.md)
     #[must_use]
     pub fn find_by_path(&self, path: &Path) -> Option<&ProjectInfo> {
-        let caliber_path = normalize_to_caliber_dir(path);
-        self.projects.iter().find(|p| p.path == caliber_path)
+        let corner_path = normalize_to_corner_dir(path);
+        self.projects.iter().find(|p| p.path == corner_path)
     }
 
     /// Generate a unique ID from a base, adding suffix for collisions
@@ -205,10 +205,10 @@ fn load_registry_file() -> io::Result<ProjectRegistryFile> {
     }
 }
 
-/// Accepts either /path/.caliber/ or /path/.caliber/journal.md
-fn normalize_to_caliber_dir(path: &Path) -> PathBuf {
+/// Accepts either /path/.corner/ or /path/.corner/journal.md
+fn normalize_to_corner_dir(path: &Path) -> PathBuf {
     if let Some(parent) = path.parent()
-        && parent.file_name().and_then(|n| n.to_str()) == Some(".caliber")
+        && parent.file_name().and_then(|n| n.to_str()) == Some(".corner")
     {
         return parent.to_path_buf();
     }
@@ -216,27 +216,27 @@ fn normalize_to_caliber_dir(path: &Path) -> PathBuf {
 }
 
 fn resolve_project_info(
-    caliber_path: &Path,
+    corner_path: &Path,
     calendars: Option<Vec<String>>,
 ) -> Option<ProjectInfo> {
     use crate::config::Config;
 
-    if caliber_path.file_name()?.to_str()? != ".caliber" {
+    if corner_path.file_name()?.to_str()? != ".corner" {
         return None;
     }
-    let root = caliber_path.parent()?;
+    let root = corner_path.parent()?;
 
     // Check config for custom journal location
     let journal_path = Config::load_merged_from(root)
         .map(|c| c.config.get_project_journal_path(root))
-        .unwrap_or_else(|_| caliber_path.join("journal.md"));
+        .unwrap_or_else(|_| corner_path.join("journal.md"));
     let available = journal_path.exists();
 
     let (name, id) = derive_identity(root);
-    let hide_from_registry = load_hide_from_registry(&caliber_path.join("config.toml"));
+    let hide_from_registry = load_hide_from_registry(&corner_path.join("config.toml"));
 
     Some(ProjectInfo {
-        path: caliber_path.to_path_buf(),
+        path: corner_path.to_path_buf(),
         root: root.to_path_buf(),
         name,
         id,
@@ -261,8 +261,8 @@ fn load_hide_from_registry(config_path: &Path) -> bool {
 }
 
 /// Set hide_from_registry in a project's config file, preserving other settings.
-pub fn set_hide_from_registry(caliber_path: &Path, hide: bool) -> io::Result<()> {
-    let config_path = caliber_path.join("config.toml");
+pub fn set_hide_from_registry(corner_path: &Path, hide: bool) -> io::Result<()> {
+    let config_path = corner_path.join("config.toml");
 
     let mut config: toml::Table = if config_path.exists() {
         let content = fs::read_to_string(&config_path)?;

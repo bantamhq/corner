@@ -8,7 +8,7 @@ use crate::config::get_config_dir;
 static HTTP_CLIENT: LazyLock<Option<Client>> = LazyLock::new(|| {
     Client::builder()
         .timeout(Duration::from_secs(30))
-        .user_agent("Caliber/1.0")
+        .user_agent(concat!("Corner/", env!("CARGO_PKG_VERSION")))
         .build()
         .ok()
 });
@@ -45,7 +45,7 @@ pub async fn fetch_calendar(url: &str) -> Result<String, String> {
 /// Fetch a local ICS file.
 /// Paths can be:
 /// - Absolute: /path/to/file.ics
-/// - Relative: resolved from config directory (profile or ~/.config/caliber)
+/// - Relative: resolved from config directory (profile or ~/.config/corner)
 fn fetch_local_file(path: &str) -> Result<String, String> {
     let path = Path::new(path);
     let file_path = if path.is_absolute() {

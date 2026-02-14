@@ -39,4 +39,4 @@ help = "Open current journal in default editor"
 [[command]]
 name = "add-gitignore"
 group = "Project"
-help = "Add .caliber to project's .gitignore"
+help = "Add .corner to project's .gitignore"
